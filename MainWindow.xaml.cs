@@ -25,6 +25,17 @@ namespace RobotControllerApp
             this.Title = "Telepresence Control Station";
             this.ExtendsContentIntoTitleBar = true;
 
+            // Customize TitleBar buttons for visibility on dark theme
+            if (Microsoft.UI.Windowing.AppWindowTitleBar.IsCustomizationSupported())
+            {
+                var titleBar = this.AppWindow.TitleBar;
+                titleBar.ButtonForegroundColor = Microsoft.UI.Colors.White;
+                titleBar.ButtonHoverForegroundColor = Microsoft.UI.Colors.White;
+                titleBar.ButtonHoverBackgroundColor = Windows.UI.Color.FromArgb(255, 50, 50, 50);
+                titleBar.ButtonPressedForegroundColor = Microsoft.UI.Colors.White;
+                titleBar.ButtonInactiveForegroundColor = Microsoft.UI.Colors.Gray;
+            }
+
             // Initialize Services
             _settings = AppSettings.Load();
             _relayServer = new RelayServerHost();

@@ -41,4 +41,11 @@
     
     <SolidColorBrush x:Key="NavigationViewItemBackgroundSelected" Color="#33FF7900" /> <!-- Semi-transparent Orange -->
     <SolidColorBrush x:Key="NavigationViewItemBackgroundSelectedPointerOver" Color="#44FF7900" />
+
+    <!-- Button Foreground Overrides for Dark Theme Reliability -->
+    <SolidColorBrush x:Key="NavigationViewButtonForeground" Color="{StaticResource Color.Neutral.100}" />
+    <SolidColorBrush x:Key="NavigationViewButtonForegroundPointerOver" Color="{StaticResource Color.Neutral.100}" />
+    <SolidColorBrush x:Key="NavigationViewButtonForegroundPressed" Color="{StaticResource Color.Neutral.100}" />
+    <SolidColorBrush x:Key="NavigationViewItemForeground" Color="{StaticResource Color.Neutral.100}" />
+    <SolidColorBrush x:Key="NavigationViewItemForegroundPointerOver" Color="{StaticResource Color.Neutral.100}" />
 </ResourceDictionary>

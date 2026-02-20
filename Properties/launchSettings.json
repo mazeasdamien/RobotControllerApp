@@ -1,9 +1,6 @@
 {
   "profiles": {
-    "RobotControllerApp (Package)": {
-      "commandName": "MsixPackage"
-    },
-    "RobotControllerApp (Unpackaged)": {
+    "RobotControllerApp": {
       "commandName": "Project"
     }
   }
