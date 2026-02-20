@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "RobotControllerApp (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "RobotControllerApp (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

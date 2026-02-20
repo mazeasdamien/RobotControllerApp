@@ -1,0 +1,21 @@
+# Visual Studio
+.vs/
+[Bb]in/
+[Oo]bj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# NuGet
+packages/
+*.nuget.props
+*.nuget.targets
+
+# OS
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# User Settings
+settings.json
