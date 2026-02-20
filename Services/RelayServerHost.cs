@@ -87,11 +87,16 @@ namespace RobotControllerApp.Services
                         using var ws = await context.WebSockets.AcceptWebSocketAsync();
                         Log($"Bridge Client Connected: {robotId}");
 
-                        connectionManager.AddRobotClient(robotId, ws);
-                        await HandleRobotConnection(ws, robotId, connectionManager, token);
-                        connectionManager.RemoveRobotClient(robotId);
-
-                        Log($"Robot Disconnected: {robotId}");
+                        try
+                        {
+                            connectionManager.AddRobotClient(robotId, ws);
+                            await HandleRobotConnection(ws, robotId, connectionManager, token);
+                        }
+                        finally
+                        {
+                            connectionManager.RemoveRobotClient(robotId);
+                            Log($"Robot Disconnected: {robotId}");
+                        }
                     }
                     else
                     {
@@ -159,6 +164,7 @@ namespace RobotControllerApp.Services
 
                     bool isConnected = manager.IsRobotConnected(robotId);
 
+                    Log($"📩 Simulated Command: {body} (Target: {robotId}, Connected: {isConnected})");
                     OnWhatsAppLog?.Invoke($"[{DateTime.Now:HH:mm:ss}] 📩 {body}");
 
                     // Nudge Logic Preparations
@@ -303,6 +309,7 @@ namespace RobotControllerApp.Services
                     {
                         if (isConnected)
                         {
+                            Log($"🚀 Forwarding '{body}' command to {robotId}");
                             await manager.SendToRobotClient(robotId, jsonCommand);
                         }
                         else

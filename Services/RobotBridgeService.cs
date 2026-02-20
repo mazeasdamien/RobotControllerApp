@@ -153,6 +153,10 @@ namespace RobotControllerApp.Services
                         if (result.MessageType == WebSocketMessageType.Close) break;
 
                         var message = Encoding.UTF8.GetString(ms.ToArray());
+                        if (message.Contains("publish") || message.Contains("call_service"))
+                        {
+                             Log("[Bridge] 📥 Received command from Relay, forwarding to ROS...");
+                        }
                         await SendToRobot(message); // Forward to Robot
                     }
                 }
