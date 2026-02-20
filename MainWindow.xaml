@@ -214,7 +214,7 @@
                                             <FontIcon Glyph="&#xE99A;" FontSize="18" Foreground="{StaticResource Brush.Primary}"/>
                                             <TextBlock Text="ROBOT PRIMARY FEED (REMOTE)" FontWeight="SemiBold"/>
                                         </StackPanel>
-                                        <Border Grid.Row="1" Background="Black" CornerRadius="8" Clip="True">
+                                        <Border Grid.Row="1" Background="Black" CornerRadius="8">
                                             <Grid>
                                                 <Image x:Name="CameraImage" Stretch="Uniform"/>
                                                 <StackPanel x:Name="CameraOfflineState" VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -237,8 +237,8 @@
                                             <FontIcon Glyph="&#xE722;" FontSize="18" Foreground="#0078D7"/>
                                             <TextBlock Text="OPERATOR WEBCAM (LOCAL)" FontWeight="SemiBold"/>
                                         </StackPanel>
-                                        <Border Grid.Row="1" Background="Black" CornerRadius="8" Clip="True">
-                                            <MediaPlayerElement x:Name="LocalWebcamPreview" AutoPlay="True" Stretch="Uniform"/>
+                                        <Border Grid.Row="1" Background="Black" CornerRadius="8">
+                                            <Image x:Name="LocalWebcamPreview" Stretch="Uniform"/>
                                         </Border>
                                     </Grid>
                                 </Border>

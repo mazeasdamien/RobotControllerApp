@@ -157,8 +157,8 @@ namespace RobotControllerApp.Services
 
                         var message = Encoding.UTF8.GetString(ms.ToArray());
 
-                        // --- HEARTBEAT PONG ---
-                        if (message.Contains("\"type\":\"pong\""))
+                        // --- HEARTBEAT PONG (ROS conventions) ---
+                        if (message.Contains("\"op\":\"pong\""))
                         {
                             _pingWatch.Stop();
                             LastLatencyMs = _pingWatch.ElapsedMilliseconds;
@@ -197,7 +197,7 @@ namespace RobotControllerApp.Services
                     try
                     {
                         _pingWatch.Restart();
-                        await SendToRelay("{\"type\":\"ping\"}");
+                        await SendToRelay("{\"op\":\"ping\"}");
                     }
                     catch { }
                 }

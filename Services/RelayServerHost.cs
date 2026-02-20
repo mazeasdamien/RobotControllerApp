@@ -384,13 +384,13 @@ namespace RobotControllerApp.Services
 
                     var message = Encoding.UTF8.GetString(ms.ToArray());
 
-                    // --- LATENCY PING ---
-                    if (message.Contains("\"type\":\"ping\""))
+                    // --- LATENCY PING (Interception) ---
+                    if (message.Contains("\"op\":\"ping\""))
                     {
-                        var pong = "{\"type\":\"pong\"}";
+                        var pong = "{\"op\":\"pong\"}";
                         var pongBytes = Encoding.UTF8.GetBytes(pong);
                         await ws.SendAsync(new ArraySegment<byte>(pongBytes), WebSocketMessageType.Text, true, token);
-                        continue; // Don't forward ping to Unity
+                        continue; // Don't forward heartbeat to Unity/ROS
                     }
 
                     // --- MESSAGE INTERCEPTION ---

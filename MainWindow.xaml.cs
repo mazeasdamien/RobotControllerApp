@@ -13,9 +13,10 @@ using System.Collections.Generic;
 using System.IO;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Windows.Media.Capture;
-using Windows.Media.Core;
-using Windows.Media.Playback;
 using Windows.Media.MediaProperties;
+using Windows.Graphics.Imaging;
+using Windows.Media.Capture.Frames;
+using System.Linq;
 
 namespace RobotControllerApp
 {
@@ -223,7 +224,9 @@ namespace RobotControllerApp
             _ = InitializeLocalWebcam();
         }
 
-        private MediaCapture _mediaCapture;
+        private MediaCapture? _mediaCapture;
+        private MediaFrameReader? _frameReader;
+        private WriteableBitmap? _webcamSource;
         private async Task InitializeLocalWebcam()
         {
             try
@@ -246,12 +249,47 @@ namespace RobotControllerApp
                     }
                 }
 
-                LocalWebcamPreview.Source = MediaSource.CreateFromMediaCapture(_mediaCapture);
-                Log("[Webcam] Local operator camera initialized (720p).");
+                // Get the video preview frame source
+                var frameSource = _mediaCapture.FrameSources.Values
+                    .FirstOrDefault(s => s.Info.MediaStreamType == MediaStreamType.VideoPreview);
+
+                if (frameSource != null)
+                {
+                    _webcamSource = new WriteableBitmap(1280, 720);
+                    LocalWebcamPreview.Source = _webcamSource;
+
+                    _frameReader = await _mediaCapture.CreateFrameReaderAsync(frameSource, MediaEncodingSubtypes.Bgra8);
+                    _frameReader.FrameArrived += FrameReader_FrameArrived;
+                    await _frameReader.StartAsync();
+                    Log("[Webcam] Local operator camera initialized (720p).");
+                }
             }
             catch (Exception ex)
             {
                 Log($"[Webcam] Initialization failed: {ex.Message}");
+            }
+        }
+
+        private void FrameReader_FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
+        {
+            var frame = sender.TryAcquireLatestFrame();
+            if (frame?.VideoMediaFrame?.SoftwareBitmap != null)
+            {
+                var softwareBitmap = frame.VideoMediaFrame.SoftwareBitmap;
+                if (softwareBitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 ||
+                    softwareBitmap.BitmapAlphaMode != BitmapAlphaMode.Premultiplied)
+                {
+                    softwareBitmap = SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+                }
+
+                this.DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (_webcamSource != null)
+                    {
+                        softwareBitmap.CopyToBuffer(_webcamSource.PixelBuffer);
+                        _webcamSource.Invalidate();
+                    }
+                });
             }
         }
 
