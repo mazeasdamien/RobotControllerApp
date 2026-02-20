@@ -23,6 +23,8 @@ namespace RobotControllerApp.Services
         public int RosPort { get; set; } = 9090;
         public string RelayServerUrl { get; set; } = "ws://localhost:5000/robot";
         public int TelemetryIntervalMs { get; set; } = 100;
+        public long LastLatencyMs { get; private set; } = 0;
+        private System.Diagnostics.Stopwatch _pingWatch = new();
 
         private void Log(string message)
         {
@@ -131,6 +133,7 @@ namespace RobotControllerApp.Services
 
                     await _relayWebSocket.ConnectAsync(new Uri(relayUrl), token);
                     Log("[Bridge] ✓ Connected to Relay Server");
+                    StartRelayHeartbeat();
 
                     // Register
                     await SendToRelay(JsonSerializer.Serialize(new
@@ -153,9 +156,18 @@ namespace RobotControllerApp.Services
                         if (result.MessageType == WebSocketMessageType.Close) break;
 
                         var message = Encoding.UTF8.GetString(ms.ToArray());
+
+                        // --- HEARTBEAT PONG ---
+                        if (message.Contains("\"type\":\"pong\""))
+                        {
+                            _pingWatch.Stop();
+                            LastLatencyMs = _pingWatch.ElapsedMilliseconds;
+                            continue;
+                        }
+
                         if (message.Contains("publish") || message.Contains("call_service"))
                         {
-                             Log("[Bridge] 📥 Received command from Relay, forwarding to ROS...");
+                            Log("[Bridge] 📥 Received command from Relay, forwarding to ROS...");
                         }
                         await SendToRobot(message); // Forward to Robot
                     }
@@ -165,9 +177,31 @@ namespace RobotControllerApp.Services
                     if (!token.IsCancellationRequested)
                         Log($"[Bridge] Failed to connect to Relay Server. Details: {ex.Message}");
                 }
+                finally
+                {
+                    _pingTimer?.Dispose();
+                }
 
                 if (!token.IsCancellationRequested) await Task.Delay(3000, token);
             }
+        }
+
+        private Timer? _pingTimer;
+        private void StartRelayHeartbeat()
+        {
+            _pingTimer?.Dispose();
+            _pingTimer = new Timer(async _ =>
+            {
+                if (_relayWebSocket?.State == WebSocketState.Open)
+                {
+                    try
+                    {
+                        _pingWatch.Restart();
+                        await SendToRelay("{\"type\":\"ping\"}");
+                    }
+                    catch { }
+                }
+            }, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
         }
 
         async Task SubscribeToJointStates()

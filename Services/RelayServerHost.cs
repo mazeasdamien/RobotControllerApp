@@ -338,6 +338,7 @@ namespace RobotControllerApp.Services
                 });
 
                 app.MapGet("/", () => "Robot Orange Relay Server - WebSocket endpoints: /robot?robotId=X, /unity?robotId=X");
+                app.MapGet("/status", () => "OK");
 
                 Log($"Relay Server active on Port {Port}");
                 await app.RunAsync(token);
@@ -382,6 +383,15 @@ namespace RobotControllerApp.Services
                     }
 
                     var message = Encoding.UTF8.GetString(ms.ToArray());
+
+                    // --- LATENCY PING ---
+                    if (message.Contains("\"type\":\"ping\""))
+                    {
+                        var pong = "{\"type\":\"pong\"}";
+                        var pongBytes = Encoding.UTF8.GetBytes(pong);
+                        await ws.SendAsync(new ArraySegment<byte>(pongBytes), WebSocketMessageType.Text, true, token);
+                        continue; // Don't forward ping to Unity
+                    }
 
                     // --- MESSAGE INTERCEPTION ---
 
@@ -543,8 +553,8 @@ namespace RobotControllerApp.Services
                 id = 11,
                 position = open ? 100 : 0,
                 speed = 100,
-                hold_torque = 100, // Updated from 500 to match screenshot/robot requirement
-                max_torque = 100   // Updated from 500 for strong hold
+                hold_torque = 1000, // Updated to 1000 for full holding strength
+                max_torque = 1000   // Updated to 1000 for full holding strength
             };
 
             var msg = new

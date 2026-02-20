@@ -12,6 +12,10 @@ using System.Net.Http;
 using System.Collections.Generic;
 using System.IO;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Windows.Media.Capture;
+using Windows.Media.Core;
+using Windows.Media.Playback;
+using Windows.Media.MediaProperties;
 
 namespace RobotControllerApp
 {
@@ -213,6 +217,42 @@ namespace RobotControllerApp
             }
 
             StartLatencyMonitor();
+            StatusPulseAnimation.Begin();
+
+            // Initialize Webcam
+            _ = InitializeLocalWebcam();
+        }
+
+        private MediaCapture _mediaCapture;
+        private async Task InitializeLocalWebcam()
+        {
+            try
+            {
+                _mediaCapture = new MediaCapture();
+                var settings = new MediaCaptureInitializationSettings
+                {
+                    StreamingCaptureMode = StreamingCaptureMode.Video
+                };
+                await _mediaCapture.InitializeAsync(settings);
+
+                // Set 720p resolution if available
+                var videoProperties = _mediaCapture.VideoDeviceController.GetAvailableMediaStreamProperties(MediaStreamType.VideoPreview);
+                foreach (var prop in videoProperties)
+                {
+                    if (prop is VideoEncodingProperties videoProp && videoProp.Width == 1280 && videoProp.Height == 720)
+                    {
+                        await _mediaCapture.VideoDeviceController.SetMediaStreamPropertiesAsync(MediaStreamType.VideoPreview, prop);
+                        break;
+                    }
+                }
+
+                LocalWebcamPreview.Source = MediaSource.CreateFromMediaCapture(_mediaCapture);
+                Log("[Webcam] Local operator camera initialized (720p).");
+            }
+            catch (Exception ex)
+            {
+                Log($"[Webcam] Initialization failed: {ex.Message}");
+            }
         }
 
         private void UpdateRobotStatus(bool isConnected)
@@ -259,18 +299,30 @@ namespace RobotControllerApp
             {
                 try
                 {
-                    // 1. Relay Latency
-                    var watch = System.Diagnostics.Stopwatch.StartNew();
-                    using var client = new HttpClient();
-                    client.Timeout = TimeSpan.FromSeconds(1);
-                    var resp = await client.GetAsync($"http://localhost:{_settings.RelayPort}/status");
-                    watch.Stop();
-                    RelayLatencyText.Text = $"{watch.ElapsedMilliseconds} ms";
+                    // 1. Relay Latency (Measured via Public Tunnel if possible)
+                    string baseUrl = string.IsNullOrEmpty(_settings.PublicUrl)
+                        ? $"http://localhost:{_settings.RelayPort}"
+                        : (_settings.PublicUrl.StartsWith("http") ? _settings.PublicUrl : $"https://{_settings.PublicUrl}");
 
-                    // 2. Robot Latency (Simulated)
+                    string url = $"{baseUrl.TrimEnd('/')}/status";
+
+                    using var client = new HttpClient();
+                    client.Timeout = TimeSpan.FromSeconds(2);
+
+                    // First request to "warm up" the tunnel connection
+                    await client.GetAsync(url);
+
+                    // Second request for precise measurement
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    var resp = await client.GetAsync(url);
+                    watch.Stop();
+
+                    RelayLatencyText.Text = $"{watch.Elapsed.TotalMilliseconds:F1} ms";
+
+                    // 2. Robot Latency (Real from WebSocket Ping)
                     if (RobotStatusText.Text.Contains("Connected"))
                     {
-                        Robot1LatencyText.Text = $"{new Random().Next(4, 15)} ms";
+                        Robot1LatencyText.Text = $"{_robotBridge.LastLatencyMs} ms";
                     }
                     else Robot1LatencyText.Text = "-- ms";
                 }
@@ -537,7 +589,6 @@ namespace RobotControllerApp
         {
             // Hide all views first
             DashboardView.Visibility = Visibility.Collapsed;
-            CameraView.Visibility = Visibility.Collapsed;
             LogsView.Visibility = Visibility.Collapsed;
             SettingsView.Visibility = Visibility.Collapsed;
 
@@ -552,9 +603,6 @@ namespace RobotControllerApp
                 {
                     case "home":
                         DashboardView.Visibility = Visibility.Visible;
-                        break;
-                    case "camera":
-                        CameraView.Visibility = Visibility.Visible;
                         break;
                     case "logs":
                         LogsView.Visibility = Visibility.Visible;
