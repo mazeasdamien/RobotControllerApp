@@ -1,6 +1,6 @@
 # Visual Studio
 .vs/
-[Bb]in/
+# [Bb]in/  (Unignored per user request to include executables)
 [Oo]bj/
 *.user
 *.suo
