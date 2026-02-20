@@ -208,15 +208,15 @@
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="320"/>
+                                            <RowDefinition Height="256"/>
                                         </Grid.RowDefinitions>
                                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
                                             <FontIcon Glyph="&#xE99A;" FontSize="18" Foreground="{StaticResource Brush.Primary}"/>
-                                            <TextBlock Text="ROBOT PRIMARY FEED (REMOTE)" FontWeight="SemiBold"/>
+                                            <TextBlock Text="ROBOT 1 VIDEO FEED" FontWeight="SemiBold"/>
                                         </StackPanel>
                                         <Border Grid.Row="1" Background="Black" CornerRadius="8">
                                             <Grid>
-                                                <Image x:Name="CameraImage" Stretch="Uniform"/>
+                                                <Image x:Name="CameraImage" Stretch="Uniform" Visibility="Collapsed"/>
                                                 <StackPanel x:Name="CameraOfflineState" VerticalAlignment="Center" HorizontalAlignment="Center">
                                                      <SymbolIcon Symbol="Camera" Foreground="Gray" Margin="0,0,0,8"/>
                                                      <TextBlock Text="Waiting for stream..." Foreground="Gray" FontSize="11"/>
@@ -231,11 +231,11 @@
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="320"/>
+                                            <RowDefinition Height="256"/>
                                         </Grid.RowDefinitions>
                                         <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
                                             <FontIcon Glyph="&#xE722;" FontSize="18" Foreground="#0078D7"/>
-                                            <TextBlock Text="OPERATOR WEBCAM (LOCAL)" FontWeight="SemiBold"/>
+                                            <TextBlock Text="OPERATOR WEBCAM" FontWeight="SemiBold"/>
                                         </StackPanel>
                                         <Border Grid.Row="1" Background="Black" CornerRadius="8">
                                             <Image x:Name="LocalWebcamPreview" Stretch="Uniform"/>

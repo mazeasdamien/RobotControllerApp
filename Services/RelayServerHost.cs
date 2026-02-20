@@ -321,7 +321,9 @@ namespace RobotControllerApp.Services
                     }
 
                     // Log the response for the UI
-                    OnWhatsAppLog?.Invoke($"[{DateTime.Now:HH:mm:ss}] 🤖 {responseText}");
+                    string logMsg = $"[{DateTime.Now:HH:mm:ss}] 🤖 {responseText}";
+                    if (!string.IsNullOrEmpty(mediaUrl)) logMsg += $" [MEDIA:{mediaUrl}]";
+                    OnWhatsAppLog?.Invoke(logMsg);
 
                     // Return TwiML XML (Standard Twilio Response)
                     string xmlResponse = "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Response><Message>";

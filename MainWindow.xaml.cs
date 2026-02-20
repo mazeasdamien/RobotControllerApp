@@ -234,34 +234,38 @@ namespace RobotControllerApp
                 _mediaCapture = new MediaCapture();
                 var settings = new MediaCaptureInitializationSettings
                 {
-                    StreamingCaptureMode = StreamingCaptureMode.Video
+                    StreamingCaptureMode = StreamingCaptureMode.Video,
+                    PhotoCaptureSource = PhotoCaptureSource.VideoPreview
                 };
                 await _mediaCapture.InitializeAsync(settings);
 
-                // Set 720p resolution if available
-                var videoProperties = _mediaCapture.VideoDeviceController.GetAvailableMediaStreamProperties(MediaStreamType.VideoPreview);
-                foreach (var prop in videoProperties)
-                {
-                    if (prop is VideoEncodingProperties videoProp && videoProp.Width == 1280 && videoProp.Height == 720)
-                    {
-                        await _mediaCapture.VideoDeviceController.SetMediaStreamPropertiesAsync(MediaStreamType.VideoPreview, prop);
-                        break;
-                    }
-                }
-
-                // Get the video preview frame source
+                // Find a suitable frame source
                 var frameSource = _mediaCapture.FrameSources.Values
-                    .FirstOrDefault(s => s.Info.MediaStreamType == MediaStreamType.VideoPreview);
+                    .FirstOrDefault(s => s.Info.MediaStreamType == MediaStreamType.VideoPreview)
+                    ?? _mediaCapture.FrameSources.Values.FirstOrDefault();
 
                 if (frameSource != null)
                 {
-                    _webcamSource = new WriteableBitmap(1280, 720);
-                    LocalWebcamPreview.Source = _webcamSource;
+                    // Update camera properties if desirable
+                    var format = frameSource.SupportedFormats.FirstOrDefault(f => f.VideoFormat.Width == 1280 && f.VideoFormat.Height == 720)
+                                 ?? frameSource.SupportedFormats.OrderByDescending(f => f.VideoFormat.Width).FirstOrDefault();
 
+                    if (format != null)
+                    {
+                        await frameSource.SetFormatAsync(format);
+                        _webcamSource = new WriteableBitmap((int)format.VideoFormat.Width, (int)format.VideoFormat.Height);
+                    }
+                    else
+                    {
+                        _webcamSource = new WriteableBitmap(640, 480);
+                    }
+
+                    LocalWebcamPreview.Source = _webcamSource;
                     _frameReader = await _mediaCapture.CreateFrameReaderAsync(frameSource, MediaEncodingSubtypes.Bgra8);
                     _frameReader.FrameArrived += FrameReader_FrameArrived;
                     await _frameReader.StartAsync();
-                    Log("[Webcam] Local operator camera initialized (720p).");
+
+                    Log($"[Webcam] Initialized: {frameSource.Info.SourceKind} ({_webcamSource.PixelWidth}x{_webcamSource.PixelHeight})");
                 }
             }
             catch (Exception ex)
@@ -694,6 +698,19 @@ namespace RobotControllerApp
                 // Use a larger tolerance (50px) to handle float precision and close-to-bottom states
                 bool isAtBottom = ChatScrollViewer.VerticalOffset >= (ChatScrollViewer.ScrollableHeight - 50);
 
+                // Media parsing
+                string mediaUrl = "";
+                if (message.Contains("[MEDIA:"))
+                {
+                    int start = message.IndexOf("[MEDIA:") + 7;
+                    int end = message.IndexOf("]", start);
+                    if (end != -1)
+                    {
+                        mediaUrl = message.Substring(start, end - start);
+                        message = message.Remove(message.IndexOf("[MEDIA:"), end - message.IndexOf("[MEDIA:") + 1);
+                    }
+                }
+
                 bool isRobot = message.Contains("🤖");
                 string displayText = message.Replace("🤖", "").Trim();
 
@@ -741,6 +758,8 @@ namespace RobotControllerApp
                     MaxWidth = 500
                 };
 
+                var bubbleContent = new StackPanel { Spacing = 8 };
+
                 var textBlock = new TextBlock
                 {
                     Text = displayText,
@@ -748,8 +767,23 @@ namespace RobotControllerApp
                     FontSize = 15,
                     Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255))
                 };
+                bubbleContent.Children.Add(textBlock);
 
-                bubble.Child = textBlock;
+                if (!string.IsNullOrEmpty(mediaUrl))
+                {
+                    var img = new Image
+                    {
+                        Source = new BitmapImage(new Uri(mediaUrl)),
+                        MaxWidth = 400,
+                        Stretch = Stretch.Uniform,
+                        Margin = new Thickness(0, 4, 0, 4)
+                    };
+                    // Round the image corners slightly
+                    var imgBorder = new Border { CornerRadius = new CornerRadius(8), Child = img };
+                    bubbleContent.Children.Add(imgBorder);
+                }
+
+                bubble.Child = bubbleContent;
                 rowPanel.Children.Add(bubble);
 
                 ChatHistoryPanel.Children.Add(rowPanel);
