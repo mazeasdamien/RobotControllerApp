@@ -10,6 +10,8 @@ using Windows.Foundation.Collections;
 using RobotControllerApp.Services;
 using System.Net.Http;
 using System.Collections.Generic;
+using System.IO;
+using Microsoft.UI.Xaml.Media.Imaging;
 
 namespace RobotControllerApp
 {
@@ -141,6 +143,31 @@ namespace RobotControllerApp
                 catch (Exception ex)
                 {
                     if (msg.Contains("pos")) Log($"[Parse Error] {ex.Message}");
+                }
+            });
+
+            RelayServerHost.OnImageReceived += (imageBytes) => this.DispatcherQueue.TryEnqueue(async () =>
+            {
+                try
+                {
+                    var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                    using (var ms = new System.IO.MemoryStream(imageBytes))
+                    {
+                        await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
+                    }
+                    CameraImage.Source = bitmap;
+
+                    // Transition UI
+                    if (CameraImage.Visibility == Visibility.Collapsed)
+                    {
+                        CameraImage.Visibility = Visibility.Visible;
+                        CameraOfflineState.Visibility = Visibility.Collapsed;
+                        Log("[UI] Camera feed active.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Log($"[UI] Failed to render camera frame: {ex.Message}");
                 }
             });
 
@@ -586,6 +613,18 @@ namespace RobotControllerApp
                 }
             }
         }
+
+        private void RefreshFeed_Click(object sender, RoutedEventArgs e)
+        {
+            Log("Refreshing camera feed connection...");
+            CameraImage.Visibility = Visibility.Collapsed;
+            CameraOfflineState.Visibility = Visibility.Visible;
+
+            // Re-subscribe just in case (though it's already active)
+            // The real 'refresh' happens at the robot/bridge level, 
+            // but resetting the UI state gives user feedback.
+        }
+
         private int _unreadMessages = 0;
 
         private void ChatScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)

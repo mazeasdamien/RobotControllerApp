@@ -316,15 +316,21 @@
                 <!-- 2. CAMERA VIEW -->
                 <Grid x:Name="CameraView" Visibility="Collapsed">
                     <Border Padding="{StaticResource Padding.Page}">
-                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <SymbolIcon Symbol="Camera" RenderTransformOrigin="0.5,0.5">
-                                <SymbolIcon.RenderTransform>
-                                    <ScaleTransform ScaleX="2" ScaleY="2"/>
-                                </SymbolIcon.RenderTransform>
-                            </SymbolIcon>
-                            <TextBlock Text="Camera Feed Offline" Style="{StaticResource Text.Headline3}" Margin="0,16,0,0" HorizontalAlignment="Center"/>
-                            <Button Content="REFRESH FEED" Style="{StaticResource Button.Primary}" Margin="0,16,0,0"/>
-                        </StackPanel>
+                        <Grid>
+                            <!-- Live Feed -->
+                            <Image x:Name="CameraImage" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"/>
+                            
+                            <!-- Offline State -->
+                            <StackPanel x:Name="CameraOfflineState" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <SymbolIcon Symbol="Camera" RenderTransformOrigin="0.5,0.5">
+                                    <SymbolIcon.RenderTransform>
+                                        <ScaleTransform ScaleX="2" ScaleY="2"/>
+                                    </SymbolIcon.RenderTransform>
+                                </SymbolIcon>
+                                <TextBlock Text="Camera Feed Offline" Style="{StaticResource Text.Headline3}" Margin="0,16,0,0" HorizontalAlignment="Center"/>
+                                <Button Content="REFRESH FEED" Style="{StaticResource Button.Primary}" Margin="0,16,0,0" Click="RefreshFeed_Click"/>
+                            </StackPanel>
+                        </Grid>
                     </Border>
                 </Grid>
 

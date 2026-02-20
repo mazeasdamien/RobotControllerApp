@@ -21,6 +21,7 @@ namespace RobotControllerApp.Services
         // Telemetry Events
         public static event Action<float[]>? OnJointsReceived;
         public static event Action<int, int>? OnImageStatsUpdated; // FPS, Total
+        public static event Action<byte[]>? OnImageReceived; // Latest base64 decoded frame
         public static event Action<string>? OnUnityMessageReceived;
 
         private WebApplication? _app;
@@ -426,6 +427,9 @@ namespace RobotControllerApp.Services
                                             {
                                                 byte[] imageBytes = Convert.FromBase64String(base64);
                                                 manager.UpdateLatestImage(imageBytes);
+                                                OnImageReceived?.Invoke(imageBytes);
+
+                                                if (_imagesTotal == 0) Log("First camera frame received! ✓");
 
                                                 _imagesTotal++;
                                                 _imagesLastSec++;
