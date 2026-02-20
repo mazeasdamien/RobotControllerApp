@@ -34,11 +34,6 @@
                         <SymbolIcon Symbol="Message"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                <NavigationViewItem Content="Network" Tag="network">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="World"/>
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
             </NavigationView.MenuItems>
 
             <NavigationView.FooterMenuItems>
@@ -90,18 +85,19 @@
                                                 <TextBlock Text="RELAY SERVER" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
                                             <TextBlock x:Name="RelayStatusText" Text="Initializing..." Style="{StaticResource Text.Caption}" Margin="0,8,0,0"/>
-                                            <TextBlock x:Name="RelayActiveText" Text="ACTIVE" FontWeight="Bold" Foreground="{StaticResource Brush.Status.Success}" Margin="0,8,0,0"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                                                <TextBlock x:Name="RelayActiveText" Text="ACTIVE" FontWeight="Bold" Foreground="{StaticResource Brush.Status.Success}"/>
+                                                <TextBlock Text="|" Opacity="0.3"/>
+                                                <TextBlock x:Name="RelayLatencyText" Text="-- ms" Opacity="0.7" FontSize="12" VerticalAlignment="Center"/>
+                                            </StackPanel>
                                         </StackPanel>
 
-                                        <!-- Relay Animation -->
-                                        <WebView2 x:Name="RelayAnimationWebView" 
-                                                  Grid.Column="1"
-                                                  Width="160" 
-                                                  Height="120" 
-                                                  DefaultBackgroundColor="Transparent"
-                                                  Visibility="Collapsed"
-                                                  VerticalAlignment="Center" 
-                                                  Margin="16,0,0,0"/>
+                                        <!-- Modern Status Indicator -->
+                                        <Grid Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                                            <Ellipse Width="48" Height="48" Stroke="{StaticResource Brush.Status.Success}" StrokeThickness="1" Opacity="0.2"/>
+                                            <Ellipse Width="36" Height="36" Stroke="{StaticResource Brush.Status.Success}" StrokeThickness="2" Opacity="0.4"/>
+                                            <FontIcon Glyph="&#xE813;" FontSize="20" Foreground="{StaticResource Brush.Status.Success}"/>
+                                        </Grid>
                                     </Grid>
                                 </Border>
 
@@ -115,25 +111,25 @@
 
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
-                                                <FontIcon Glyph="&#xE99A;" FontSize="24" Foreground="{StaticResource Brush.Primary}"/>
+                                                <FontIcon x:Name="Robot1Icon" Glyph="&#xE99A;" FontSize="28" Foreground="{StaticResource Brush.Status.Warning}"/>
                                                 <TextBlock Text="ROBOT 1" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
-                                            <TextBlock x:Name="RobotStatusText" Text="Pending Connection..." Style="{StaticResource Text.Caption}" Foreground="{StaticResource Brush.Status.Warning}" Margin="0,8,0,0"/>
-                                            <StackPanel x:Name="RobotConnectingState" Orientation="Horizontal" Spacing="8" Margin="0,12,0,0">
-                                                <ProgressRing IsActive="True" Width="16" Height="16" Foreground="{StaticResource Brush.Primary}"/>
-                                                <TextBlock Text="Auto-Reconnecting..." FontSize="12" VerticalAlignment="Center" Opacity="0.7"/>
+                                            <TextBlock x:Name="RobotStatusText" Text="Connecting..." Style="{StaticResource Text.Caption}" Margin="0,8,0,0"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
+                                                <TextBlock x:Name="Robot1LatencyText" Text="-- ms" Opacity="0.7" FontSize="12" VerticalAlignment="Center"/>
+                                                <StackPanel x:Name="RobotConnectingState" Orientation="Horizontal" Spacing="8">
+                                                    <ProgressRing IsActive="True" Width="14" Height="14" Foreground="{StaticResource Brush.Primary}"/>
+                                                    <TextBlock Text="Searching..." FontSize="11" VerticalAlignment="Center" Opacity="0.6"/>
+                                                </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
 
-                                        <!-- Robot 1 Animation -->
-                                        <WebView2 x:Name="RobotAnimationWebView" 
-                                                  Grid.Column="1"
-                                                  Width="208" 
-                                                  Height="156" 
-                                                  DefaultBackgroundColor="Transparent"
-                                                  Visibility="Collapsed"
-                                                  VerticalAlignment="Center" 
-                                                  Margin="16,-40,-30,-8"/>
+                                        <!-- Modern Status Indicator -->
+                                        <Grid Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                                            <Ellipse Width="48" Height="48" Stroke="{Binding ElementName=Robot1Icon, Path=Foreground}" StrokeThickness="1" Opacity="0.2"/>
+                                            <Ellipse Width="36" Height="36" Stroke="{Binding ElementName=Robot1Icon, Path=Foreground}" StrokeThickness="2" Opacity="0.4"/>
+                                            <FontIcon Glyph="&#xEBC5;" FontSize="20" Foreground="{Binding ElementName=Robot1Icon, Path=Foreground}"/>
+                                        </Grid>
                                     </Grid>
                                 </Border>
 
@@ -158,12 +154,15 @@
                                         <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}" HorizontalAlignment="Right">
                                                 <TextBlock Text="ROBOT 2" Style="{StaticResource Text.Headline3}"/>
-                                                <FontIcon Glyph="&#xE99A;" FontSize="24" Foreground="{StaticResource Brush.Primary}"/>
+                                                <FontIcon x:Name="Robot2Icon" Glyph="&#xE99A;" FontSize="24" Foreground="{StaticResource Brush.Text.Primary}"/>
                                             </StackPanel>
                                             <TextBlock x:Name="Robot2StatusText" Text="Offline" Style="{StaticResource Text.Caption}" Foreground="{StaticResource Brush.Text.Primary}" Margin="0,8,0,0" HorizontalAlignment="Right" TextAlignment="Right"/>
-                                            <StackPanel x:Name="Robot2ConnectingState" Orientation="Horizontal" Spacing="8" Margin="0,12,0,0" HorizontalAlignment="Right">
-                                                <TextBlock Text="Auto-Reconnecting..." FontSize="12" VerticalAlignment="Center" Opacity="0.7"/>
-                                                <ProgressRing IsActive="True" Width="16" Height="16" Foreground="{StaticResource Brush.Primary}"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,12,0,0" HorizontalAlignment="Right">
+                                                <TextBlock x:Name="Robot2LatencyText" Text="-- ms" Opacity="0.7" FontSize="12" VerticalAlignment="Center"/>
+                                                <StackPanel x:Name="Robot2ConnectingState" Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="Auto-Reconnecting..." FontSize="12" VerticalAlignment="Center" Opacity="0.7"/>
+                                                    <ProgressRing IsActive="True" Width="16" Height="16" Foreground="{StaticResource Brush.Primary}"/>
+                                                </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
                                     </Grid>

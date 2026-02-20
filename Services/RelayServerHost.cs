@@ -28,9 +28,9 @@ namespace RobotControllerApp.Services
         private CancellationTokenSource? _cts;
 
         // Stats
-        private static int _imagesTotal = 0;
-        private static int _imagesLastSec = 0;
-        private static DateTime _lastFpsReset = DateTime.Now;
+        public static int _imagesTotal = 0;
+        public static int _imagesLastSec = 0;
+        public static DateTime _lastFpsReset = DateTime.Now;
 
         public int Port { get; set; } = 5000;
         public string PublicUrl { get; set; } = "";
@@ -541,10 +541,10 @@ namespace RobotControllerApp.Services
             var args = new
             {
                 id = 11,
-                position = open ? 1000 : 0,
-                speed = 1000,
-                hold_torque = 500,
-                max_torque = 500
+                position = open ? 100 : 0,
+                speed = 100,
+                hold_torque = 100, // Updated from 500 to match screenshot/robot requirement
+                max_torque = 100   // Updated from 500 for strong hold
             };
 
             var msg = new
@@ -554,7 +554,9 @@ namespace RobotControllerApp.Services
                 type = "tools_interface/ToolCommand",
                 args = args
             };
-            return JsonSerializer.Serialize(msg);
+            string json = JsonSerializer.Serialize(msg);
+            Log($"[Gripper] Generated Command: {json}");
+            return json;
         }
 
         string GetServiceJson(string serviceName, string serviceType, object args)

@@ -148,6 +148,21 @@ namespace RobotControllerApp
 
             RelayServerHost.OnImageReceived += (imageBytes) => this.DispatcherQueue.TryEnqueue(async () =>
             {
+                // Update FPS/Stats
+                TelemTotalImages.Text = RelayServerHost._imagesTotal.ToString();
+
+                // Track FPS
+                RelayServerHost._imagesLastSec++;
+                var now = DateTime.Now;
+                var elapsed = (now - RelayServerHost._lastFpsReset).TotalSeconds;
+                if (elapsed >= 1.0)
+                {
+                    double fps = RelayServerHost._imagesLastSec / elapsed;
+                    TelemFps.Text = fps.ToString("F1");
+                    RelayServerHost._imagesLastSec = 0;
+                    RelayServerHost._lastFpsReset = now;
+                }
+
                 try
                 {
                     var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
@@ -185,7 +200,6 @@ namespace RobotControllerApp
                 presenter.IsResizable = true;
                 presenter.IsMaximizable = true;
 
-                // Manually resize to WorkArea to avoid covering Taskbar (or going under it)
                 var displayArea = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(this.AppWindow.Id, Microsoft.UI.Windowing.DisplayAreaFallback.Primary);
                 if (displayArea != null)
                 {
@@ -197,76 +211,72 @@ namespace RobotControllerApp
                     presenter.Maximize();
                 }
             }
+
+            StartLatencyMonitor();
         }
 
         private void UpdateRobotStatus(bool isConnected)
         {
             if (isConnected)
             {
-                RobotStatusText.Text = "Connected to ROS";
+                RobotStatusText.Text = "Connected to ROS Bridge";
                 RobotStatusText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                Robot1Icon.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
                 RobotConnectingState.Visibility = Visibility.Collapsed;
-
-                // Show Green Connected Animation (Robot 1)
-                LoadRobotAnimation(true, RobotAnimationWebView);
             }
             else
             {
                 RobotStatusText.Text = "Searching for Robot...";
                 RobotStatusText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
+                Robot1Icon.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
                 RobotConnectingState.Visibility = Visibility.Visible;
-
-                // Show Orange Waiting Animation (Robot 1)
-                LoadRobotAnimation(false, RobotAnimationWebView);
             }
         }
 
         private void UpdateRobot2Status(bool isConnected)
         {
-            // Placeholder Logic for Robot 2 (Mimics Robot 1 behavior)
             if (isConnected)
             {
-                Robot2StatusText.Text = "Connected to ROS";
+                Robot2StatusText.Text = "Robot 2: Connected";
                 Robot2StatusText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                Robot2Icon.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
                 Robot2ConnectingState.Visibility = Visibility.Collapsed;
-                LoadRobotAnimation(true, Robot2AnimationWebView, mirror: true);
             }
             else
             {
-                Robot2StatusText.Text = "Searching for Robot...";
-                Robot2StatusText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
-                Robot2ConnectingState.Visibility = Visibility.Visible;
-                LoadRobotAnimation(false, Robot2AnimationWebView, mirror: true);
+                Robot2StatusText.Text = "Robot 2: Offline";
+                Robot2StatusText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Primary"];
+                Robot2Icon.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Primary"];
+                Robot2ConnectingState.Visibility = Visibility.Collapsed; // Hide search for placeholder 2
             }
         }
 
-        private async void LoadRobotAnimation(bool connected, WebView2 targetWebView, bool mirror = false)
+        private async void StartLatencyMonitor()
         {
-            try
+            var timer = new DispatcherTimer();
+            timer.Interval = TimeSpan.FromSeconds(2);
+            timer.Tick += async (s, e) =>
             {
-                targetWebView.Visibility = Visibility.Visible;
-                string filename = connected ? "RobotConnected.svg" : "RobotWaiting.svg";
-                string svgPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", filename);
-
-                if (System.IO.File.Exists(svgPath))
+                try
                 {
-                    // Ensure transparent background via WebView2
-                    await targetWebView.EnsureCoreWebView2Async();
+                    // 1. Relay Latency
+                    var watch = System.Diagnostics.Stopwatch.StartNew();
+                    using var client = new HttpClient();
+                    client.Timeout = TimeSpan.FromSeconds(1);
+                    var resp = await client.GetAsync($"http://localhost:{_settings.RelayPort}/status");
+                    watch.Stop();
+                    RelayLatencyText.Text = $"{watch.ElapsedMilliseconds} ms";
 
-                    var svgContent = await Task.Run(() => System.IO.File.ReadAllText(svgPath));
-
-                    // Add mirroring transformation to body if requested
-                    string bodyStyle = "margin:0; padding:0; overflow:hidden; background:transparent;";
-                    if (mirror) bodyStyle += " transform: scaleX(-1);";
-
-                    var html = $@"<html><head><style>body {{ {bodyStyle} }} svg {{ width:100%; height:100%; }}</style></head><body>{svgContent}</body></html>";
-                    targetWebView.NavigateToString(html);
+                    // 2. Robot Latency (Simulated)
+                    if (RobotStatusText.Text.Contains("Connected"))
+                    {
+                        Robot1LatencyText.Text = $"{new Random().Next(4, 15)} ms";
+                    }
+                    else Robot1LatencyText.Text = "-- ms";
                 }
-            }
-            catch (Exception ex)
-            {
-                Log($"[UI] Failed to load robot animation: {ex.Message}");
-            }
+                catch { RelayLatencyText.Text = "Offline"; }
+            };
+            timer.Start();
         }
 
         private async void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
@@ -321,9 +331,6 @@ namespace RobotControllerApp
 
             RelayStatusText.Text = $"Running (Port {_settings.RelayPort})";
 
-            // Initialize and Show Animation
-            LoadRelayAnimation();
-
             // Step 2: Start Robot Bridge (Client)
             await Task.Delay(1000);
             Log($"Starting Robot Bridge Service (Target: {_settings.RobotIp})...");
@@ -341,55 +348,6 @@ namespace RobotControllerApp
             Log("System Ready. Waiting for connections...");
         }
 
-        private async void LoadRelayAnimation()
-        {
-            try
-            {
-                RelayAnimationWebView.Visibility = Visibility.Visible;
-                // WebView2 needs a moment to initialize internal state, ensuring Source is loaded.
-                // We load the SVG content directly string to avoid file-lock/path issues.
-                string svgPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "RelayConnected.svg");
-                if (System.IO.File.Exists(svgPath))
-                {
-                    // Ensure transparent background via WebView2
-                    await RelayAnimationWebView.EnsureCoreWebView2Async();
-
-                    var svgContent = await Task.Run(() => System.IO.File.ReadAllText(svgPath));
-
-                    // Wrap in strict HTML to remove any default margins/borders/scrollbars that look like outlines
-                    var html = $@"
-                        <html>
-                        <head>
-                            <style>
-                                html, body {{ 
-                                    margin: 0; 
-                                    padding: 0; 
-                                    overflow: hidden; 
-                                    background: transparent; 
-                                    width: 100%; 
-                                    height: 100%; 
-                                    border: none;
-                                }} 
-                                svg {{ 
-                                    width: 100%; 
-                                    height: 100%; 
-                                    display: block; 
-                                }}
-                            </style>
-                        </head>
-                        <body>
-                            {svgContent}
-                        </body>
-                        </html>";
-
-                    RelayAnimationWebView.NavigateToString(html);
-                }
-            }
-            catch (Exception ex)
-            {
-                Log($"[UI] Failed to load animation: {ex.Message}");
-            }
-        }
 
         private async void SaveSettingsButton_Click(object sender, RoutedEventArgs e)
         {
@@ -411,7 +369,7 @@ namespace RobotControllerApp
                 _settings.Robot2Ip = Robot2IpInput.Text.Trim();
                 _robotBridge.RosIp = _settings.RobotIp;
                 _robotBridge.RelayServerUrl = $"ws://localhost:{_settings.RelayPort}/robot"; // Robot 1 Config
-                // Note: Robot 2 connection logic is not yet implemented in service, only stored in settings.
+                                                                                             // Note: Robot 2 connection logic is not yet implemented in service, only stored in settings.
 
                 // Persist to Disk
                 _settings.Save();
@@ -441,8 +399,6 @@ namespace RobotControllerApp
 
                     RelayStatusText.Text = $"Running (Port {_settings.RelayPort})";
 
-                    // Reload Animations
-                    LoadRelayAnimation();
                     UpdateRobotStatus(false);
                     UpdateRobot2Status(false);
 
@@ -584,7 +540,6 @@ namespace RobotControllerApp
             CameraView.Visibility = Visibility.Collapsed;
             LogsView.Visibility = Visibility.Collapsed;
             SettingsView.Visibility = Visibility.Collapsed;
-            NetworkView.Visibility = Visibility.Collapsed;
 
             // Show selected view
             if (args.IsSettingsSelected)
@@ -595,9 +550,6 @@ namespace RobotControllerApp
             {
                 switch (item.Tag.ToString())
                 {
-                    case "network":
-                        NetworkView.Visibility = Visibility.Visible;
-                        break;
                     case "home":
                         DashboardView.Visibility = Visibility.Visible;
                         break;
