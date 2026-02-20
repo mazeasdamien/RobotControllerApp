@@ -13,8 +13,6 @@
                         PaneDisplayMode="Left" 
                         IsBackButtonVisible="Collapsed"
                         IsSettingsVisible="False"
-                        PaneBackground="{StaticResource Brush.Background.Page}"
-                        Background="{StaticResource Brush.Background.Page}"
                         SelectionChanged="NavView_SelectionChanged" 
                         Loaded="NavView_Loaded">
             
