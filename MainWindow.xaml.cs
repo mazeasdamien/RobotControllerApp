@@ -319,10 +319,15 @@ namespace RobotControllerApp
                     if (format != null)
                         await frameSource.SetFormatAsync(format);
 
-                    // Simplest WinUI 3 pattern: set Source directly on MediaPlayerElement
-                    // (MediaSource implements IMediaPlaybackSource)
+                    // Simplest WinUI 3 pattern for webcam preview
                     var mediaSource = MediaSource.CreateFromMediaFrameSource(frameSource);
-                    LocalWebcamPreview.Source = mediaSource;
+
+                    var player = new MediaPlayer();
+                    player.Source = mediaSource;
+                    player.AutoPlay = true;
+
+                    LocalWebcamPreview.SetMediaPlayer(player);
+                    player.Play();
 
                     Log($"[Webcam] Streaming: {selected.Name}");
                 }
