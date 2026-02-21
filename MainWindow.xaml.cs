@@ -845,7 +845,7 @@ namespace RobotControllerApp
                     double internetLat = 0;
                     try
                     {
-                        var reply = await _pinger.SendPingAsync("100.100.100.100", 1000);
+                        var reply = await _pinger.SendPingAsync("google.com", 1000);
                         if (reply.Status == IPStatus.Success)
                         {
                             internetLat = reply.RoundtripTime;

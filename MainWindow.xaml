@@ -427,7 +427,7 @@
                                         <StackPanel Spacing="16">
                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                             <FontIcon Glyph="&#xE81E;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
-                                            <TextBlock Text="Tailscale Performance Test" Style="{StaticResource Text.Headline3}"/>
+                                            <TextBlock Text="Internet Performance Test" Style="{StaticResource Text.Headline3}"/>
                                         </StackPanel>
                                             
                                             <Grid ColumnSpacing="16">
@@ -530,7 +530,7 @@
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                                                     <Ellipse Width="8" Height="8" Fill="#00E5FF"/>
-                                                    <TextBlock Text="Tailscale VPN" FontSize="12" Opacity="0.8"/>
+                                                    <TextBlock Text="Internet (Google)" FontSize="12" Opacity="0.8"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
@@ -589,7 +589,7 @@
 
                                             <!-- Internet Stats -->
                                             <StackPanel Grid.Column="1" Spacing="4">
-                                                <TextBlock Text="TAILSCALE LATENCY" FontSize="10" FontWeight="Bold" Foreground="#00E5FF" Margin="0,0,0,4"/>
+                                                <TextBlock Text="INTERNET (GOOGLE) LATENCY" FontSize="10" FontWeight="Bold" Foreground="#00E5FF" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal" Spacing="16">
                                                     <StackPanel>
                                                         <TextBlock Text="MIN" FontSize="9" Opacity="0.5"/>
