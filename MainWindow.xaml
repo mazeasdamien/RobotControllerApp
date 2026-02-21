@@ -234,13 +234,44 @@
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="256"/>
                                         </Grid.RowDefinitions>
-                                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
+
+                                        <!-- Title -->
+                                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
                                             <FontIcon Glyph="&#xE722;" FontSize="18" Foreground="#0078D7"/>
-                                            <TextBlock Text="OPERATOR WEBCAM" FontWeight="SemiBold"/>
+                                            <TextBlock Text="OPERATOR WEBCAM" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                         </StackPanel>
-                                        <Border Grid.Row="1" Background="Black" CornerRadius="8">
+
+                                        <!-- Camera selector -->
+                                        <Grid Grid.Row="1" Margin="0,0,0,10">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <ComboBox x:Name="CameraComboBox"
+                                                      PlaceholderText="Select camera..."
+                                                      HorizontalAlignment="Stretch"
+                                                      SelectionChanged="CameraComboBox_SelectionChanged"
+                                                      FontSize="12"
+                                                      CornerRadius="6"/>
+                                            <Button Grid.Column="1" x:Name="RefreshCamerasButton"
+                                                    Content="&#xE72C;"
+                                                    FontFamily="Segoe Fluent Icons"
+                                                    FontSize="14"
+                                                    Width="36" Height="36"
+                                                    Margin="6,0,0,0"
+                                                    ToolTipService.ToolTip="Refresh camera list"
+                                                    Click="RefreshCamerasButton_Click"
+                                                    CornerRadius="6"
+                                                    Background="Transparent"
+                                                    BorderThickness="1"
+                                                    BorderBrush="{StaticResource Brush.Border}"/>
+                                        </Grid>
+
+                                        <!-- Preview -->
+                                        <Border Grid.Row="2" Background="Black" CornerRadius="8">
                                             <MediaPlayerElement x:Name="LocalWebcamPreview" AutoPlay="True" Stretch="Uniform"/>
                                         </Border>
                                     </Grid>

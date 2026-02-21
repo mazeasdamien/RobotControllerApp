@@ -259,52 +259,110 @@ namespace RobotControllerApp
             _ = TraceHubLocation(); // Initial async trace
             StatusPulseAnimation.Begin();
 
-            // Initialize Webcam
-            _ = InitializeLocalWebcam();
+            // Initialize Webcam — enumerate cameras and auto-select
+            _ = LoadCameraList();
         }
 
         private MediaCapture? _mediaCapture;
-        private async Task InitializeLocalWebcam()
+        private Windows.Devices.Enumeration.DeviceInformationCollection? _videoDevices;
+
+        /// <summary>Enumerate cameras and populate the ComboBox.</summary>
+        private async Task LoadCameraList()
         {
             try
             {
-                var videoDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(Windows.Devices.Enumeration.DeviceClass.VideoCapture);
-                if (videoDevices.Count == 0)
+                _videoDevices = await Windows.Devices.Enumeration.DeviceInformation
+                    .FindAllAsync(Windows.Devices.Enumeration.DeviceClass.VideoCapture);
+
+                CameraComboBox.Items.Clear();
+
+                if (_videoDevices.Count == 0)
                 {
-                    Log("[Webcam] No cameras found");
+                    Log("[Webcam] No cameras found.");
                     return;
                 }
 
-                // Check for Creative webcam first, otherwise fallback to the first one available
-                var selectedCamera = videoDevices.FirstOrDefault(c => c.Name.IndexOf("Creative", StringComparison.OrdinalIgnoreCase) >= 0) ?? videoDevices[0];
+                foreach (var device in _videoDevices)
+                    CameraComboBox.Items.Add(device.Name);
 
+                // Auto-select Creative camera if present, else first available
+                int defaultIdx = 0;
+                for (int i = 0; i < _videoDevices.Count; i++)
+                {
+                    if (_videoDevices[i].Name.IndexOf("Creative", StringComparison.OrdinalIgnoreCase) >= 0)
+                    { defaultIdx = i; break; }
+                }
+
+                CameraComboBox.SelectedIndex = defaultIdx;
+                Log($"[Webcam] {_videoDevices.Count} camera(s) found. Selected: {_videoDevices[defaultIdx].Name}");
+            }
+            catch (Exception ex)
+            {
+                Log($"[Webcam] Failed to enumerate cameras: {ex.Message}");
+            }
+        }
+
+        /// <summary>Start the selected camera by its index in the ComboBox.</summary>
+        private async Task StartCameraByIndex(int index)
+        {
+            if (_videoDevices == null || index < 0 || index >= _videoDevices.Count) return;
+
+            // Stop and dispose existing capture
+            if (_mediaCapture != null)
+            {
+                try
+                {
+                    LocalWebcamPreview.Source = null;
+                    _mediaCapture.Dispose();
+                    _mediaCapture = null;
+                }
+                catch { }
+            }
+
+            try
+            {
+                var selected = _videoDevices[index];
                 _mediaCapture = new MediaCapture();
                 var settings = new MediaCaptureInitializationSettings
                 {
-                    VideoDeviceId = selectedCamera.Id,
+                    VideoDeviceId = selected.Id,
                     StreamingCaptureMode = StreamingCaptureMode.Video,
                     PhotoCaptureSource = PhotoCaptureSource.VideoPreview
                 };
                 await _mediaCapture.InitializeAsync(settings);
 
-                var frameSourceInfo = _mediaCapture.FrameSources.Values
+                var frameSource = _mediaCapture.FrameSources.Values
                     .FirstOrDefault(s => s.Info.MediaStreamType == MediaStreamType.VideoPreview)
                     ?? _mediaCapture.FrameSources.Values.FirstOrDefault();
 
-                if (frameSourceInfo != null)
+                if (frameSource != null)
                 {
-                    var format = frameSourceInfo.SupportedFormats.FirstOrDefault(f => f.VideoFormat.Width == 1280 && f.VideoFormat.Height == 720)
-                                 ?? frameSourceInfo.SupportedFormats.OrderByDescending(f => f.VideoFormat.Width).FirstOrDefault();
-                    if (format != null) await frameSourceInfo.SetFormatAsync(format);
+                    var format = frameSource.SupportedFormats
+                        .FirstOrDefault(f => f.VideoFormat.Width == 1280 && f.VideoFormat.Height == 720)
+                        ?? frameSource.SupportedFormats.OrderByDescending(f => f.VideoFormat.Width).FirstOrDefault();
 
-                    LocalWebcamPreview.Source = Windows.Media.Core.MediaSource.CreateFromMediaFrameSource(frameSourceInfo);
-                    Log($"[Webcam] Initialized attached camera: {selectedCamera.Name}");
+                    if (format != null) await frameSource.SetFormatAsync(format);
+
+                    LocalWebcamPreview.Source = Windows.Media.Core.MediaSource.CreateFromMediaFrameSource(frameSource);
+                    Log($"[Webcam] Streaming: {selected.Name}");
                 }
             }
             catch (Exception ex)
             {
-                Log($"[Webcam] Initialization failed: {ex.Message}");
+                Log($"[Webcam] Failed to start camera: {ex.Message}");
             }
+        }
+
+        private async void CameraComboBox_SelectionChanged(object sender, Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs e)
+        {
+            int idx = CameraComboBox.SelectedIndex;
+            if (idx >= 0) await StartCameraByIndex(idx);
+        }
+
+        private async void RefreshCamerasButton_Click(object sender, RoutedEventArgs e)
+        {
+            Log("[Webcam] Refreshing camera list...");
+            await LoadCameraList();
         }
 
         private void UpdateRobotStatus(bool isConnected)
@@ -554,32 +612,46 @@ namespace RobotControllerApp
                 double upMbps = -1;
 
                 using var client = new HttpClient();
-                client.Timeout = TimeSpan.FromSeconds(15);
+                client.Timeout = TimeSpan.FromSeconds(30);
 
-                // 1. DOWNLOAD TEST (2MB for better reliability/speed at 10s intervals)
+                // ── 1. DOWNLOAD TEST ──────────────────────────────────────────────────
+                // 25 MB streamed in chunks — avoids TCP slow-start skew and RAM spike.
+                // At 100 Mbps this takes ~2s; at 400 Mbps ~0.5s — both reliable ranges.
                 try
                 {
-                    // Removed speedtest URLs
+                    long totalBytes = 0;
                     var sw = System.Diagnostics.Stopwatch.StartNew();
-                    byte[] data = await client.GetByteArrayAsync("https://speed.cloudflare.com/__down?bytes=2000000");
+
+                    using var response = await client.GetAsync(
+                        "https://speed.cloudflare.com/__down?bytes=25000000",
+                        HttpCompletionOption.ResponseHeadersRead);
+
+                    using var stream = await response.Content.ReadAsStreamAsync();
+                    byte[] buf = new byte[65536]; // 64 KB chunks
+                    int read;
+                    while ((read = await stream.ReadAsync(buf, 0, buf.Length)) > 0)
+                        totalBytes += read;
+
                     sw.Stop();
-                    downMbps = (data.Length * 8.0 / 1000000.0) / sw.Elapsed.TotalSeconds;
+                    if (sw.Elapsed.TotalSeconds > 0)
+                        downMbps = (totalBytes * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
                 }
                 catch { downMbps = -1; }
 
-                // 2. UPLOAD TEST (1MB)
+                // ── 2. UPLOAD TEST ────────────────────────────────────────────────────
+                // 4 MB of random data — gives a reasonable signal on any connection.
                 try
                 {
-                    byte[] upData = new byte[1000000]; // 1MB
+                    byte[] upData = new byte[4_000_000]; // 4 MB
                     new Random().NextBytes(upData);
 
                     var sw = System.Diagnostics.Stopwatch.StartNew();
-                    var content = new ByteArrayContent(upData);
+                    using var content = new ByteArrayContent(upData);
                     var resp = await client.PostAsync("https://speed.cloudflare.com/__up", content);
                     sw.Stop();
 
-                    if (resp.IsSuccessStatusCode)
-                        upMbps = (upData.Length * 8.0 / 1000000.0) / sw.Elapsed.TotalSeconds;
+                    if (resp.IsSuccessStatusCode && sw.Elapsed.TotalSeconds > 0)
+                        upMbps = (upData.Length * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
                 }
                 catch { upMbps = -1; }
 
