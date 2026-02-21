@@ -93,10 +93,10 @@ namespace RobotControllerApp.Services
                         await SendToRelay(message); // Forward to Relay
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     if (!token.IsCancellationRequested)
-                        Log($"[ROS] Failed to connect to local robot ({RosIp}). Details: {ex.Message}");
+                        Log($"[ROS] Failed to connect to local robot ({RosIp}).");
                 }
                 finally
                 {
@@ -116,23 +116,18 @@ namespace RobotControllerApp.Services
 
             while (!token.IsCancellationRequested)
             {
-                // WAIT for ROS Connection first
-                // We don't want to connect to the Relay until we are actually connected to the Robot.
-                // This ensures the Relay Server knows that if we are connected, the Robot is too.
-                while ((_robotWebSocket == null || _robotWebSocket.State != WebSocketState.Open) && !token.IsCancellationRequested)
-                {
-                    await Task.Delay(1000, token);
-                }
+                // Bridge now connects to Relay immediately to validate the communication link,
+                // even if the hardware ROS robot is still booting or offline.
 
                 if (token.IsCancellationRequested) break;
 
                 try
                 {
                     _relayWebSocket = new ClientWebSocket();
-                    Log($"[Bridge] Connecting to Relay {relayUrl}...");
+                    Log($"[Hub] Connecting to Expert Hub at {relayUrl}...");
 
                     await _relayWebSocket.ConnectAsync(new Uri(relayUrl), token);
-                    Log("[Bridge] ✓ Connected to Relay Server");
+                    Log("[Hub] ✓ Connected to Expert Hub");
                     StartRelayHeartbeat();
 
                     // Register
@@ -167,15 +162,15 @@ namespace RobotControllerApp.Services
 
                         if (message.Contains("publish") || message.Contains("call_service"))
                         {
-                            Log("[Bridge] 📥 Received command from Relay, forwarding to ROS...");
+                            Log("[Hub] 📥 Received command from Expert Hub, forwarding to ROS...");
                         }
                         await SendToRobot(message); // Forward to Robot
                     }
                 }
-                catch (Exception ex)
+                catch (Exception)
                 {
                     if (!token.IsCancellationRequested)
-                        Log($"[Bridge] Failed to connect to Relay Server. Details: {ex.Message}");
+                        Log($"[Hub] Failed to connect to Expert Hub.");
                 }
                 finally
                 {
@@ -225,6 +220,26 @@ namespace RobotControllerApp.Services
             };
             await SendToRobot(JsonSerializer.Serialize(subscribeCamera));
             Log("[ROS] Subscribed to Camera Stream");
+
+            // Additional Telemetry for Research
+            var subscribeGripper = new
+            {
+                op = "subscribe",
+                topic = "/niryo_robot_gripper/gripper_state",
+                type = "niryo_robot_msgs/GripperState",
+                throttle_rate = 500
+            };
+            await SendToRobot(JsonSerializer.Serialize(subscribeGripper));
+
+            var subscribeState = new
+            {
+                op = "subscribe",
+                topic = "/niryo_robot/robot_state",
+                type = "niryo_robot_msgs/RobotState",
+                throttle_rate = 1000
+            };
+            await SendToRobot(JsonSerializer.Serialize(subscribeState));
+            Log("[ROS] Subscribed to Gripper and System State");
         }
 
         async Task SendToRobot(string json)
@@ -236,7 +251,7 @@ namespace RobotControllerApp.Services
             }
             else
             {
-                Log("[Bridge] ⚠️ Cannot forward command: Not connected to Robot (ROS).");
+                Log("[Hub] ⚠️ Cannot forward command: Not connected to Robot (ROS).");
             }
         }
 

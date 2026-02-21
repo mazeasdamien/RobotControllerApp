@@ -27,6 +27,7 @@
     
     <SolidColorBrush x:Key="Brush.Status.Success" Color="{StaticResource Color.Status.Success}" />
     <SolidColorBrush x:Key="Brush.Status.Warning" Color="{StaticResource Color.Status.Warning}" />
+    <SolidColorBrush x:Key="Brush.Status.Error" Color="{StaticResource Color.Status.Error}" />
 
     <!-- NAVIGATION VIEW OVERRIDES (Fix Blue Highlight) -->
     <Color x:Key="SystemAccentColor">#FFFF7900</Color>

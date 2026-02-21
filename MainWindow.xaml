@@ -16,6 +16,7 @@
                         SelectionChanged="NavView_SelectionChanged" 
                         Loaded="NavView_Loaded">
             
+
             <NavigationView.MenuItems>
                 <NavigationViewItem Content="Dashboard" Tag="home">
                     <NavigationViewItem.Icon>
@@ -26,6 +27,18 @@
                 <NavigationViewItem Content="WhatsApp Logs" Tag="logs">
                     <NavigationViewItem.Icon>
                         <SymbolIcon Symbol="Message"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+
+                <NavigationViewItem Content="Telemetry" Tag="telemetry">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="FourBars"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
+
+                <NavigationViewItem Content="Expert Network" Tag="network">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="World"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
@@ -76,9 +89,14 @@
                             </Grid.RowDefinitions>
 
                             <!-- HEADER -->
-                            <StackPanel Grid.Row="0" Margin="0,0,0,24">
-                                <TextBlock Text="Telepresence Control Station" Style="{StaticResource Text.Headline1}"/>
-                                <TextBlock Text="Unified Relay &amp; Console Manager" Style="{StaticResource Text.Caption}" Margin="0,4,0,0"/>
+                            <StackPanel Grid.Row="0" Margin="0,0,0,24" Orientation="Horizontal" Spacing="20">
+                                <Border Background="{StaticResource Brush.Background.Card}" Padding="12" CornerRadius="12">
+                                    <Image Source="ms-appx:///Assets/AppLogo.png" Width="48" Height="48"/>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Telepresence Control Station" Style="{StaticResource Text.Headline1}"/>
+                                    <TextBlock Text="Unified Relay &amp; Console Manager" Style="{StaticResource Text.Caption}" Margin="0,4,0,0"/>
+                                </StackPanel>
                             </StackPanel>
 
                             <!-- STATUS CARDS -->
@@ -99,12 +117,12 @@
 
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
-                                                <FontIcon Glyph="&#xE774;" FontSize="24" Foreground="{StaticResource Brush.Status.Success}"/>
-                                                <TextBlock Text="RELAY SERVER" Style="{StaticResource Text.Headline3}"/>
+                                                <FontIcon x:Name="RelayIcon" Glyph="&#xE774;" FontSize="24" Foreground="{StaticResource Brush.Text.Muted}"/>
+                                                <TextBlock Text="EXPERT INTERFACE (QUEST 3)" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
-                                            <TextBlock x:Name="RelayStatusText" Text="Initializing..." Style="{StaticResource Text.Caption}" Margin="0,8,0,0"/>
+                                            <TextBlock x:Name="RelayStatusText" Text="Listening for Quest 3..." Style="{StaticResource Text.Caption}" Margin="0,8,0,0"/>
                                             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-                                                <TextBlock x:Name="RelayActiveText" Text="ACTIVE" FontWeight="Bold" Foreground="{StaticResource Brush.Status.Success}"/>
+                                                <TextBlock x:Name="RelayActiveText" Text="STANDBY" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}"/>
                                                 <TextBlock Text="|" Opacity="0.3"/>
                                                 <TextBlock x:Name="RelayLatencyText" Text="-- ms" Opacity="0.7" FontSize="12" VerticalAlignment="Center"/>
                                             </StackPanel>
@@ -112,13 +130,13 @@
 
                                         <!-- Modern Status Indicator -->
                                         <Grid Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
-                                            <Ellipse x:Name="RelayHaloOuter" Width="48" Height="48" Stroke="{StaticResource Brush.Status.Success}" StrokeThickness="1" Opacity="0.2" RenderTransformOrigin="0.5,0.5">
+                                            <Ellipse x:Name="RelayHaloOuter" Width="48" Height="48" Stroke="{Binding ElementName=RelayActiveText, Path=Foreground}" StrokeThickness="1" Opacity="0.2" RenderTransformOrigin="0.5,0.5">
                                                 <Ellipse.RenderTransform>
                                                     <ScaleTransform/>
                                                 </Ellipse.RenderTransform>
                                             </Ellipse>
-                                            <Ellipse x:Name="RelayHaloInner" Width="36" Height="36" Stroke="{StaticResource Brush.Status.Success}" StrokeThickness="2" Opacity="0.4"/>
-                                            <FontIcon Glyph="&#xE813;" FontSize="20" Foreground="{StaticResource Brush.Status.Success}"/>
+                                            <Ellipse x:Name="RelayHaloInner" Width="36" Height="36" Stroke="{Binding ElementName=RelayActiveText, Path=Foreground}" StrokeThickness="2" Opacity="0.4"/>
+                                            <FontIcon x:Name="RelayHaloIcon" Glyph="&#xE813;" FontSize="20" Foreground="{Binding ElementName=RelayActiveText, Path=Foreground}"/>
                                         </Grid>
                                     </Grid>
                                 </Border>
@@ -245,14 +263,14 @@
                             </Grid>
 
                             <!-- LOGS & TELEMETRY -->
+                            <!-- LOGS & MINIMAL FEEDBACK -->
                             <Grid Grid.Row="3" ColumnSpacing="24">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="1.5*"/> <!-- Logs -->
-                                    <ColumnDefinition Width="2.5*"/> <!-- Dashboard -->
+                                    <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- LEFT: System Logs -->
-                                <Grid Grid.Column="0">
+                                <!-- System Logs -->
+                                <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
@@ -264,129 +282,140 @@
                                         </ScrollViewer>
                                     </Border>
                                 </Grid>
-
-                                <!-- RIGHT: Detailed Telemetry -->
-                                <Grid Grid.Column="1">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-                                    <TextBlock Text="Live Telemetry" Style="{StaticResource Text.Headline3}" Margin="{StaticResource Margin.Component}"/>
-                                    
-                                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                                        <Grid RowSpacing="16" ColumnSpacing="16">
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="Auto"/>
-                                            </Grid.RowDefinitions>
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-
-                                            <!-- 1. Robot State Card -->
-                                            <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Small}" Padding="16">
-                                                <StackPanel Spacing="12">
-                                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                                        <FontIcon Glyph="&#xE99A;" Foreground="{StaticResource Brush.Primary}"/>
-                                                        <TextBlock Text="Robot 1" FontWeight="SemiBold"/>
-                                                    </StackPanel>
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Text="Joints:" Opacity="0.6" Margin="0,0,8,0"/>
-                                                        <TextBlock x:Name="TelemJoints" Text="[0, 0, 0, 0, 0, 0]" Grid.Column="1" TextWrapping="Wrap" FontSize="12" FontFamily="Consolas"/>
-                                                    </Grid>
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Text="Gripper:" Opacity="0.6" Margin="0,0,8,0"/>
-                                                        <TextBlock x:Name="TelemGripper" Text="Unknown" Grid.Column="1" FontWeight="Bold"/>
-                                                    </Grid>
-                                                    <Grid>
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="Auto"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <TextBlock Text="Mode:" Opacity="0.6" Margin="0,0,8,0"/>
-                                                        <TextBlock x:Name="TelemMode" Text="Standard" Grid.Column="1"/>
-                                                    </Grid>
-                                                </StackPanel>
-                                            </Border>
-
-                                            <!-- 2. Unity / Headset Card -->
-                                            <Border Grid.Row="0" Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Small}" Padding="16">
-                                                <StackPanel Spacing="12">
-                                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                                        <FontIcon Glyph="&#xE7F4;" Foreground="#0078D7"/>
-                                                        <TextBlock Text="Unity / Headset" FontWeight="SemiBold"/>
-                                                    </StackPanel>
-                                                    <TextBlock Text="Last IK Solution:" Opacity="0.6" FontSize="10"/>
-                                                    <TextBlock x:Name="TelemIKPos" Text="Pos: [0.00, 0.00, 0.00]" FontFamily="Consolas" FontSize="12"/>
-                                                    <TextBlock x:Name="TelemIKRot" Text="Rot: [0.00, 0.00, 0.00, 1.00]" FontFamily="Consolas" FontSize="12"/>
-                                                    <Border Height="1" Background="#FFFFFF" Opacity="0.1" Margin="0,4"/>
-                                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                                        <TextBlock Text="Latency:" Opacity="0.6"/>
-                                                        <TextBlock x:Name="TelemUnityLatency" Text="-- ms" Foreground="#0078D7"/>
-                                                    </StackPanel>
-                                                </StackPanel>
-                                            </Border>
-
-                                            <!-- 3. Media Stats Card -->
-                                            <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Small}" Padding="16">
-                                                <StackPanel Spacing="12">
-                                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                                        <FontIcon Glyph="&#xE722;" Foreground="#FFD279"/> <!-- Camera -->
-                                                        <TextBlock Text="Media Stream" FontWeight="SemiBold"/>
-                                                    </StackPanel>
-                                                    <Grid>
-                                                         <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        <StackPanel>
-                                                            <TextBlock Text="FPS" Opacity="0.6" FontSize="10"/>
-                                                            <TextBlock x:Name="TelemFps" Text="0" FontSize="20"/>
-                                                        </StackPanel>
-                                                        <StackPanel Grid.Column="1">
-                                                            <TextBlock Text="Total Sent" Opacity="0.6" FontSize="10"/>
-                                                            <TextBlock x:Name="TelemTotalImages" Text="0" FontSize="20"/>
-                                                        </StackPanel>
-                                                    </Grid>
-                                                    <ProgressBar x:Name="TelemBufferBar" Value="0" Maximum="100" Height="4"/>
-                                                    <TextBlock Text="Buffer Health" HorizontalAlignment="Right" FontSize="10" Opacity="0.5"/>
-                                                </StackPanel>
-                                            </Border>
-
-                                            <!-- 4. Communication Card -->
-                                            <Border Grid.Row="1" Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Small}" Padding="16">
-                                                <StackPanel Spacing="12">
-                                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                                        <FontIcon Glyph="&#xE8BD;" Foreground="#25D366"/>
-                                                        <TextBlock Text="Communication" FontWeight="SemiBold"/>
-                                                    </StackPanel>
-                                                    <TextBlock Text="Last Command Received:" Opacity="0.6" FontSize="10"/>
-                                                    <TextBlock x:Name="TelemLastCmd" Text="-"  TextWrapping="Wrap" MaxLines="2" TextTrimming="CharacterEllipsis" FontStyle="Italic"/>
-                                                    <Border Height="1" Background="#FFFFFF" Opacity="0.1" Margin="0,4"/>
-                                                    <Grid>
-                                                        <TextBlock Text="Source:" Opacity="0.6"/>
-                                                        <TextBlock x:Name="TelemCmdSource" Text="System" HorizontalAlignment="Right" Foreground="#25D366"/>
-                                                    </Grid>
-                                                </StackPanel>
-                                            </Border>
-
-                                        </Grid>
-                                    </ScrollViewer>
-                                </Grid>
                             </Grid>
                         </Grid>
                     </Border>
                 </Grid>
 
+                <!-- 2. EXPERT TELEMETRY VIEW -->
+                <Grid x:Name="TelemetryView" Visibility="Collapsed">
+                    <Border Padding="{StaticResource Padding.Page}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24">
+                                <Image Source="ms-appx:///Assets/AppLogo.png" Width="36" Height="36"/>
+                                <TextBlock Text="Telemetry" Style="{StaticResource Text.Headline1}" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                                <Grid RowSpacing="24" ColumnSpacing="24">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- 1. Robot Core State -->
+                                    <Border Grid.Row="0" Grid.Column="0" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="24">
+                                        <StackPanel Spacing="16">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE99A;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
+                                                <TextBlock Text="Local Robot State" Style="{StaticResource Text.Headline3}"/>
+                                            </StackPanel>
+                                            <StackPanel Spacing="12">
+                                                <Grid>
+                                                    <TextBlock Text="Joint Configuration" Opacity="0.6"/>
+                                                    <TextBlock x:Name="TelemJoints" Text="[0, 0, 0, 0, 0, 0]" HorizontalAlignment="Right" FontFamily="Consolas"/>
+                                                </Grid>
+                                                <Border Height="1" Background="White" Opacity="0.1"/>
+                                                <Grid>
+                                                    <TextBlock Text="End Effector (Gripper)" Opacity="0.6"/>
+                                                    <TextBlock x:Name="TelemGripper" Text="Unknown" HorizontalAlignment="Right" FontWeight="Bold" Foreground="{StaticResource Brush.Primary}"/>
+                                                </Grid>
+                                                <Border Height="1" Background="White" Opacity="0.1"/>
+                                                <Grid>
+                                                    <TextBlock Text="Operational Mode" Opacity="0.6"/>
+                                                    <TextBlock x:Name="TelemMode" Text="Standard / Teleop" HorizontalAlignment="Right"/>
+                                                </Grid>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- 2. IK Solver Feed (From Quest 3) -->
+                                    <Border Grid.Row="0" Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="24">
+                                        <StackPanel Spacing="16">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE7F4;" FontSize="20" Foreground="#0078D7"/>
+                                                <TextBlock Text="IK Matrix Solutions" Style="{StaticResource Text.Headline3}"/>
+                                            </StackPanel>
+                                            <StackPanel Spacing="12">
+                                                <TextBlock Text="Target Pose (World Coordinates)" Opacity="0.6"/>
+                                                <Border Background="Black" Padding="12" CornerRadius="8">
+                                                    <StackPanel>
+                                                        <TextBlock x:Name="TelemIKPos" Text="Pos: [0.00, 0.00, 0.00]" FontFamily="Consolas" FontSize="14" Foreground="#00FF00"/>
+                                                        <TextBlock x:Name="TelemIKRot" Text="Rot: [0.00, 0.00, 0.00, 1.00]" FontFamily="Consolas" FontSize="14" Foreground="#00FF00" Margin="0,4,0,0"/>
+                                                    </StackPanel>
+                                                </Border>
+                                                <Grid Margin="0,8,0,0">
+                                                    <TextBlock Text="Signal Interval" Opacity="0.6"/>
+                                                    <TextBlock x:Name="TelemUnityLatency" Text="-- ms" HorizontalAlignment="Right" Foreground="#0078D7"/>
+                                                </Grid>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- 3. Network Media Performance -->
+                                    <Border Grid.Row="1" Grid.Column="0" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="24">
+                                        <StackPanel Spacing="16">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE722;" FontSize="20" Foreground="#FFD279"/>
+                                                <TextBlock Text="Media Pipeline" Style="{StaticResource Text.Headline3}"/>
+                                            </StackPanel>
+                                            <Grid ColumnSpacing="24">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="Throughput" Opacity="0.6" FontSize="11"/>
+                                                    <TextBlock x:Name="TelemFps" Text="0.0" FontSize="32" FontWeight="Bold"/>
+                                                    <TextBlock Text="Frames / Second" FontSize="10" Opacity="0.5"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="Total Transmission" Opacity="0.6" FontSize="11"/>
+                                                    <TextBlock x:Name="TelemTotalImages" Text="0" FontSize="32" FontWeight="Bold" Foreground="#FFD279"/>
+                                                    <TextBlock Text="Encoded Images" FontSize="10" Opacity="0.5"/>
+                                                </StackPanel>
+                                            </Grid>
+                                            <StackPanel Spacing="4">
+                                                <Grid>
+                                                    <TextBlock Text="Stream Buffer Health" FontSize="11" Opacity="0.6"/>
+                                                    <TextBlock Text="NOMINAL" FontSize="10" HorizontalAlignment="Right" Foreground="#00CC6A"/>
+                                                </Grid>
+                                                <ProgressBar x:Name="TelemBufferBar" Value="0" Maximum="100" Height="4" Foreground="#FFD279"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- 4. Command Dispatcher -->
+                                    <Border Grid.Row="1" Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="24">
+                                        <StackPanel Spacing="16">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE8BD;" FontSize="20" Foreground="#25D366"/>
+                                                <TextBlock Text="Command Dispatch" Style="{StaticResource Text.Headline3}"/>
+                                            </StackPanel>
+                                            <TextBlock Text="Last Instruction Received:" Opacity="0.6"/>
+                                            <Border Background="#202C33" Padding="16" CornerRadius="8">
+                                                <TextBlock x:Name="TelemLastCmd" Text="Hub idle. Awaiting instruction..." FontStyle="Italic" TextWrapping="Wrap" MaxLines="3" Foreground="#8696A0"/>
+                                            </Border>
+                                            <Grid>
+                                                <TextBlock Text="Active Provider:" Opacity="0.6"/>
+                                                <TextBlock x:Name="TelemCmdSource" Text="SYSTEM" HorizontalAlignment="Right" Foreground="#25D366" FontWeight="Bold"/>
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </Grid>
 
                 <!-- 3. LOGS VIEW (WhatsApp) -->
                 <Grid x:Name="LogsView" Visibility="Collapsed">
@@ -472,121 +501,338 @@
                     </Border>
                 </Grid>
 
-                <!-- 5. NETWORK VIEW -->
+                            <!-- 5. NETWORK VIEW -->
                 <Grid x:Name="NetworkView" Visibility="Collapsed">
                     <Border Padding="{StaticResource Padding.Page}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
 
-                            <TextBlock Text="Network &amp; Latency" Style="{StaticResource Text.Headline1}" Margin="0,0,0,24"/>
+                                <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24">
+                                    <Image Source="ms-appx:///Assets/AppLogo.png" Width="36" Height="36"/>
+                                    <TextBlock Text="Network &amp; Latency" Style="{StaticResource Text.Headline1}" VerticalAlignment="Center"/>
+                                </StackPanel>
 
-                            <!-- Speed Test Section -->
-                            <Border Grid.Row="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}" Margin="0,0,0,24" HorizontalAlignment="Left" MinWidth="500">
-                                <StackPanel Spacing="16">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <FontIcon Glyph="&#xE9D2;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
-                                        <TextBlock Text="Internet Speed Test" Style="{StaticResource Text.Headline3}"/>
-                                    </StackPanel>
-                                    
-                                    <Grid ColumnSpacing="24">
+                                <!-- Speed Test Section -->
+                                <Border Grid.Row="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}" Margin="0,0,0,24" HorizontalAlignment="Stretch">
+                                    <Grid ColumnSpacing="32">
                                         <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="420"/>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         
-                                        <StackPanel Grid.Column="0">
-                                            <TextBlock Text="LATENCY" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
-                                            <TextBlock Text="-- ms" FontSize="24" FontWeight="SemiBold" x:Name="InternetLatencyText"/>
+                                        <StackPanel Spacing="16">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE9D2;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
+                                                <TextBlock Text="Internet Speed Test" Style="{StaticResource Text.Headline3}"/>
+                                            </StackPanel>
+                                            
+                                            <Grid ColumnSpacing="16">
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                
+                                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,16">
+                                                    <TextBlock Text="LATENCY" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
+                                                    <TextBlock Text="-- ms" FontSize="20" FontWeight="SemiBold" x:Name="InternetLatencyText"/>
+                                                </StackPanel>
+
+                                                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,16">
+                                                    <TextBlock Text="DOWNLOAD" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
+                                                    <TextBlock Text="-- Mbps" FontSize="20" FontWeight="SemiBold" x:Name="InternetSpeedText" Foreground="{StaticResource Brush.Primary}"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,16">
+                                                    <TextBlock Text="UPLOAD" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
+                                                    <TextBlock Text="-- Mbps" FontSize="20" FontWeight="SemiBold" x:Name="InternetUploadText" Foreground="#00E5FF"/>
+                                                </StackPanel>
+                                                
+                                                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2">
+                                                    <TextBlock Text="STATUS" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
+                                                    <TextBlock Text="Idle" FontSize="16" FontWeight="SemiBold" x:Name="NetworkStatusText"/>
+                                                </StackPanel>
+                                                
+                                                <StackPanel Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="AUTO-MONITORING" FontSize="11" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" VerticalAlignment="Center" Opacity="0.8"/>
+                                                    <ToggleSwitch x:Name="AutoMonitorToggle" IsOn="True" MinWidth="0" Margin="0,0,0,-8" Toggled="AutoMonitorToggle_Toggled"/>
+                                                </StackPanel>
+                                                <Button x:Name="RunSpeedTestButton" Visibility="Collapsed" IsEnabled="True"/>
+                                            </Grid>
+
+                                            <!-- Speed Stats -->
+                                            <Border Background="Black" Opacity="0.3" Height="1" Margin="0,8"/>
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <TextBlock Text="LOW" FontSize="10" Opacity="0.5"/>
+                                                    <TextBlock x:Name="SpeedLowText" Text="-- Mbps" FontSize="12" FontWeight="Bold"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1">
+                                                    <TextBlock Text="HIGH" FontSize="10" Opacity="0.5"/>
+                                                    <TextBlock x:Name="SpeedHighText" Text="-- Mbps" FontSize="12" FontWeight="Bold"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="AVG" FontSize="10" Opacity="0.5"/>
+                                                    <TextBlock x:Name="SpeedAvgText" Text="-- Mbps" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Brush.Primary}"/>
+                                                </StackPanel>
+                                            </Grid>
                                         </StackPanel>
 
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="DOWNLOAD" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
-                                            <TextBlock Text="-- Mbps" FontSize="24" FontWeight="SemiBold" x:Name="InternetSpeedText" Foreground="{StaticResource Brush.Primary}"/>
-                                        </StackPanel>
-                                        
-                                        <StackPanel Grid.Column="2">
-                                            <TextBlock Text="STATUS" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
-                                            <TextBlock Text="Idle" FontSize="18" FontWeight="SemiBold" x:Name="NetworkStatusText"/>
-                                        </StackPanel>
-                                        
-                                        <Button Grid.Column="3" Content="Run Test" Style="{StaticResource Button.Primary}" VerticalAlignment="Center" Click="RunSpeedTest_Click"/>
+                                        <!-- Speed Graph -->
+                                        <Grid Grid.Column="1">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto"/>
+                                                <RowDefinition Height="*"/>
+                                            </Grid.RowDefinitions>
+                                            <TextBlock Text="Speed History (Mbps)" FontSize="12" Opacity="0.6" Margin="0,0,0,8"/>
+                                            <Border Grid.Row="1" Height="100" Background="#08FFFFFF" CornerRadius="12" BorderBrush="#15FFFFFF" BorderThickness="1">
+                                                <Canvas x:Name="SpeedCanvas">
+                                                    <Polyline x:Name="SpeedPath" Stroke="{StaticResource Brush.Primary}" StrokeThickness="2" StrokeLineJoin="Round"/>
+                                                </Canvas>
+                                            </Border>
+                                        </Grid>
                                     </Grid>
-                                </StackPanel>
-                            </Border>
+                                </Border>
 
-                            <!-- Node Graph -->
-                            <Grid Grid.Row="2" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="32">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/> <!-- Cloud -->
-                                    <RowDefinition Height="100"/>  <!-- Link -->
-                                    <RowDefinition Height="Auto"/> <!-- PC -->
-                                    <RowDefinition Height="100"/>  <!-- Links -->
-                                    <RowDefinition Height="Auto"/> <!-- Devices -->
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+                                <!-- Real-time Latency Graph -->
+                                <Border Grid.Row="2" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="32" Margin="0,0,0,24">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="150"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
 
-                                <!-- Cloudflare -->
-                                <StackPanel Grid.Row="0" Grid.Column="1" HorizontalAlignment="Center" Spacing="4">
-                                    <Border Width="60" Height="60" CornerRadius="30" Background="#2D2D30" BorderBrush="#F48024" BorderThickness="2">
-                                        <FontIcon Glyph="&#xE753;" FontSize="24" Foreground="#F48024" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Cloudflare" HorizontalAlignment="Center" FontWeight="Bold"/>
-                                    <TextBlock x:Name="GraphCloudPing" Text="-- ms" HorizontalAlignment="Center" Foreground="#F48024"/>
-                                </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="24" Margin="0,0,0,24">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE9D2;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
+                                                <TextBlock Text="Latency Timeline (RTT)" Style="{StaticResource Text.Headline3}"/>
+                                            </StackPanel>
+                                            
+                                            <!-- Legend -->
+                                            <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <Rectangle Width="12" Height="12" Fill="#0078D7"/>
+                                                    <TextBlock Text="Expert (Quest)" FontSize="12" Opacity="0.8"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <Rectangle Width="12" Height="12" Fill="{StaticResource Brush.Primary}"/>
+                                                    <TextBlock Text="Robot 1" FontSize="12" Opacity="0.8"/>
+                                                </StackPanel>
+                                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                                    <Rectangle Width="12" Height="12" Fill="#FFD279"/>
+                                                    <TextBlock Text="Robot 2" FontSize="12" Opacity="0.8"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </StackPanel>
 
-                                <!-- Vertical Line -->
-                                <Rectangle Grid.Row="1" Grid.Column="1" Width="2" Fill="#404040"/>
+                                        <!-- Graph Area -->
+                                        <Grid Grid.Row="2" Margin="0,0,0,10">
+                                            <!-- Y-Axis Labels -->
+                                            <Grid VerticalAlignment="Stretch" HorizontalAlignment="Left" Width="40" Margin="0,0,10,0">
+                                                <TextBlock Text="150ms" FontSize="10" Opacity="0.4" VerticalAlignment="Top"/>
+                                                <TextBlock Text="100ms" FontSize="10" Opacity="0.4" Margin="0,50,0,0" VerticalAlignment="Top"/>
+                                                <TextBlock Text="50ms" FontSize="10" Opacity="0.4" Margin="0,100,0,0" VerticalAlignment="Top"/>
+                                                <TextBlock Text="0ms" FontSize="10" Opacity="0.4" VerticalAlignment="Bottom"/>
+                                            </Grid>
 
-                                <!-- Controller -->
-                                <StackPanel Grid.Row="2" Grid.Column="1" HorizontalAlignment="Center" Spacing="4">
-                                    <Border Width="80" Height="80" CornerRadius="40" Background="#F48024" BorderBrush="White" BorderThickness="2">
-                                        <FontIcon Glyph="&#xE950;" FontSize="32" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="This PC" HorizontalAlignment="Center" FontWeight="Bold" FontSize="16"/>
-                                </StackPanel>
+                                            <!-- Grid Lines -->
+                                            <Canvas Margin="40,0,0,0" Opacity="0.1" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                                                <Line X1="0" Y1="0" X2="2000" Y2="0" Stroke="White" StrokeThickness="1"/>
+                                                <Line X1="0" Y1="50" X2="2000" Y2="50" Stroke="White" StrokeThickness="1"/>
+                                                <Line X1="0" Y1="100" X2="2000" Y2="100" Stroke="White" StrokeThickness="1"/>
+                                                <Line X1="0" Y1="150" X2="2000" Y2="150" Stroke="White" StrokeThickness="1"/>
+                                            </Canvas>
 
-                                <!-- Diagonal Lines via Grid/Path is hard, using simple Layout -->
-                                <Grid Grid.Row="3" Grid.ColumnSpan="3">
-                                    <Path Stroke="#404040" StrokeThickness="2" Data="M 200,100 L 400,0 L 600,100" HorizontalAlignment="Center" Stretch="Fill" Width="400" Height="100"/>
-                                </Grid>
+                                            <!-- Plot Layers -->
+                                            <Canvas x:Name="LatencyCanvas" Margin="40,0,0,0" Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                                                <Polyline x:Name="UnityPath" Stroke="#0078D7" StrokeThickness="2" StrokeLineJoin="Round"/>
+                                                <Polyline x:Name="Robot1Path" Stroke="{StaticResource Brush.Primary}" StrokeThickness="3" StrokeDashArray="2,1" StrokeLineJoin="Round"/>
+                                                <Polyline x:Name="Robot2Path" Stroke="#FFD279" StrokeThickness="3" StrokeDashArray="4,2" StrokeLineJoin="Round"/>
+                                            </Canvas>
+                                        </Grid>
 
-                                <!-- Robot -->
-                                <StackPanel Grid.Row="4" Grid.Column="0" HorizontalAlignment="Center" Spacing="4">
-                                    <Border Width="60" Height="60" CornerRadius="30" Background="#2D2D30" BorderBrush="{StaticResource Brush.Primary}" BorderThickness="2">
-                                        <FontIcon Glyph="&#xE99A;" FontSize="24" Foreground="{StaticResource Brush.Primary}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Robot" HorizontalAlignment="Center" FontWeight="Bold"/>
-                                    <TextBlock x:Name="GraphRobotPing" Text="-- ms" HorizontalAlignment="Center" Foreground="{StaticResource Brush.Primary}"/>
-                                </StackPanel>
+                                        <!-- Stats Panel -->
+                                        <Grid Grid.Row="3" Margin="40,16,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
 
-                                <!-- Unity -->
-                                <StackPanel Grid.Row="4" Grid.Column="2" HorizontalAlignment="Center" Spacing="4">
-                                    <Border Width="60" Height="60" CornerRadius="30" Background="#2D2D30" BorderBrush="#0078D7" BorderThickness="2">
-                                        <FontIcon Glyph="&#xE7F4;" FontSize="24" Foreground="#0078D7" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                    </Border>
-                                    <TextBlock Text="Unity Client" HorizontalAlignment="Center" FontWeight="Bold"/>
-                                    <TextBlock x:Name="GraphUnityPing" Text="-- ms" HorizontalAlignment="Center" Foreground="#0078D7"/>
-                                </StackPanel>
+                                            <!-- Quest Stats -->
+                                            <StackPanel Grid.Column="0" Spacing="4">
+                                                <TextBlock Text="QUEST LATENCY" FontSize="11" FontWeight="Bold" Opacity="0.6" Foreground="#0078D7"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                                    <StackPanel>
+                                                        <TextBlock Text="MIN" FontSize="9" Opacity="0.4"/>
+                                                        <TextBlock x:Name="QuestMinText" Text="-- ms" FontSize="13"/>
+                                                    </StackPanel>
+                                                    <StackPanel>
+                                                        <TextBlock Text="MAX" FontSize="9" Opacity="0.4"/>
+                                                        <TextBlock x:Name="QuestMaxText" Text="-- ms" FontSize="13"/>
+                                                    </StackPanel>
+                                                    <StackPanel>
+                                                        <TextBlock Text="AVG" FontSize="9" Opacity="0.4"/>
+                                                        <TextBlock x:Name="QuestAvgText" Text="-- ms" FontSize="13" FontWeight="SemiBold"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <!-- Robot 1 Stats -->
+                                            <StackPanel Grid.Column="1" Spacing="4">
+                                                <TextBlock Text="ROBOT 1 LATENCY" FontSize="11" FontWeight="Bold" Opacity="0.6" Foreground="{StaticResource Brush.Primary}"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                                    <StackPanel>
+                                                        <TextBlock Text="MIN" FontSize="9" Opacity="0.4"/>
+                                                        <TextBlock x:Name="R1MinText" Text="-- ms" FontSize="13"/>
+                                                    </StackPanel>
+                                                    <StackPanel>
+                                                        <TextBlock Text="MAX" FontSize="9" Opacity="0.4"/>
+                                                        <TextBlock x:Name="R1MaxText" Text="-- ms" FontSize="13"/>
+                                                    </StackPanel>
+                                                    <StackPanel>
+                                                        <TextBlock Text="AVG" FontSize="9" Opacity="0.4"/>
+                                                        <TextBlock x:Name="R1AvgText" Text="-- ms" FontSize="13" FontWeight="SemiBold"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </StackPanel>
+
+                                            <!-- Robot 2 Stats -->
+                                            <StackPanel Grid.Column="2" Spacing="4">
+                                                <TextBlock Text="ROBOT 2 LATENCY" FontSize="11" FontWeight="Bold" Opacity="0.6" Foreground="#FFD279"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="16">
+                                                    <StackPanel>
+                                                        <TextBlock Text="MIN" FontSize="9" Opacity="0.4"/>
+                                                        <TextBlock x:Name="R2MinText" Text="-- ms" FontSize="13"/>
+                                                    </StackPanel>
+                                                    <StackPanel>
+                                                        <TextBlock Text="MAX" FontSize="9" Opacity="0.4"/>
+                                                        <TextBlock x:Name="R2MaxText" Text="-- ms" FontSize="13"/>
+                                                    </StackPanel>
+                                                    <StackPanel>
+                                                        <TextBlock Text="AVG" FontSize="9" Opacity="0.4"/>
+                                                        <TextBlock x:Name="R2AvgText" Text="-- ms" FontSize="13" FontWeight="SemiBold"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Node Discovery Section -->
+                                <Border Grid.Row="3" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="32">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        
+                                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,24">
+                                            <FontIcon Glyph="&#xE774;" FontSize="20" Foreground="#00CC6A"/>
+                                            <TextBlock Text="Network Topology &amp; Node Discovery" Style="{StaticResource Text.Headline3}"/>
+                                        </StackPanel>
+                                        
+                                        <Grid Grid.Row="1" ColumnSpacing="24">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <!-- Hub Node -->
+                                            <StackPanel Grid.Column="0" Spacing="12">
+                                                <TextBlock Text="LOCAL HUB (THIS PC)" FontSize="11" FontWeight="Bold" Opacity="0.6"/>
+                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="16" CornerRadius="12">
+                                                    <StackPanel Spacing="6">
+                                                        <TextBlock x:Name="HubIpText" Text="Checking..." FontSize="13" FontWeight="SemiBold"/>
+                                                        <TextBlock x:Name="HubLocText" Text="Locating Hub..." FontSize="11" Opacity="0.5"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                                                            <Ellipse Width="6" Height="6" Fill="#00CC6A"/>
+                                                            <TextBlock Text="MASTER COUPLER" FontSize="10" FontWeight="SemiBold" Foreground="#00CC6A"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- Expert Node -->
+                                            <StackPanel Grid.Column="1" Spacing="12">
+                                                <TextBlock Text="EXPERT (QUEST)" FontSize="11" FontWeight="Bold" Opacity="0.6"/>
+                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="16" CornerRadius="12">
+                                                    <StackPanel Spacing="6">
+                                                        <TextBlock x:Name="QuestIpText" Text="Searching..." FontSize="13" FontWeight="SemiBold"/>
+                                                        <TextBlock x:Name="QuestLocText" Text="Local Mesh" FontSize="11" Opacity="0.5"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                                                            <Ellipse Width="6" Height="6" Fill="#0078D7"/>
+                                                            <TextBlock x:Name="QuestRelayText" Text="DIRECT P2P" FontSize="10" FontWeight="SemiBold" Foreground="#0078D7"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- Robot 1 Node -->
+                                            <StackPanel Grid.Column="2" Spacing="12">
+                                                <TextBlock Text="ROBOT 1" FontSize="11" FontWeight="Bold" Opacity="0.6"/>
+                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="16" CornerRadius="12">
+                                                    <StackPanel Spacing="6">
+                                                        <TextBlock x:Name="R1IpText" Text="Disconnected" FontSize="13" FontWeight="SemiBold"/>
+                                                        <TextBlock x:Name="R1LocText" Text="LAN / Ethernet" FontSize="11" Opacity="0.5"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                                                            <Ellipse Width="6" Height="6" Fill="{StaticResource Brush.Primary}"/>
+                                                            <TextBlock Text="ROS BRIDGE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Brush.Primary}"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- Robot 2 Node -->
+                                            <StackPanel Grid.Column="3" Spacing="12">
+                                                <TextBlock Text="ROBOT 2" FontSize="11" FontWeight="Bold" Opacity="0.6"/>
+                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="16" CornerRadius="12">
+                                                    <StackPanel Spacing="6">
+                                                        <TextBlock x:Name="R2IpText" Text="Offline" FontSize="13" FontWeight="SemiBold"/>
+                                                        <TextBlock x:Name="R2LocText" Text="N/A" FontSize="11" Opacity="0.5"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+                                                            <Ellipse Width="6" Height="6" Fill="#808080"/>
+                                                            <TextBlock Text="PENDING" FontSize="10" FontWeight="SemiBold" Opacity="0.8"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
                             </Grid>
-                        </Grid>
+                        </ScrollViewer>
                     </Border>
                 </Grid>
+
+
 
                 <!-- 4. SETTINGS VIEW -->
                 <Grid x:Name="SettingsView" Visibility="Collapsed">
                     <Border Padding="{StaticResource Padding.Page}">
                         <StackPanel Spacing="{StaticResource Space.24}" MaxWidth="600" HorizontalAlignment="Left">
-                            <TextBlock Text="Settings" Style="{StaticResource Text.Headline1}"/>
+                            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,12">
+                                <Image Source="ms-appx:///Assets/AppLogo.png" Width="36" Height="36"/>
+                                <TextBlock Text="Settings" Style="{StaticResource Text.Headline1}" VerticalAlignment="Center"/>
+                            </StackPanel>
                             
                             <!-- Relay Settings -->
                             <StackPanel Spacing="8">
@@ -596,9 +842,15 @@
                             </StackPanel>
 
                             <StackPanel Spacing="8">
-                                <TextBlock Text="Cloudflare Tunnel / Public URL" Style="{StaticResource Text.Body1}"/>
-                                <TextBox x:Name="PublicUrlInput" PlaceholderText="https://teleop.dmzs-lab.com" MinWidth="300"/>
-                                <TextBlock Text="The public address (Cloudflare) used for external connectivity (Unity, Web, Twilio)." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
+                                <TextBlock Text="Hub Address (To use in Quest)" Style="{StaticResource Text.Body1}"/>
+                                <TextBox x:Name="PublicUrlInput" PlaceholderText="http://yd-9s71544222:5000" MinWidth="300"/>
+                                <TextBlock Text="The URL or IP where this laptop is reachable from the Quest." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
+                            </StackPanel>
+
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Expert / Quest IP Address (For Monitoring)" Style="{StaticResource Text.Body1}"/>
+                                <TextBox x:Name="ExpertIpInput" PlaceholderText="127.0.0.1" MinWidth="300"/>
+                                <TextBlock Text="The IP of your Quest headset for proactive latency and health pings." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
                             </StackPanel>
 
                             <!-- Robot Settings -->
@@ -614,7 +866,7 @@
 
 
                             
-                            <Button x:Name="SaveSettingsButton" Content="SAVE &amp; RESTART RELAY" Style="{StaticResource Button.Filled}" HorizontalAlignment="Left" Click="SaveSettingsButton_Click" Margin="0,16,0,0"/>
+                            <Button x:Name="SaveSettingsButton" Content="SAVE &amp; RESTART HUB" Style="{StaticResource Button.Filled}" HorizontalAlignment="Left" Click="SaveSettingsButton_Click" Margin="0,16,0,0"/>
                         </StackPanel>
                     </Border>
                 </Grid>

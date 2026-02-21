@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net.WebSockets;
 using System.Text;
@@ -23,6 +24,14 @@ namespace RobotControllerApp.Services
         public static event Action<int, int>? OnImageStatsUpdated; // FPS, Total
         public static event Action<byte[]>? OnImageReceived; // Latest base64 decoded frame
         public static event Action<string>? OnUnityMessageReceived;
+        public static event Action<string>? OnGripperReceived;
+        public static event Action<string>? OnRobotStateReceived;
+
+        public static string? UnityClientIp { get; private set; }
+        public static string? RobotBridgeIp { get; private set; }
+        public static bool UnityClientConnected { get; private set; }
+        public static long LastQuestLatencyMs { get; private set; } = 0;
+        public static event Action<bool>? OnUnityConnectionChanged;
 
         private WebApplication? _app;
         private CancellationTokenSource? _cts;
@@ -85,7 +94,8 @@ namespace RobotControllerApp.Services
                         }
 
                         using var ws = await context.WebSockets.AcceptWebSocketAsync();
-                        Log($"Bridge Client Connected: {robotId}");
+                        RobotBridgeIp = context.Connection.RemoteIpAddress?.ToString();
+                        Log($"[Hub] Bridge Client Connected: {robotId} from {RobotBridgeIp}");
 
                         try
                         {
@@ -95,7 +105,7 @@ namespace RobotControllerApp.Services
                         finally
                         {
                             connectionManager.RemoveRobotClient(robotId);
-                            Log($"Robot Disconnected: {robotId}");
+                            Log($"[Hub] Robot Disconnected: {robotId}");
                         }
                     }
                     else
@@ -118,25 +128,25 @@ namespace RobotControllerApp.Services
                         }
 
                         using var ws = await context.WebSockets.AcceptWebSocketAsync();
-                        Log($"Unity Connected for robot: {robotId}");
+                        UnityClientIp = context.Connection.RemoteIpAddress?.ToString();
+                        UnityClientConnected = true;
+                        OnUnityConnectionChanged?.Invoke(true);
+                        Log($"[Hub] Unity Connected for robot: {robotId} from {UnityClientIp}");
 
                         connectionManager.AddUnityClient(robotId, ws);
                         await HandleUnityConnection(ws, robotId, connectionManager, token);
+
+                        UnityClientConnected = false;
+                        OnUnityConnectionChanged?.Invoke(false);
+                        LastQuestLatencyMs = 0;
                         connectionManager.RemoveUnityClient(robotId);
 
-                        Log($"Unity Disconnected from robot: {robotId}");
+                        Log($"[Hub] Unity Disconnected from robot: {robotId}");
                     }
                     else
                     {
                         context.Response.StatusCode = 400;
                     }
-                });
-
-                // Status endpoint
-                app.MapGet("/status", () =>
-                {
-                    var status = connectionManager.GetStatus();
-                    return Results.Json(status);
                 });
 
                 // Image Endpoint (Serves latest cached frame)
@@ -315,7 +325,7 @@ namespace RobotControllerApp.Services
                         else
                         {
                             // OVERRIDE the previous success message with an error
-                            responseText = "🤖 *Robot Orange Bot*\n⚠️ Command Failed: Robot is not connected to the relay server. Unable to execute.";
+                            responseText = "🤖 *Robot Orange Bot*\n⚠️ Command Failed: Robot is not connected. Unable to execute.";
                             mediaUrl = ""; // Clear any media since we failed
                         }
                     }
@@ -339,15 +349,19 @@ namespace RobotControllerApp.Services
                     return Results.Content(xmlResponse, "application/xml");
                 });
 
-                app.MapGet("/", () => "Robot Orange Relay Server - WebSocket endpoints: /robot?robotId=X, /unity?robotId=X");
-                app.MapGet("/status", () => "OK");
+                app.MapGet("/", () => "Robot Orange Hub Server - WebSocket endpoints: /robot?robotId=X, /unity?robotId=X");
+                app.MapGet("/status", () =>
+                {
+                    dynamic status = connectionManager.GetStatus();
+                    return Results.Ok(new { status = "Hub Active", clients = ((List<string>)status.RobotClients).Count });
+                });
 
-                Log($"Relay Server active on Port {Port}");
+                Log($"[Hub] Server active on Port {Port}");
                 await app.RunAsync(token);
             }
             catch (Exception ex)
             {
-                Log($"Critical Error: {ex.Message}");
+                Log($"[Hub] Critical Error: {ex.Message}");
             }
         }
 
@@ -467,6 +481,18 @@ namespace RobotControllerApp.Services
                         catch { }
                     }
 
+                    // 3. Gripper State
+                    if (message.Contains("gripper_state", StringComparison.OrdinalIgnoreCase))
+                    {
+                        OnGripperReceived?.Invoke(message);
+                    }
+
+                    // 4. Robot System State
+                    if (message.Contains("robot_state", StringComparison.OrdinalIgnoreCase) && !message.Contains("gripper_state"))
+                    {
+                        OnRobotStateReceived?.Invoke(message);
+                    }
+
                     // Relay to Unity client
                     await manager.SendToUnityClient(robotId, message);
                 }
@@ -484,6 +510,23 @@ namespace RobotControllerApp.Services
         async Task HandleUnityConnection(WebSocket ws, string robotId, ConnectionManager manager, CancellationToken token)
         {
             var buffer = new byte[1024 * 1024]; // 1MB buffer
+            var pingWatch = new System.Diagnostics.Stopwatch();
+
+            // Start local heartbeat to measure Quest latency
+            var pingTimer = new Timer(async _ =>
+            {
+                if (ws.State == WebSocketState.Open)
+                {
+                    try
+                    {
+                        pingWatch.Restart();
+                        var ping = Encoding.UTF8.GetBytes("{\"op\":\"ping\"}");
+                        await ws.SendAsync(new ArraySegment<byte>(ping), WebSocketMessageType.Text, true, CancellationToken.None);
+                    }
+                    catch { }
+                }
+            }, null, TimeSpan.FromSeconds(1), TimeSpan.FromSeconds(2));
+
             try
             {
                 while (ws.State == WebSocketState.Open && !token.IsCancellationRequested)
@@ -503,19 +546,24 @@ namespace RobotControllerApp.Services
                     }
 
                     var message = Encoding.UTF8.GetString(ms.ToArray());
+
+                    // Intercept Pong from Quest
+                    if (message.Contains("\"op\":\"pong\""))
+                    {
+                        pingWatch.Stop();
+                        LastQuestLatencyMs = pingWatch.ElapsedMilliseconds;
+                        continue;
+                    }
+
                     OnUnityMessageReceived?.Invoke(message);
 
                     // Relay to Robot client
                     await manager.SendToRobotClient(robotId, message);
                 }
             }
-            catch (WebSocketException)
+            finally
             {
-                // Normal disconnect (abrupt)
-            }
-            catch (Exception ex)
-            {
-                Log($"[Unity Error] {ex.Message}");
+                pingTimer.Dispose();
             }
         }
 

@@ -2,21 +2,18 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
 using Microsoft.UI.Xaml.Media;
-using Microsoft.UI.Xaml.Navigation;
-using System;
-using System.Threading.Tasks;
-using Windows.Foundation;
-using Windows.Foundation.Collections;
-using RobotControllerApp.Services;
-using System.Net.Http;
-using System.Collections.Generic;
-using System.IO;
 using Microsoft.UI.Xaml.Media.Imaging;
-using Windows.Media.Capture;
-using Windows.Media.MediaProperties;
-using Windows.Graphics.Imaging;
-using Windows.Media.Capture.Frames;
+using RobotControllerApp.Services;
+using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
+using System.Net.NetworkInformation;
+using System.Threading.Tasks;
+using Windows.Graphics.Imaging;
+using Windows.Media.Capture;
+using Windows.Media.Capture.Frames;
+using Windows.Media.MediaProperties;
 
 namespace RobotControllerApp
 {
@@ -25,6 +22,17 @@ namespace RobotControllerApp
         private readonly RelayServerHost _relayServer;
         private readonly RobotBridgeService _robotBridge;
         private readonly AppSettings _settings;
+
+        // Network Performance History
+        private readonly List<double> _unityLatencyHistory = [];
+        private readonly List<double> _robot1LatencyHistory = [];
+        private readonly List<double> _robot2LatencyHistory = [];
+        private readonly List<double> _speedHistory = [];
+        private DispatcherTimer? _networkTimer;
+        private DispatcherTimer? _speedTestTimer;
+        private readonly Ping _pinger = new();
+        private const int MaxHistory = 50;
+        private const int MaxSpeedHistory = 20;
 
         public MainWindow()
         {
@@ -41,6 +49,13 @@ namespace RobotControllerApp
                 titleBar.ButtonHoverBackgroundColor = Windows.UI.Color.FromArgb(255, 50, 50, 50);
                 titleBar.ButtonPressedForegroundColor = Microsoft.UI.Colors.White;
                 titleBar.ButtonInactiveForegroundColor = Microsoft.UI.Colors.Gray;
+
+                // Set Taskbar and Window Icon
+                try
+                {
+                    this.AppWindow.SetIcon("Assets/AppLogo.png");
+                }
+                catch { }
             }
 
             // Initialize Services
@@ -51,8 +66,17 @@ namespace RobotControllerApp
             // Initialize Settings UI values
             RelayPortInput.Text = _settings.RelayPort.ToString();
             PublicUrlInput.Text = _settings.PublicUrl;
+            ExpertIpInput.Text = _settings.ExpertIp;
             RobotIpInput.Text = _settings.RobotIp;
             Robot2IpInput.Text = _settings.Robot2Ip;
+
+            // Update Hub Card Status (Initialize as Waiting for Hub to start or Unity to connect)
+            RelayStatusText.Text = "Hub Service Primary";
+            RelayActiveText.Text = "WAITING";
+            RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
+            RelayIcon.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+
+            StartNetworkMonitoring();
 
 
             // Wire up Logs
@@ -62,6 +86,11 @@ namespace RobotControllerApp
             RobotBridgeService.OnRosConnectionChanged += (connected) =>
             {
                 this.DispatcherQueue.TryEnqueue(() => UpdateRobotStatus(connected));
+            };
+
+            RelayServerHost.OnUnityConnectionChanged += (connected) =>
+            {
+                this.DispatcherQueue.TryEnqueue(() => UpdateExpertStatus(connected));
             };
 
             // Telemetry Subscriptions
@@ -81,6 +110,38 @@ namespace RobotControllerApp
                 TelemBufferBar.Value = Math.Min(fps * 2, 100);
             });
 
+            RelayServerHost.OnGripperReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(msg);
+                    if (doc.RootElement.TryGetProperty("msg", out var m))
+                    {
+                        if (m.TryGetProperty("state", out var s))
+                            TelemGripper.Text = s.ToString().ToUpper();
+                        else if (m.TryGetProperty("opened", out var o))
+                            TelemGripper.Text = o.GetBoolean() ? "OPEN" : "CLOSED";
+                    }
+                }
+                catch { }
+            });
+
+            RelayServerHost.OnRobotStateReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(msg);
+                    if (doc.RootElement.TryGetProperty("msg", out var m))
+                    {
+                        if (m.TryGetProperty("robot_status", out var s))
+                            TelemMode.Text = s.ToString();
+                        else if (m.TryGetProperty("state", out var st))
+                            TelemMode.Text = st.ToString();
+                    }
+                }
+                catch { }
+            });
+
             DateTime lastUnityMsg = DateTime.MinValue;
 
             RelayServerHost.OnUnityMessageReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
@@ -98,50 +159,46 @@ namespace RobotControllerApp
                 }
                 lastUnityMsg = now;
 
-                TelemLastCmd.Text = msg.Length > 60 ? msg.Substring(0, 57) + "..." : msg;
+                TelemLastCmd.Text = msg.Length > 60 ? string.Concat(msg.AsSpan(0, 57), "...") : msg;
                 TelemCmdSource.Text = "Unity Client";
 
                 try
                 {
-                    using (var doc = System.Text.Json.JsonDocument.Parse(msg))
+                    using var doc = System.Text.Json.JsonDocument.Parse(msg);
+                    var root = doc.RootElement;
+
+                    // Flexible parsing for Position (pos, position / Array, Object)
+                    if (root.TryGetProperty("pos", out System.Text.Json.JsonElement pos) || root.TryGetProperty("position", out pos))
                     {
-                        var root = doc.RootElement;
-
-                        // Flexible parsing for Position (pos, position / Array, Object)
-                        System.Text.Json.JsonElement pos;
-                        if (root.TryGetProperty("pos", out pos) || root.TryGetProperty("position", out pos))
+                        if (pos.ValueKind == System.Text.Json.JsonValueKind.Array && pos.GetArrayLength() >= 3)
                         {
-                            if (pos.ValueKind == System.Text.Json.JsonValueKind.Array && pos.GetArrayLength() >= 3)
-                            {
-                                TelemIKPos.Text = $"Pos: [{pos[0].GetDouble():0.00}, {pos[1].GetDouble():0.00}, {pos[2].GetDouble():0.00}]";
-                            }
-                            else if (pos.ValueKind == System.Text.Json.JsonValueKind.Object)
-                            {
-                                double x = 0, y = 0, z = 0;
-                                if (pos.TryGetProperty("x", out var vx)) x = vx.GetDouble();
-                                if (pos.TryGetProperty("y", out var vy)) y = vy.GetDouble();
-                                if (pos.TryGetProperty("z", out var vz)) z = vz.GetDouble();
-                                TelemIKPos.Text = $"Pos: [{x:0.00}, {y:0.00}, {z:0.00}]";
-                            }
+                            TelemIKPos.Text = $"Pos: [{pos[0].GetDouble():0.00}, {pos[1].GetDouble():0.00}, {pos[2].GetDouble():0.00}]";
                         }
-
-                        // Flexible parsing for Rotation (rot, rotation / Array, Object)
-                        System.Text.Json.JsonElement rot;
-                        if (root.TryGetProperty("rot", out rot) || root.TryGetProperty("rotation", out rot))
+                        else if (pos.ValueKind == System.Text.Json.JsonValueKind.Object)
                         {
-                            if (rot.ValueKind == System.Text.Json.JsonValueKind.Array && rot.GetArrayLength() >= 4)
-                            {
-                                TelemIKRot.Text = $"Rot: [{rot[0].GetDouble():0.00}, {rot[1].GetDouble():0.00}, {rot[2].GetDouble():0.00}, {rot[3].GetDouble():0.00}]";
-                            }
-                            else if (rot.ValueKind == System.Text.Json.JsonValueKind.Object)
-                            {
-                                double x = 0, y = 0, z = 0, w = 1;
-                                if (rot.TryGetProperty("x", out var vx)) x = vx.GetDouble();
-                                if (rot.TryGetProperty("y", out var vy)) y = vy.GetDouble();
-                                if (rot.TryGetProperty("z", out var vz)) z = vz.GetDouble();
-                                if (rot.TryGetProperty("w", out var vw)) w = vw.GetDouble();
-                                TelemIKRot.Text = $"Rot: [{x:0.00}, {y:0.00}, {z:0.00}, {w:0.00}]";
-                            }
+                            double x = 0, y = 0, z = 0;
+                            if (pos.TryGetProperty("x", out var vx)) x = vx.GetDouble();
+                            if (pos.TryGetProperty("y", out var vy)) y = vy.GetDouble();
+                            if (pos.TryGetProperty("z", out var vz)) z = vz.GetDouble();
+                            TelemIKPos.Text = $"Pos: [{x:0.00}, {y:0.00}, {z:0.00}]";
+                        }
+                    }
+
+                    // Flexible parsing for Rotation (rot, rotation / Array, Object)
+                    if (root.TryGetProperty("rot", out System.Text.Json.JsonElement rot) || root.TryGetProperty("rotation", out rot))
+                    {
+                        if (rot.ValueKind == System.Text.Json.JsonValueKind.Array && rot.GetArrayLength() >= 4)
+                        {
+                            TelemIKRot.Text = $"Rot: [{rot[0].GetDouble():0.00}, {rot[1].GetDouble():0.00}, {rot[2].GetDouble():0.00}, {rot[3].GetDouble():0.00}]";
+                        }
+                        else if (rot.ValueKind == System.Text.Json.JsonValueKind.Object)
+                        {
+                            double x = 0, y = 0, z = 0, w = 1;
+                            if (rot.TryGetProperty("x", out var vx)) x = vx.GetDouble();
+                            if (rot.TryGetProperty("y", out var vy)) y = vy.GetDouble();
+                            if (rot.TryGetProperty("z", out var vz)) z = vz.GetDouble();
+                            if (rot.TryGetProperty("w", out var vw)) w = vw.GetDouble();
+                            TelemIKRot.Text = $"Rot: [{x:0.00}, {y:0.00}, {z:0.00}, {w:0.00}]";
                         }
                     }
                 }
@@ -153,20 +210,6 @@ namespace RobotControllerApp
 
             RelayServerHost.OnImageReceived += (imageBytes) => this.DispatcherQueue.TryEnqueue(async () =>
             {
-                // Update FPS/Stats
-                TelemTotalImages.Text = RelayServerHost._imagesTotal.ToString();
-
-                // Track FPS
-                RelayServerHost._imagesLastSec++;
-                var now = DateTime.Now;
-                var elapsed = (now - RelayServerHost._lastFpsReset).TotalSeconds;
-                if (elapsed >= 1.0)
-                {
-                    double fps = RelayServerHost._imagesLastSec / elapsed;
-                    TelemFps.Text = fps.ToString("F1");
-                    RelayServerHost._imagesLastSec = 0;
-                    RelayServerHost._lastFpsReset = now;
-                }
 
                 try
                 {
@@ -193,7 +236,7 @@ namespace RobotControllerApp
 
             RelayServerHost.OnWhatsAppLog += (msg) => this.DispatcherQueue.TryEnqueue(() =>
             {
-                TelemLastCmd.Text = msg.Contains("]") ? msg.Substring(msg.IndexOf("]") + 1).Trim() : msg;
+                TelemLastCmd.Text = msg.Contains(']') ? msg.Substring(msg.IndexOf(']') + 1).Trim() : msg;
                 TelemCmdSource.Text = "WhatsApp";
             });
 
@@ -217,7 +260,9 @@ namespace RobotControllerApp
                 }
             }
 
-            StartLatencyMonitor();
+            StartNetworkMonitoring();
+            StartSpeedTestInterval();
+            _ = TraceHubLocation(); // Initial async trace
             StatusPulseAnimation.Begin();
 
             // Initialize Webcam
@@ -333,45 +378,42 @@ namespace RobotControllerApp
             }
         }
 
-        private async void StartLatencyMonitor()
+        private async Task TraceHubLocation()
         {
-            var timer = new DispatcherTimer();
-            timer.Interval = TimeSpan.FromSeconds(2);
-            timer.Tick += async (s, e) =>
+            try
             {
-                try
+                using var client = new HttpClient();
+                // Get Hub Public IP
+                var ipResp = await client.GetStringAsync("https://api.ipify.org");
+                string publicIp = ipResp.Trim();
+
+                // Get Location via IP-API
+                var locResp = await client.GetStringAsync($"http://ip-api.com/json/{publicIp}");
+                using var doc = System.Text.Json.JsonDocument.Parse(locResp);
+                var root = doc.RootElement;
+
+                string city = root.TryGetProperty("city", out var c) ? (c.GetString() ?? "Unknown") : "Unknown";
+                string country = root.TryGetProperty("country", out var co) ? (co.GetString() ?? "") : "";
+                string isp = root.TryGetProperty("isp", out var i) ? (i.GetString() ?? "") : "";
+
+                this.DispatcherQueue.TryEnqueue(() =>
                 {
-                    // 1. Relay Latency (Measured via Public Tunnel if possible)
-                    string baseUrl = string.IsNullOrEmpty(_settings.PublicUrl)
-                        ? $"http://localhost:{_settings.RelayPort}"
-                        : (_settings.PublicUrl.StartsWith("http") ? _settings.PublicUrl : $"https://{_settings.PublicUrl}");
-
-                    string url = $"{baseUrl.TrimEnd('/')}/status";
-
-                    using var client = new HttpClient();
-                    client.Timeout = TimeSpan.FromSeconds(2);
-
-                    // First request to "warm up" the tunnel connection
-                    await client.GetAsync(url);
-
-                    // Second request for precise measurement
-                    var watch = System.Diagnostics.Stopwatch.StartNew();
-                    var resp = await client.GetAsync(url);
-                    watch.Stop();
-
-                    RelayLatencyText.Text = $"{watch.Elapsed.TotalMilliseconds:F1} ms";
-
-                    // 2. Robot Latency (Real from WebSocket Ping)
-                    if (RobotStatusText.Text.Contains("Connected"))
-                    {
-                        Robot1LatencyText.Text = $"{_robotBridge.LastLatencyMs} ms";
-                    }
-                    else Robot1LatencyText.Text = "-- ms";
-                }
-                catch { RelayLatencyText.Text = "Offline"; }
-            };
-            timer.Start();
+                    HubIpText.Text = publicIp;
+                    HubLocText.Text = $"{city}, {country} ({isp})";
+                    Log($"[Trace] Hub located in {city}, {country}");
+                });
+            }
+            catch (Exception ex)
+            {
+                this.DispatcherQueue.TryEnqueue(() =>
+                {
+                    HubIpText.Text = "Hub (Local Only)";
+                    HubLocText.Text = "Trace failed or offline";
+                });
+                Log($"[Trace] Hub location trace failed: {ex.Message}");
+            }
         }
+
 
         private async void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
         {
@@ -412,24 +454,35 @@ namespace RobotControllerApp
 
         private async Task StartSystem()
         {
-            Log("🚀 Initializing Robot Controller System...");
+            Log("🚀 Initializing Expert Telepresence Hub...");
 
             // Step 1: Start Relay Server (Background)
             await Task.Delay(500);
-            Log($"Starting Relay Server (Kestrel Port {_settings.RelayPort})...");
+            Log($"Starting Hub Relay Server for Quest 3 (Port {_settings.RelayPort})...");
 
             _relayServer.Port = _settings.RelayPort;
             _relayServer.PublicUrl = _settings.PublicUrl;
 
             _ = Task.Run(async () => await _relayServer.StartAsync());
 
-            RelayStatusText.Text = $"Running (Port {_settings.RelayPort})";
+            RelayStatusText.Text = $"Listening (Port {_settings.RelayPort})";
 
             // Step 2: Start Robot Bridge (Client)
             await Task.Delay(1000);
             Log($"Starting Robot Bridge Service (Target: {_settings.RobotIp})...");
 
-            _robotBridge.RosIp = _settings.RobotIp;
+            string sanitizedRosIp = _settings.RobotIp;
+            if (sanitizedRosIp.Contains("://"))
+            {
+                // Extract hostname/IP from URI
+                try { sanitizedRosIp = new Uri(sanitizedRosIp).Host; } catch { }
+            }
+            else if (sanitizedRosIp.Contains(':'))
+            {
+                sanitizedRosIp = sanitizedRosIp.Split(':')[0];
+            }
+
+            _robotBridge.RosIp = sanitizedRosIp;
             _robotBridge.RelayServerUrl = $"ws://localhost:{_settings.RelayPort}/robot";
             _robotBridge.Start();
 
@@ -459,9 +512,10 @@ namespace RobotControllerApp
                 _settings.PublicUrl = PublicUrlInput.Text.Trim();
                 _relayServer.PublicUrl = _settings.PublicUrl;
 
+                _settings.ExpertIp = ExpertIpInput.Text.Trim();
                 _settings.RobotIp = RobotIpInput.Text.Trim();
                 _settings.Robot2Ip = Robot2IpInput.Text.Trim();
-                _robotBridge.RosIp = _settings.RobotIp;
+                _settings.Save();
                 _robotBridge.RelayServerUrl = $"ws://localhost:{_settings.RelayPort}/robot"; // Robot 1 Config
                                                                                              // Note: Robot 2 connection logic is not yet implemented in service, only stored in settings.
 
@@ -491,7 +545,7 @@ namespace RobotControllerApp
                     _ = Task.Run(async () => await _relayServer.StartAsync());
                     _robotBridge.Start();
 
-                    RelayStatusText.Text = $"Running (Port {_settings.RelayPort})";
+                    RelayStatusText.Text = $"Listening (Port {_settings.RelayPort})";
 
                     UpdateRobotStatus(false);
                     UpdateRobot2Status(false);
@@ -499,7 +553,7 @@ namespace RobotControllerApp
                     var dialog = new ContentDialog
                     {
                         Title = "Settings Saved",
-                        Content = "The Relay Server has been restarted with your new configuration.",
+                        Content = "The Expert Telepresence Hub has restarted with your new configuration.",
                         CloseButtonText = "OK",
                         XamlRoot = this.Content.XamlRoot
                     };
@@ -518,81 +572,172 @@ namespace RobotControllerApp
 
         private async void RunSpeedTest_Click(object sender, RoutedEventArgs e)
         {
-            var btn = sender as Button;
-            if (btn != null) btn.IsEnabled = false;
+            await RunSpeedTest();
+        }
 
-            NetworkStatusText.Text = "Testing...";
+        private async Task RunSpeedTest()
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                NetworkStatusText.Text = "Testing...";
+                RunSpeedTestButton.IsEnabled = false;
+            });
 
             try
             {
-                // 1. Cloudflare Ping
+                double downMbps = -1;
+                double upMbps = -1;
+
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(15);
+
+                // 1. DOWNLOAD TEST (2MB for better reliability/speed at 10s intervals)
                 try
                 {
-                    using var ping = new System.Net.NetworkInformation.Ping();
-                    var reply = await ping.SendPingAsync("1.1.1.1", 2000);
-                    if (reply.Status == System.Net.NetworkInformation.IPStatus.Success)
-                    {
-                        long ms = reply.RoundtripTime;
-                        GraphCloudPing.Text = $"{ms} ms";
-                        InternetLatencyText.Text = $"{ms} ms";
-                    }
-                    else
-                    {
-                        GraphCloudPing.Text = "Timeout";
-                        InternetLatencyText.Text = "Err";
-                    }
-                }
-                catch { GraphCloudPing.Text = "Error"; InternetLatencyText.Text = "Err"; }
-
-                await Task.Delay(500);
-
-                // 2. Robot Ping
-                try
-                {
-                    using var ping = new System.Net.NetworkInformation.Ping();
-                    // Use stored IP from settings
-                    string ip = _settings.RobotIp;
-                    if (string.IsNullOrWhiteSpace(ip)) ip = "169.254.200.200";
-
-                    // Strip ws:// and port if present for Ping
-                    ip = ip.Replace("ws://", "").Replace("wss://", "").Split(':')[0];
-
-                    var reply = await ping.SendPingAsync(ip, 2000);
-                    if (reply.Status == System.Net.NetworkInformation.IPStatus.Success)
-                    {
-                        GraphRobotPing.Text = $"{reply.RoundtripTime} ms";
-                    }
-                    else
-                    {
-                        GraphRobotPing.Text = "Timeout";
-                    }
-                }
-                catch { GraphRobotPing.Text = "Unreachable"; }
-
-                // 3. Unity Mock
-                GraphUnityPing.Text = "N/A";
-
-                // 4. Download Speed Test
-                NetworkStatusText.Text = "Measuring Speed...";
-                try
-                {
-                    using var client = new HttpClient();
-                    string testUrl = "https://speed.cloudflare.com/__down?bytes=10485760";
+                    string downUrl = "https://speed.cloudflare.com/__down?bytes=2000000";
                     var sw = System.Diagnostics.Stopwatch.StartNew();
-                    byte[] data = await client.GetByteArrayAsync(testUrl);
+                    byte[] data = await client.GetByteArrayAsync(downUrl);
+                    sw.Stop();
+                    downMbps = (data.Length * 8.0 / 1000000.0) / sw.Elapsed.TotalSeconds;
+                }
+                catch { downMbps = -1; }
+
+                // 2. UPLOAD TEST (1MB)
+                try
+                {
+                    string upUrl = "https://speed.cloudflare.com/__up";
+                    byte[] upData = new byte[1000000]; // 1MB
+                    new Random().NextBytes(upData);
+
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    var content = new ByteArrayContent(upData);
+                    var resp = await client.PostAsync(upUrl, content);
                     sw.Stop();
 
-                    double seconds = sw.Elapsed.TotalSeconds;
-                    double mbps = (data.Length * 8.0 / 1000000.0) / seconds;
-                    InternetSpeedText.Text = $"{mbps:F1} Mbps";
+                    if (resp.IsSuccessStatusCode)
+                        upMbps = (upData.Length * 8.0 / 1000000.0) / sw.Elapsed.TotalSeconds;
                 }
-                catch { InternetSpeedText.Text = "Err"; }
+                catch { upMbps = -1; }
 
-                NetworkStatusText.Text = "Idle";
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    // Reset colors
+                    InternetSpeedText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Primary"];
+                    InternetUploadText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 229, 255));
+
+                    if (downMbps >= 0)
+                    {
+                        InternetSpeedText.Text = $"{downMbps:F1} Mbps";
+                        UpdateHistory(_speedHistory, downMbps, MaxSpeedHistory);
+                        DrawSpeedGraph();
+                        UpdateSpeedStats();
+                    }
+                    else InternetSpeedText.Text = "Err";
+
+                    if (upMbps >= 0) InternetUploadText.Text = $"{upMbps:F1} Mbps";
+                    else InternetUploadText.Text = "Err";
+
+                    NetworkStatusText.Text = "Idle";
+                    RunSpeedTestButton.IsEnabled = true;
+                });
             }
-            finally
+            catch
             {
-                if (btn != null) btn.IsEnabled = true;
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    NetworkStatusText.Text = "Failed";
+                    RunSpeedTestButton.IsEnabled = true;
+                });
+            }
+        }
+
+        private void StartSpeedTestInterval()
+        {
+            _speedTestTimer?.Stop();
+            _speedTestTimer = new DispatcherTimer();
+            _speedTestTimer.Interval = TimeSpan.FromMinutes(1); // Run every 60s to save bandwidth
+            _nextSpeedTest = DateTime.Now.Add(_speedTestTimer.Interval);
+
+            _speedTestTimer.Tick += async (s, e) =>
+            {
+                await RunSpeedTest();
+                _nextSpeedTest = DateTime.Now.Add(_speedTestTimer.Interval);
+            };
+
+            if (AutoMonitorToggle.IsOn)
+            {
+                _speedTestTimer.Start();
+            }
+        }
+
+        private void AutoMonitorToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (AutoMonitorToggle.IsOn)
+            {
+                if (_speedTestTimer != null)
+                {
+                    _nextSpeedTest = DateTime.Now.Add(_speedTestTimer.Interval);
+                    _speedTestTimer.Start();
+                }
+                if (NetworkStatusText != null) NetworkStatusText.Text = "Resuming...";
+            }
+            else
+            {
+                _speedTestTimer?.Stop();
+                if (NetworkStatusText != null) NetworkStatusText.Text = "Paused";
+            }
+        }
+
+        private void UpdateSpeedStats()
+        {
+            if (_speedHistory.Count == 0) return;
+
+            double low = _speedHistory.Min();
+            double high = _speedHistory.Max();
+            double avg = _speedHistory.Average();
+
+            SpeedLowText.Text = $"{low:F1} Mbps";
+            SpeedHighText.Text = $"{high:F1} Mbps";
+            SpeedAvgText.Text = $"{avg:F1} Mbps";
+        }
+
+        private DateTime _nextSpeedTest = DateTime.MinValue;
+        private void UpdateSpeedCountdown()
+        {
+            if (NetworkView.Visibility != Visibility.Visible) return;
+            if (_nextSpeedTest == DateTime.MinValue) return;
+
+            var remaining = _nextSpeedTest - DateTime.Now;
+            if (remaining.TotalSeconds > 0)
+            {
+                if (NetworkStatusText.Text != "Testing...")
+                    NetworkStatusText.Text = $"Next in {(int)remaining.TotalSeconds}s";
+            }
+        }
+
+        private void DrawSpeedGraph()
+        {
+            if (NetworkView.Visibility != Visibility.Visible) return;
+
+            SpeedPath.Points.Clear();
+            if (_speedHistory.Count < 2) return;
+
+            double width = SpeedCanvas.ActualWidth > 0 ? SpeedCanvas.ActualWidth : 400;
+            double height = SpeedCanvas.ActualHeight > 0 ? SpeedCanvas.ActualHeight : 100;
+
+            // If we have few points, space them out so the graph doesn't look "stuck" on the left
+            int divisor = Math.Max(_speedHistory.Count, MaxSpeedHistory);
+            double stepX = width / (divisor - 1);
+
+            double maxSpeed = Math.Max(100.0, _speedHistory.Max() * 1.2);
+            double scaleY = height / maxSpeed;
+
+            for (int i = 0; i < _speedHistory.Count; i++)
+            {
+                double x = i * stepX;
+                double val = Math.Min(_speedHistory[i], maxSpeed);
+                double y = height - (val * scaleY);
+                SpeedPath.Points.Add(new Windows.Foundation.Point(x, y));
             }
         }
 
@@ -606,7 +751,7 @@ namespace RobotControllerApp
                     color = Microsoft.UI.Colors.Red;
                 else if (message.Contains("Warning") || message.Contains("Timeout") || message.Contains("Pending"))
                     color = Microsoft.UI.Colors.Orange;
-                else if (message.Contains("Connected") || message.Contains("Success") || message.Contains("✓") || message.Contains("Ready"))
+                else if (message.Contains("Connected") || message.Contains("Success") || message.Contains('✓') || message.Contains("Ready"))
                     color = Microsoft.UI.Colors.LightGreen;
                 else if (message.Contains("[Relay]"))
                     color = Microsoft.UI.Colors.Cyan;
@@ -627,12 +772,15 @@ namespace RobotControllerApp
             });
         }
 
+
         private void NavView_SelectionChanged(NavigationView _, NavigationViewSelectionChangedEventArgs args)
         {
             // Hide all views first
             DashboardView.Visibility = Visibility.Collapsed;
             LogsView.Visibility = Visibility.Collapsed;
+            TelemetryView.Visibility = Visibility.Collapsed;
             SettingsView.Visibility = Visibility.Collapsed;
+            NetworkView.Visibility = Visibility.Collapsed;
 
             // Show selected view
             if (args.IsSettingsSelected)
@@ -649,8 +797,14 @@ namespace RobotControllerApp
                     case "logs":
                         LogsView.Visibility = Visibility.Visible;
                         break;
+                    case "telemetry":
+                        TelemetryView.Visibility = Visibility.Visible;
+                        break;
                     case "settings":
                         SettingsView.Visibility = Visibility.Visible;
+                        break;
+                    case "network":
+                        NetworkView.Visibility = Visibility.Visible;
                         break;
                 }
             }
@@ -846,11 +1000,10 @@ namespace RobotControllerApp
             try
             {
                 using var client = new HttpClient();
-                var content = new FormUrlEncodedContent(new KeyValuePair<string, string>[]
-                {
+                var content = new FormUrlEncodedContent([
                     new("Body", text),
                     new("From", "Simulator")
-                });
+                ]);
 
                 await client.PostAsync($"http://localhost:{_settings.RelayPort}/api/whatsapp", content);
             }
@@ -862,6 +1015,252 @@ namespace RobotControllerApp
             {
                 SimulatorInput.IsEnabled = true;
                 SimulatorInput.Focus(FocusState.Programmatic);
+            }
+        }
+        private void StartNetworkMonitoring()
+        {
+            _networkTimer = new DispatcherTimer();
+            _networkTimer.Interval = TimeSpan.FromMilliseconds(1000);
+            _networkTimer.Tick += async (s, e) =>
+            {
+                // 1. Measure expert latency (Unity Client)
+                double unityLat = 0;
+                string? expertTarget = RelayServerHost.UnityClientIp;
+                // Fallback to static IP from settings if not connected
+                if (string.IsNullOrEmpty(expertTarget)) expertTarget = _settings.ExpertIp;
+
+                if (!string.IsNullOrEmpty(expertTarget))
+                {
+                    try
+                    {
+                        string host = expertTarget;
+                        if (host == "::1" || host.ToLower() == "localhost") host = "127.0.0.1";
+                        var reply = await _pinger.SendPingAsync(host, 1000);
+                        if (reply.Status == IPStatus.Success) unityLat = reply.RoundtripTime;
+                    }
+                    catch { }
+                }
+
+                // 2. Measure Robot 1 latency (Ethernet)
+                double r1Lat = 0;
+                if (!string.IsNullOrEmpty(_settings.RobotIp))
+                {
+                    try
+                    {
+                        // Parse IP from ws:// URL if necessary
+                        string host = _settings.RobotIp;
+                        if (host.StartsWith("ws://"))
+                        {
+                            host = host.Substring(5).Split(':')[0];
+                        }
+                        var reply = await _pinger.SendPingAsync(host, 500);
+                        if (reply.Status == IPStatus.Success) r1Lat = reply.RoundtripTime;
+                    }
+                    catch { }
+                }
+
+                // 3. Measure Robot 2 latency (Ethernet)
+                double r2Lat = 0;
+                if (!string.IsNullOrEmpty(_settings.Robot2Ip))
+                {
+                    try
+                    {
+                        var reply = await _pinger.SendPingAsync(_settings.Robot2Ip, 500);
+                        if (reply.Status == IPStatus.Success) r2Lat = reply.RoundtripTime;
+                    }
+                    catch { }
+                }
+
+                // Update histories
+                UpdateHistory(_unityLatencyHistory, unityLat, MaxHistory);
+                UpdateHistory(_robot1LatencyHistory, r1Lat, MaxHistory);
+                UpdateHistory(_robot2LatencyHistory, r2Lat, MaxHistory);
+
+                // Update Dashboard & Discovery Labels
+                UpdateDashboardAndDiscovery(unityLat, r1Lat, r2Lat);
+
+                // 4. Measure Internet Latency (Real-time)
+                try
+                {
+                    var reply = await _pinger.SendPingAsync("speed.cloudflare.com", 1000);
+                    if (reply.Status == IPStatus.Success)
+                    {
+                        InternetLatencyText.Text = $"{reply.RoundtripTime} ms";
+                    }
+                }
+                catch { }
+
+                // Redraw graphs
+                DrawNetworkGraph();
+                DrawSpeedGraph();
+                UpdateLatencyStats();
+                UpdateSpeedCountdown();
+            };
+            _networkTimer.Start();
+
+            // Run first speed test automatically
+            _ = RunSpeedTest();
+            StartSpeedTestInterval();
+        }
+
+        private void UpdateExpertStatus(bool connected)
+        {
+            if (connected)
+            {
+                RelayActiveText.Text = "ACTIVE";
+                RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                RelayStatusText.Text = "Expert (Quest) Connected";
+            }
+            else
+            {
+                RelayActiveText.Text = "WAITING";
+                RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
+                RelayStatusText.Text = "Awaiting Quest Connection...";
+            }
+        }
+
+        private void UpdateDashboardAndDiscovery(double uLat, double r1Lat, double r2Lat)
+        {
+            // 1. Dashboard updates (Latencies)
+            bool isExpertWsConnected = RelayServerHost.UnityClientConnected;
+            bool isExpertReachable = uLat > 0;
+            // Robot 1 is logically connected ONLY if the bridge is sending heartbeats
+            bool isR1Connected = _robotBridge.LastLatencyMs > 0;
+
+            // Robot 2 is logically connected if we can reach its IP (as it has no specific bridge software yet)
+            bool isR2Connected = r2Lat > 0 && !string.IsNullOrEmpty(_settings.Robot2Ip);
+
+            // Expert: use WebSocket latency if ICMP failing
+            double displayULat = uLat;
+            if (isExpertWsConnected && displayULat <= 0 && RelayServerHost.LastQuestLatencyMs > 0)
+                displayULat = RelayServerHost.LastQuestLatencyMs;
+
+            // Robot 1: If ping failed but bridge reports heartbeat latency, use that
+            double displayR1Lat = r1Lat;
+            if (isR1Connected && displayR1Lat <= 0)
+                displayR1Lat = _robotBridge.LastLatencyMs;
+
+            // DISPLAY LOGIC: Show ms if reachable or connected
+            RelayLatencyText.Text = (displayULat > 0) ? $"{displayULat:F0} ms" : "-- ms";
+            Robot1LatencyText.Text = (isR1Connected && displayR1Lat > 0) ? $"{displayR1Lat:F0} ms" : "-- ms";
+            Robot2LatencyText.Text = (isR2Connected) ? $"{r2Lat:F0} ms" : "-- ms";
+
+            // Dashboard Status Update based on Ping (if WS is offline)
+            if (!isExpertWsConnected)
+            {
+                if (isExpertReachable)
+                {
+                    RelayActiveText.Text = "QUEST REACHABLE";
+                    RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
+                }
+                else
+                {
+                    RelayActiveText.Text = "WAITING FOR QUEST";
+                    RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Error"];
+                }
+            }
+            else
+            {
+                RelayActiveText.Text = "ACTIVE";
+                RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+            }
+
+            // 2. Discovery updates
+            string expertDisplayIp = RelayServerHost.UnityClientIp;
+            if (string.IsNullOrEmpty(expertDisplayIp)) expertDisplayIp = _settings.ExpertIp;
+            if (string.IsNullOrEmpty(expertDisplayIp)) expertDisplayIp = "quest-3"; // Default fallback
+
+            QuestIpText.Text = expertDisplayIp;
+            R1IpText.Text = displayR1Lat > 0 ? ExtractIp(_settings.RobotIp) : "Disconnected";
+            R2IpText.Text = r2Lat > 0 ? _settings.Robot2Ip : "Offline";
+
+            // 3. Status logic for Discovery cards
+            if (isExpertWsConnected)
+            {
+                QuestRelayText.Text = "CONN: DIRECT P2P";
+                QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+            }
+            else if (isExpertReachable)
+            {
+                QuestRelayText.Text = "CONN: LAN REACHABLE";
+                QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
+            }
+            else
+            {
+                QuestRelayText.Text = "CONN: SEARCHING";
+                QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+            }
+        }
+
+        private static string ExtractIp(string input)
+        {
+            if (string.IsNullOrEmpty(input)) return "N/A";
+            if (input.StartsWith("ws://"))
+            {
+                return input.Substring(5).Split(':')[0];
+            }
+            return input;
+        }
+
+        private void UpdateLatencyStats()
+        {
+            UpdateStatTexts(_unityLatencyHistory, QuestMinText, QuestMaxText, QuestAvgText);
+            UpdateStatTexts(_robot1LatencyHistory, R1MinText, R1MaxText, R1AvgText);
+            UpdateStatTexts(_robot2LatencyHistory, R2MinText, R2MaxText, R2AvgText);
+        }
+
+        private void UpdateStatTexts(List<double> history, TextBlock minT, TextBlock maxT, TextBlock avgT)
+        {
+            var valid = history.Where(v => v > 0).ToList();
+            if (valid.Count == 0)
+            {
+                minT.Text = "-- ms";
+                maxT.Text = "-- ms";
+                avgT.Text = "-- ms";
+                return;
+            }
+
+            minT.Text = $"{valid.Min():F0} ms";
+            maxT.Text = $"{valid.Max():F0} ms";
+            avgT.Text = $"{valid.Average():F0} ms";
+        }
+
+        private static void UpdateHistory(List<double> history, double val, int max)
+        {
+            history.Add(val);
+            if (history.Count > max) history.RemoveAt(0);
+        }
+
+        private void DrawNetworkGraph()
+        {
+            // Only draw if the view is visible to save resources
+            if (NetworkView.Visibility != Visibility.Visible) return;
+
+            UpdatePath(UnityPath, _unityLatencyHistory);
+            UpdatePath(Robot1Path, _robot1LatencyHistory);
+            UpdatePath(Robot2Path, _robot2LatencyHistory);
+        }
+
+        private void UpdatePath(Microsoft.UI.Xaml.Shapes.Polyline polyline, List<double> history)
+        {
+            polyline.Points.Clear();
+            if (history.Count < 2) return;
+
+            // Use fixed dimensions or actual dimensions if available
+            double width = LatencyCanvas.ActualWidth > 0 ? LatencyCanvas.ActualWidth : 800;
+            double height = LatencyCanvas.ActualHeight > 0 ? LatencyCanvas.ActualHeight : 120;
+
+            double stepX = width / (MaxHistory - 1);
+            double maxHeight = 150.0; // 150ms max scale
+            double scaleY = height / maxHeight;
+
+            for (int i = 0; i < history.Count; i++)
+            {
+                double x = i * stepX;
+                // Clip value to maxHeight for display
+                double val = Math.Min(history[i], maxHeight);
+                double y = height - (val * scaleY);
+                polyline.Points.Add(new Windows.Foundation.Point(x, y));
             }
         }
     }
