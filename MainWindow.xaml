@@ -206,73 +206,119 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- Robot Feed -->
-                                <Border Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="16">
+                                <!-- ── ROBOT 1 VIDEO FEED ─────────────────────────────────────────── -->
+                                <Border Background="{StaticResource Brush.Background.Card}"
+                                        CornerRadius="{StaticResource Radius.Medium}"
+                                        Padding="16">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="256"/>
+                                            <RowDefinition Height="280"/>
                                         </Grid.RowDefinitions>
-                                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,12">
-                                            <FontIcon Glyph="&#xE99A;" FontSize="18" Foreground="{StaticResource Brush.Primary}"/>
-                                            <TextBlock Text="ROBOT 1 VIDEO FEED" FontWeight="SemiBold"/>
-                                        </StackPanel>
-                                        <Border Grid.Row="1" Background="Black" CornerRadius="8">
+
+                                        <!-- Header -->
+                                        <Grid Margin="0,0,0,12">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                <FontIcon Glyph="&#xE99A;" FontSize="16" Foreground="{StaticResource Brush.Primary}"/>
+                                                <TextBlock Text="ROBOT 1 VIDEO FEED" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <!-- LIVE badge -->
+                                            <Border Grid.Column="2" CornerRadius="4" Padding="6,2"
+                                                    x:Name="RobotFeedBadge"
+                                                    Background="#1A3A1A" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" Spacing="5">
+                                                    <Ellipse Width="6" Height="6" Fill="#4CAF50"
+                                                             x:Name="RobotFeedDot"/>
+                                                    <TextBlock x:Name="RobotFeedBadgeText"
+                                                               Text="OFFLINE" FontSize="10"
+                                                               Foreground="#4CAF50" FontWeight="SemiBold"/>
+                                                </StackPanel>
+                                            </Border>
+                                        </Grid>
+
+                                        <!-- Preview -->
+                                        <Border Grid.Row="1" Background="#0A0A0A" CornerRadius="10"
+                                                BorderBrush="#1E1E1E" BorderThickness="1">
                                             <Grid>
-                                                <Image x:Name="CameraImage" Stretch="Uniform" Visibility="Collapsed"/>
-                                                <StackPanel x:Name="CameraOfflineState" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                                     <SymbolIcon Symbol="Camera" Foreground="Gray" Margin="0,0,0,8"/>
-                                                     <TextBlock Text="Waiting for stream..." Foreground="Gray" FontSize="11"/>
+                                                <Image x:Name="CameraImage" Stretch="UniformToFill"
+                                                       Visibility="Collapsed"/>
+                                                <StackPanel x:Name="CameraOfflineState"
+                                                            VerticalAlignment="Center"
+                                                            HorizontalAlignment="Center" Spacing="6">
+                                                    <FontIcon Glyph="&#xE99A;" FontSize="32"
+                                                              Foreground="#333333"/>
+                                                    <TextBlock Text="Waiting for video stream..."
+                                                               Foreground="#444444" FontSize="11"
+                                                               HorizontalAlignment="Center"/>
                                                 </StackPanel>
                                             </Grid>
                                         </Border>
                                     </Grid>
                                 </Border>
 
-                                <!-- Local Webcam -->
-                                <Border Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="16">
+                                <!-- ── OPERATOR WEBCAM ────────────────────────────────────────────── -->
+                                <Border Grid.Column="1"
+                                        Background="{StaticResource Brush.Background.Card}"
+                                        CornerRadius="{StaticResource Radius.Medium}"
+                                        Padding="16">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="256"/>
+                                            <RowDefinition Height="280"/>
                                         </Grid.RowDefinitions>
 
-                                        <!-- Title -->
-                                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
-                                            <FontIcon Glyph="&#xE722;" FontSize="18" Foreground="#0078D7"/>
-                                            <TextBlock Text="OPERATOR WEBCAM" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                        </StackPanel>
-
-                                        <!-- Camera selector -->
-                                        <Grid Grid.Row="1" Margin="0,0,0,10">
+                                        <!-- Header: icon + title + camera picker + refresh -->
+                                        <Grid Margin="0,0,0,12">
                                             <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <ComboBox x:Name="CameraComboBox"
+
+                                            <FontIcon Grid.Column="0" Glyph="&#xE722;" FontSize="16"
+                                                      Foreground="#0078D7" VerticalAlignment="Center"
+                                                      Margin="0,0,8,0"/>
+                                            <TextBlock Grid.Column="1" Text="OPERATOR WEBCAM"
+                                                       FontWeight="SemiBold" FontSize="12"
+                                                       VerticalAlignment="Center" Margin="0,0,10,0"/>
+
+                                            <!-- Camera dropdown -->
+                                            <ComboBox Grid.Column="2"
+                                                      x:Name="CameraComboBox"
                                                       PlaceholderText="Select camera..."
                                                       HorizontalAlignment="Stretch"
                                                       SelectionChanged="CameraComboBox_SelectionChanged"
-                                                      FontSize="12"
+                                                      FontSize="11"
+                                                      Height="32"
                                                       CornerRadius="6"/>
-                                            <Button Grid.Column="1" x:Name="RefreshCamerasButton"
+
+                                            <!-- Refresh -->
+                                            <Button Grid.Column="3"
+                                                    x:Name="RefreshCamerasButton"
                                                     Content="&#xE72C;"
                                                     FontFamily="Segoe Fluent Icons"
-                                                    FontSize="14"
-                                                    Width="36" Height="36"
+                                                    FontSize="13"
+                                                    Width="32" Height="32"
                                                     Margin="6,0,0,0"
                                                     ToolTipService.ToolTip="Refresh camera list"
                                                     Click="RefreshCamerasButton_Click"
                                                     CornerRadius="6"
                                                     Background="Transparent"
-                                                    BorderThickness="1"
-                                                    BorderBrush="{StaticResource Brush.Border}"/>
+                                                    BorderBrush="#333333"
+                                                    VerticalAlignment="Center"/>
                                         </Grid>
 
-                                        <!-- Preview -->
-                                        <Border Grid.Row="2" Background="Black" CornerRadius="8">
-                                            <MediaPlayerElement x:Name="LocalWebcamPreview" AutoPlay="True" Stretch="Uniform"/>
+                                        <!-- Preview — identical height to robot feed -->
+                                        <Border Grid.Row="1" Background="#0A0A0A" CornerRadius="10"
+                                                BorderBrush="#1E1E1E" BorderThickness="1">
+                                            <MediaPlayerElement x:Name="LocalWebcamPreview"
+                                                                AutoPlay="True" Stretch="Uniform"/>
                                         </Border>
                                     </Grid>
                                 </Border>
