@@ -23,12 +23,6 @@
                         <SymbolIcon Symbol="Home"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
-                
-                <NavigationViewItem Content="WhatsApp Logs" Tag="logs">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Message"/>
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
 
                 <NavigationViewItem Content="Telemetry" Tag="telemetry">
                     <NavigationViewItem.Icon>
@@ -247,7 +241,7 @@
                                             <TextBlock Text="OPERATOR WEBCAM" FontWeight="SemiBold"/>
                                         </StackPanel>
                                         <Border Grid.Row="1" Background="Black" CornerRadius="8">
-                                            <Image x:Name="LocalWebcamPreview" Stretch="Uniform"/>
+                                            <MediaPlayerElement x:Name="LocalWebcamPreview" AutoPlay="True" Stretch="Uniform"/>
                                         </Border>
                                     </Grid>
                                 </Border>
@@ -404,88 +398,6 @@
                     </Border>
                 </Grid>
 
-                <!-- 3. LOGS VIEW (WhatsApp) -->
-                <Grid x:Name="LogsView" Visibility="Collapsed">
-                    <Border Padding="{StaticResource Padding.Page}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
-                            
-                            <!-- HEADER REMOVED -->                            
-                            <Border Grid.Row="1" Background="#111B21" CornerRadius="{StaticResource Radius.Small}" Margin="0,16,0,0">
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="*"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
-
-                                    <!-- Chat Area -->
-                                    <Grid>
-                                        <ScrollViewer x:Name="ChatScrollViewer" Padding="0,10" ViewChanged="ChatScrollViewer_ViewChanged">
-                                            <StackPanel x:Name="ChatHistoryPanel" Padding="16" Spacing="12"/>
-                                        </ScrollViewer>
-
-                                        <Button x:Name="NewMessageBadge" 
-                                                Visibility="Collapsed" 
-                                                VerticalAlignment="Bottom" 
-                                                HorizontalAlignment="Center" 
-                                                Margin="0,0,0,12" 
-                                                Style="{StaticResource Button.Primary}"
-                                                CornerRadius="16"
-                                                Click="NewMessageBadge_Click">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE70D;" FontSize="12"/>
-                                                <TextBlock x:Name="NewMessageCountText" Text="New Message"/>
-                                            </StackPanel>
-                                        </Button>
-                                    </Grid>
-
-                                    <!-- Simulator Area -->
-                                    <Border Grid.Row="1" Background="#202C33" CornerRadius="0,0,8,8">
-                                        <StackPanel Padding="16" Spacing="16">
-                                            <!-- Info Box -->
-                                            <Border Background="#2A3942" CornerRadius="8" Padding="12">
-                                                <StackPanel Orientation="Horizontal" Spacing="12">
-                                                    <FontIcon Glyph="&#xE946;" FontSize="16" Foreground="#FFD279"/>
-                                                    <StackPanel>
-                                                        <TextBlock Text="Command Simulator" FontWeight="Bold" Foreground="#E9EDEF"/>
-                                                        <TextBlock Text="Test robot commands (e.g., 'home', 'wave') directly here without using WhatsApp." Foreground="#8696A0" FontSize="12"/>
-                                                    </StackPanel>
-                                                </StackPanel>
-                                            </Border>
-
-                                            <!-- Quick Commands -->
-                                            <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Enabled" VerticalScrollMode="Disabled">
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <Button Content="🏠 Home" Click="QuickCommand_Click" Tag="home" Style="{StaticResource Button.Secondary}"/>
-                                                    <Button Content="👋 Wave" Click="QuickCommand_Click" Tag="wave" Style="{StaticResource Button.Secondary}"/>
-                                                    <Button Content="📸 Photo" Click="QuickCommand_Click" Tag="photo" Style="{StaticResource Button.Secondary}"/>
-                                                    <Button Content="🅿️ Park" Click="QuickCommand_Click" Tag="park" Style="{StaticResource Button.Secondary}"/>
-                                                    <Button Content="✊ Grab" Click="QuickCommand_Click" Tag="grab" Style="{StaticResource Button.Secondary}"/>
-                                                    <Button Content="👐 Release" Click="QuickCommand_Click" Tag="release" Style="{StaticResource Button.Secondary}"/>
-                                                    <Button Content="⚙️ Calibrate" Click="QuickCommand_Click" Tag="calibrate" Style="{StaticResource Button.Secondary}"/>
-                                                    <Button Content="🟢 Status" Click="QuickCommand_Click" Tag="status" Style="{StaticResource Button.Secondary}"/>
-                                                </StackPanel>
-                                            </ScrollViewer>
-
-                                            <!-- Input -->
-                                            <Grid ColumnSpacing="10">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <TextBox x:Name="SimulatorInput" PlaceholderText="Type a message..." KeyDown="SimulatorInput_KeyDown"/>
-                                                <Button x:Name="SimulateButton" Content="SEND" Style="{StaticResource Button.Primary}" Click="SimulateButton_Click" Grid.Column="1"/>
-                                            </Grid>
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
-                            </Border>
-                        </Grid>
-                    </Border>
-                </Grid>
 
                             <!-- 5. NETWORK VIEW -->
                 <Grid x:Name="NetworkView" Visibility="Collapsed">
@@ -514,9 +426,9 @@
                                         
                                         <StackPanel Spacing="16">
                                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE9D2;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
-                                                <TextBlock Text="Internet Speed Test" Style="{StaticResource Text.Headline3}"/>
-                                            </StackPanel>
+                                            <FontIcon Glyph="&#xE81E;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
+                                            <TextBlock Text="Tailscale Performance Test" Style="{StaticResource Text.Headline3}"/>
+                                        </StackPanel>
                                             
                                             <Grid ColumnSpacing="16">
                                                 <Grid.RowDefinitions>
@@ -616,9 +528,9 @@
                                                     <Rectangle Width="12" Height="12" Fill="#0078D7"/>
                                                     <TextBlock Text="Expert (Quest)" FontSize="12" Opacity="0.8"/>
                                                 </StackPanel>
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <Rectangle Width="12" Height="12" Fill="#00E5FF"/>
-                                                    <TextBlock Text="Internet (Cloudflare)" FontSize="12" Opacity="0.8"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                                    <Ellipse Width="8" Height="8" Fill="#00E5FF"/>
+                                                    <TextBlock Text="Tailscale VPN" FontSize="12" Opacity="0.8"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
@@ -677,19 +589,19 @@
 
                                             <!-- Internet Stats -->
                                             <StackPanel Grid.Column="1" Spacing="4">
-                                                <TextBlock Text="INTERNET LATENCY" FontSize="11" FontWeight="Bold" Opacity="0.6" Foreground="#00E5FF"/>
+                                                <TextBlock Text="TAILSCALE LATENCY" FontSize="10" FontWeight="Bold" Foreground="#00E5FF" Margin="0,0,0,4"/>
                                                 <StackPanel Orientation="Horizontal" Spacing="16">
                                                     <StackPanel>
-                                                        <TextBlock Text="MIN" FontSize="9" Opacity="0.4"/>
-                                                        <TextBlock x:Name="InternetMinText" Text="-- ms" FontSize="13"/>
+                                                        <TextBlock Text="MIN" FontSize="9" Opacity="0.5"/>
+                                                        <TextBlock x:Name="InternetMinText" Text="-- ms" FontSize="13" FontWeight="Bold"/>
                                                     </StackPanel>
                                                     <StackPanel>
-                                                        <TextBlock Text="MAX" FontSize="9" Opacity="0.4"/>
-                                                        <TextBlock x:Name="InternetMaxText" Text="-- ms" FontSize="13"/>
+                                                        <TextBlock Text="MAX" FontSize="9" Opacity="0.5"/>
+                                                        <TextBlock x:Name="InternetMaxText" Text="-- ms" FontSize="13" FontWeight="Bold"/>
                                                     </StackPanel>
                                                     <StackPanel>
-                                                        <TextBlock Text="AVG" FontSize="9" Opacity="0.4"/>
-                                                        <TextBlock x:Name="InternetAvgText" Text="-- ms" FontSize="13" FontWeight="SemiBold"/>
+                                                        <TextBlock Text="AVG" FontSize="9" Opacity="0.5"/>
+                                                        <TextBlock x:Name="InternetAvgText" Text="-- ms" FontSize="13" FontWeight="Bold" Foreground="#00E5FF"/>
                                                     </StackPanel>
                                                 </StackPanel>
                                             </StackPanel>

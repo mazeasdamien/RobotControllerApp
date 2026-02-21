@@ -86,7 +86,6 @@ namespace RobotControllerApp
 
             // Wire up Logs
             RelayServerHost.OnLog += Log;
-            RelayServerHost.OnWhatsAppLog += LogWhatsApp;
             RobotBridgeService.OnLog += Log;
             RobotBridgeService.OnRosConnectionChanged += (connected) =>
             {
@@ -246,11 +245,6 @@ namespace RobotControllerApp
                 }
             });
 
-            RelayServerHost.OnWhatsAppLog += (msg) => this.DispatcherQueue.TryEnqueue(() =>
-            {
-                TelemLastCmd.Text = msg.Contains(']') ? msg.Substring(msg.IndexOf(']') + 1).Trim() : msg;
-                TelemCmdSource.Text = "WhatsApp";
-            });
 
             this.AppWindow.Closing += AppWindow_Closing;
 
@@ -282,8 +276,6 @@ namespace RobotControllerApp
         }
 
         private MediaCapture? _mediaCapture;
-        private MediaFrameReader? _frameReader;
-        private WriteableBitmap? _webcamSource;
         private async Task InitializeLocalWebcam()
         {
             try
@@ -296,61 +288,23 @@ namespace RobotControllerApp
                 };
                 await _mediaCapture.InitializeAsync(settings);
 
-                // Find a suitable frame source
-                var frameSource = _mediaCapture.FrameSources.Values
+                var frameSourceInfo = _mediaCapture.FrameSources.Values
                     .FirstOrDefault(s => s.Info.MediaStreamType == MediaStreamType.VideoPreview)
                     ?? _mediaCapture.FrameSources.Values.FirstOrDefault();
 
-                if (frameSource != null)
+                if (frameSourceInfo != null)
                 {
-                    // Update camera properties if desirable
-                    var format = frameSource.SupportedFormats.FirstOrDefault(f => f.VideoFormat.Width == 1280 && f.VideoFormat.Height == 720)
-                                 ?? frameSource.SupportedFormats.OrderByDescending(f => f.VideoFormat.Width).FirstOrDefault();
+                    var format = frameSourceInfo.SupportedFormats.FirstOrDefault(f => f.VideoFormat.Width == 1280 && f.VideoFormat.Height == 720)
+                                 ?? frameSourceInfo.SupportedFormats.OrderByDescending(f => f.VideoFormat.Width).FirstOrDefault();
+                    if (format != null) await frameSourceInfo.SetFormatAsync(format);
 
-                    if (format != null)
-                    {
-                        await frameSource.SetFormatAsync(format);
-                        _webcamSource = new WriteableBitmap((int)format.VideoFormat.Width, (int)format.VideoFormat.Height);
-                    }
-                    else
-                    {
-                        _webcamSource = new WriteableBitmap(640, 480);
-                    }
-
-                    LocalWebcamPreview.Source = _webcamSource;
-                    _frameReader = await _mediaCapture.CreateFrameReaderAsync(frameSource, MediaEncodingSubtypes.Bgra8);
-                    _frameReader.FrameArrived += FrameReader_FrameArrived;
-                    await _frameReader.StartAsync();
-
-                    Log($"[Webcam] Initialized: {frameSource.Info.SourceKind} ({_webcamSource.PixelWidth}x{_webcamSource.PixelHeight})");
+                    LocalWebcamPreview.Source = Windows.Media.Core.MediaSource.CreateFromMediaFrameSource(frameSourceInfo);
+                    Log($"[Webcam] Initialized attached camera");
                 }
             }
             catch (Exception ex)
             {
                 Log($"[Webcam] Initialization failed: {ex.Message}");
-            }
-        }
-
-        private void FrameReader_FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
-        {
-            var frame = sender.TryAcquireLatestFrame();
-            if (frame?.VideoMediaFrame?.SoftwareBitmap != null)
-            {
-                var softwareBitmap = frame.VideoMediaFrame.SoftwareBitmap;
-                if (softwareBitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 ||
-                    softwareBitmap.BitmapAlphaMode != BitmapAlphaMode.Premultiplied)
-                {
-                    softwareBitmap = SoftwareBitmap.Convert(softwareBitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
-                }
-
-                this.DispatcherQueue.TryEnqueue(() =>
-                {
-                    if (_webcamSource != null)
-                    {
-                        softwareBitmap.CopyToBuffer(_webcamSource.PixelBuffer);
-                        _webcamSource.Invalidate();
-                    }
-                });
             }
         }
 
@@ -606,9 +560,9 @@ namespace RobotControllerApp
                 // 1. DOWNLOAD TEST (2MB for better reliability/speed at 10s intervals)
                 try
                 {
-                    string downUrl = "https://speed.cloudflare.com/__down?bytes=2000000";
+                    // Removed speedtest URLs
                     var sw = System.Diagnostics.Stopwatch.StartNew();
-                    byte[] data = await client.GetByteArrayAsync(downUrl);
+                    byte[] data = await client.GetByteArrayAsync("https://speed.cloudflare.com/__down?bytes=2000000");
                     sw.Stop();
                     downMbps = (data.Length * 8.0 / 1000000.0) / sw.Elapsed.TotalSeconds;
                 }
@@ -617,13 +571,12 @@ namespace RobotControllerApp
                 // 2. UPLOAD TEST (1MB)
                 try
                 {
-                    string upUrl = "https://speed.cloudflare.com/__up";
                     byte[] upData = new byte[1000000]; // 1MB
                     new Random().NextBytes(upData);
 
                     var sw = System.Diagnostics.Stopwatch.StartNew();
                     var content = new ByteArrayContent(upData);
-                    var resp = await client.PostAsync(upUrl, content);
+                    var resp = await client.PostAsync("https://speed.cloudflare.com/__up", content);
                     sw.Stop();
 
                     if (resp.IsSuccessStatusCode)
@@ -789,7 +742,6 @@ namespace RobotControllerApp
         {
             // Hide all views first
             DashboardView.Visibility = Visibility.Collapsed;
-            LogsView.Visibility = Visibility.Collapsed;
             TelemetryView.Visibility = Visibility.Collapsed;
             SettingsView.Visibility = Visibility.Collapsed;
             NetworkView.Visibility = Visibility.Collapsed;
@@ -805,9 +757,6 @@ namespace RobotControllerApp
                 {
                     case "home":
                         DashboardView.Visibility = Visibility.Visible;
-                        break;
-                    case "logs":
-                        LogsView.Visibility = Visibility.Visible;
                         break;
                     case "telemetry":
                         TelemetryView.Visibility = Visibility.Visible;
@@ -833,202 +782,7 @@ namespace RobotControllerApp
             // but resetting the UI state gives user feedback.
         }
 
-        private int _unreadMessages = 0;
-
-        private void ChatScrollViewer_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
-        {
-            // If user scrolls to bottom manually, clear badge
-            if (ChatScrollViewer.VerticalOffset >= ChatScrollViewer.ScrollableHeight - 50)
-            {
-                if (_unreadMessages > 0)
-                {
-                    _unreadMessages = 0;
-                    NewMessageBadge.Visibility = Visibility.Collapsed;
-                }
-            }
-        }
-
-        private void NewMessageBadge_Click(object sender, RoutedEventArgs e)
-        {
-            // Scroll to bottom
-            ChatScrollViewer.ChangeView(null, ChatScrollViewer.ScrollableHeight, null);
-            _unreadMessages = 0;
-            NewMessageBadge.Visibility = Visibility.Collapsed;
-        }
-
-        private void LogWhatsApp(string message)
-        {
-            this.DispatcherQueue.TryEnqueue(() =>
-            {
-                // 1. Check if we are at the bottom *before* adding content
-                // Use a larger tolerance (50px) to handle float precision and close-to-bottom states
-                bool isAtBottom = ChatScrollViewer.VerticalOffset >= (ChatScrollViewer.ScrollableHeight - 50);
-
-                // Media parsing
-                string mediaUrl = "";
-                if (message.Contains("[MEDIA:"))
-                {
-                    int start = message.IndexOf("[MEDIA:") + 7;
-                    int end = message.IndexOf("]", start);
-                    if (end != -1)
-                    {
-                        mediaUrl = message.Substring(start, end - start);
-                        message = message.Remove(message.IndexOf("[MEDIA:"), end - message.IndexOf("[MEDIA:") + 1);
-                    }
-                }
-
-                bool isRobot = message.Contains("🤖");
-                string displayText = message.Replace("🤖", "").Trim();
-
-                // Main Container for Row
-                var rowPanel = new StackPanel
-                {
-                    Orientation = Orientation.Horizontal,
-                    HorizontalAlignment = isRobot ? HorizontalAlignment.Left : HorizontalAlignment.Right,
-                    Margin = new Thickness(0, 8, 0, 8)
-                };
-
-                if (isRobot)
-                {
-                    // Avatar (Robot/Orange Brand)
-                    var avatarContainer = new Border
-                    {
-                        Width = 32,
-                        Height = 32,
-                        CornerRadius = new CornerRadius(16), // Circle
-                        Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 241, 110, 0)), // #F16E00 (Orange)
-                        Margin = new Thickness(0, 0, 12, 0),
-                        VerticalAlignment = VerticalAlignment.Bottom,
-                    };
-
-                    var icon = new FontIcon
-                    {
-                        Glyph = "\uE99A", // Robot Icon
-                        FontSize = 16,
-                        Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255))
-                    };
-                    avatarContainer.Child = icon;
-
-                    rowPanel.Children.Add(avatarContainer);
-                }
-
-                // Chat Bubble
-                var bubble = new Border
-                {
-                    Background = isRobot
-                        ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 50, 50, 50))   // Dark Gray (Robot)
-                        : new SolidColorBrush(Windows.UI.Color.FromArgb(255, 241, 110, 0)), // #F16E00 (User/Orange)
-
-                    CornerRadius = new CornerRadius(18),
-                    Padding = new Thickness(16, 10, 16, 10),
-                    MaxWidth = 500
-                };
-
-                var bubbleContent = new StackPanel { Spacing = 8 };
-
-                var textBlock = new TextBlock
-                {
-                    Text = displayText,
-                    TextWrapping = TextWrapping.Wrap,
-                    FontSize = 15,
-                    Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255))
-                };
-                bubbleContent.Children.Add(textBlock);
-
-                if (!string.IsNullOrEmpty(mediaUrl))
-                {
-                    var img = new Image
-                    {
-                        Source = new BitmapImage(new Uri(mediaUrl)),
-                        MaxWidth = 400,
-                        Stretch = Stretch.Uniform,
-                        Margin = new Thickness(0, 4, 0, 4)
-                    };
-                    // Round the image corners slightly
-                    var imgBorder = new Border { CornerRadius = new CornerRadius(8), Child = img };
-                    bubbleContent.Children.Add(imgBorder);
-                }
-
-                bubble.Child = bubbleContent;
-                rowPanel.Children.Add(bubble);
-
-                ChatHistoryPanel.Children.Add(rowPanel);
-
-                // 2. Logic: Should we scroll?
-                // - IF it is a user message (right side), always scroll.
-                // - OR IF the user was already at the bottom before this message arried, keep them at the bottom.
-                if (!isRobot || isAtBottom)
-                {
-                    // Force the layout to update so ScrollableHeight increases to include the new message
-                    ChatHistoryPanel.UpdateLayout();
-
-                    // Scroll to the new absolute bottom
-                    ChatScrollViewer.ChangeView(null, double.MaxValue, null);
-
-                    // Reset Badge since we are viewing latest
-                    _unreadMessages = 0;
-                    NewMessageBadge.Visibility = Visibility.Collapsed;
-                }
-                else
-                {
-                    // User is genuinely scrolled up reading history -> Show Badge
-                    _unreadMessages++;
-                    NewMessageCountText.Text = $"{_unreadMessages} New Message" + (_unreadMessages > 1 ? "s" : "");
-                    NewMessageBadge.Visibility = Visibility.Visible;
-                }
-            });
-        }
-
-        private async void SimulateButton_Click(object _, RoutedEventArgs __)
-        {
-            await SendSimulation();
-        }
-
-        private async void SimulatorInput_KeyDown(object _, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)
-        {
-            if (e.Key == Windows.System.VirtualKey.Enter)
-            {
-                await SendSimulation();
-            }
-        }
-
-        private async void QuickCommand_Click(object sender, RoutedEventArgs _)
-        {
-            if (sender is Button btn && btn.Tag != null)
-            {
-                SimulatorInput.Text = btn.Tag.ToString();
-                await SendSimulation();
-            }
-        }
-
-        private async Task SendSimulation()
-        {
-            var text = SimulatorInput.Text.Trim();
-            if (string.IsNullOrEmpty(text)) return;
-
-            SimulatorInput.Text = "";
-            SimulatorInput.IsEnabled = false;
-
-            try
-            {
-                using var client = new HttpClient();
-                var content = new FormUrlEncodedContent([
-                    new("Body", text),
-                    new("From", "Simulator")
-                ]);
-
-                await client.PostAsync($"http://localhost:{_settings.RelayPort}/api/whatsapp", content);
-            }
-            catch (Exception ex)
-            {
-                Log($"[Simulator] Error: {ex.Message}");
-            }
-            finally
-            {
-                SimulatorInput.IsEnabled = true;
-                SimulatorInput.Focus(FocusState.Programmatic);
-            }
-        }
+        // WhatsApp block removed completely
         private void StartNetworkMonitoring()
         {
             _networkTimer = new DispatcherTimer();
@@ -1091,7 +845,7 @@ namespace RobotControllerApp
                     double internetLat = 0;
                     try
                     {
-                        var reply = await _pinger.SendPingAsync("speed.cloudflare.com", 1000);
+                        var reply = await _pinger.SendPingAsync("100.100.100.100", 1000);
                         if (reply.Status == IPStatus.Success)
                         {
                             internetLat = reply.RoundtripTime;
@@ -1146,7 +900,7 @@ namespace RobotControllerApp
             int uCount = _unityLatencyHistory.Count;
             bool isExpertReachable = uLat > 0 || (uCount > 0 && _unityLatencyHistory.Skip(System.Math.Max(0, uCount - 3)).Any(v => v > 0));
             // Robot 1 is logically connected ONLY if the bridge is sending heartbeats
-            bool isR1Connected = _robotBridge.LastLatencyMs > 0;
+            bool isR1Connected = _robotBridge.IsConnected || _robotBridge.LastLatencyMs > 0;
 
             // Robot 2 is logically connected if we can reach its IP (as it has no specific bridge software yet)
             bool isR2Connected = r2Lat > 0 && !string.IsNullOrEmpty(_settings.Robot2Ip);
@@ -1187,7 +941,7 @@ namespace RobotControllerApp
             }
 
             // 2. Discovery updates
-            string expertDisplayIp = RelayServerHost.UnityClientIp;
+            string? expertDisplayIp = RelayServerHost.UnityClientIp;
             if (string.IsNullOrEmpty(expertDisplayIp)) expertDisplayIp = _settings.ExpertIp;
             if (string.IsNullOrEmpty(expertDisplayIp)) expertDisplayIp = "quest-3"; // Default fallback
 

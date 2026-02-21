@@ -12,6 +12,7 @@ namespace RobotControllerApp.Services
     {
         public static event Action<string>? OnLog;
         public static event Action<bool>? OnRosConnectionChanged;
+        public bool IsConnected { get; private set; }
 
         private ClientWebSocket? _robotWebSocket;
         private ClientWebSocket? _relayWebSocket;
@@ -73,6 +74,7 @@ namespace RobotControllerApp.Services
 
                     await _robotWebSocket.ConnectAsync(new Uri(rosUrl), token);
                     Log("[ROS] ✓ Connected to robot");
+                    IsConnected = true;
                     OnRosConnectionChanged?.Invoke(true);
 
                     await SubscribeToJointStates();
@@ -100,6 +102,7 @@ namespace RobotControllerApp.Services
                 }
                 finally
                 {
+                    IsConnected = false;
                     OnRosConnectionChanged?.Invoke(false);
                     // Force disconnect from Relay so the Server knows we are offline
                     try { _relayWebSocket?.Abort(); } catch { }
