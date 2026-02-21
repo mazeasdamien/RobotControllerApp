@@ -27,6 +27,7 @@ namespace RobotControllerApp
         private readonly List<double> _unityLatencyHistory = [];
         private readonly List<double> _internetLatencyHistory = [];
         private readonly List<double> _speedHistory = [];
+        private readonly List<double> _uploadHistory = [];
         private DispatcherTimer? _networkTimer;
         private DispatcherTimer? _speedTestTimer;
         private readonly Ping _pinger = new();
@@ -118,7 +119,6 @@ namespace RobotControllerApp
                 else TelemFps.Foreground = new SolidColorBrush(Microsoft.UI.Colors.Orange);
 
                 TelemTotalImages.Text = total.ToString();
-                TelemBufferBar.Value = Math.Min(fps * 2, 100);
             });
 
             RelayServerHost.OnGripperReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
@@ -157,17 +157,7 @@ namespace RobotControllerApp
 
             RelayServerHost.OnUnityMessageReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
             {
-                // Interval calc
                 var now = DateTime.Now;
-                if (lastUnityMsg > DateTime.MinValue)
-                {
-                    double ms = (now - lastUnityMsg).TotalMilliseconds;
-                    TelemUnityLatency.Text = $"{ms:F0} ms (Interval)";
-
-                    if (ms > 100) TelemUnityLatency.Foreground = new SolidColorBrush(Microsoft.UI.Colors.Red);
-                    else if (ms < 40) TelemUnityLatency.Foreground = new SolidColorBrush(Microsoft.UI.Colors.LightGreen);
-                    else TelemUnityLatency.Foreground = new SolidColorBrush(Microsoft.UI.Colors.Orange);
-                }
                 lastUnityMsg = now;
 
 
@@ -285,8 +275,8 @@ namespace RobotControllerApp
                     return;
                 }
 
-                // Pick the other webcam if there are multiple (assuming the second one is the desired one)
-                var selectedCamera = videoDevices.Count > 1 ? videoDevices.Last() : videoDevices[0];
+                // Check for Creative webcam first, otherwise fallback to the first one available
+                var selectedCamera = videoDevices.FirstOrDefault(c => c.Name.IndexOf("Creative", StringComparison.OrdinalIgnoreCase) >= 0) ?? videoDevices[0];
 
                 _mediaCapture = new MediaCapture();
                 var settings = new MediaCaptureInitializationSettings
@@ -308,7 +298,7 @@ namespace RobotControllerApp
                     if (format != null) await frameSourceInfo.SetFormatAsync(format);
 
                     LocalWebcamPreview.Source = Windows.Media.Core.MediaSource.CreateFromMediaFrameSource(frameSourceInfo);
-                    Log($"[Webcam] Initialized attached camera");
+                    Log($"[Webcam] Initialized attached camera: {selectedCamera.Name}");
                 }
             }
             catch (Exception ex)
@@ -597,7 +587,7 @@ namespace RobotControllerApp
                 {
                     // Reset colors
                     InternetSpeedText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Primary"];
-                    InternetUploadText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 229, 255));
+                    InternetUploadText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 210, 121, 255));
 
                     if (downMbps >= 0)
                     {
@@ -608,7 +598,11 @@ namespace RobotControllerApp
                     }
                     else InternetSpeedText.Text = "Err";
 
-                    if (upMbps >= 0) InternetUploadText.Text = $"{upMbps:F1} Mbps";
+                    if (upMbps >= 0)
+                    {
+                        InternetUploadText.Text = $"{upMbps:F1} Mbps";
+                        UpdateHistory(_uploadHistory, upMbps, MaxSpeedHistory);
+                    }
                     else InternetUploadText.Text = "Err";
 
                     NetworkStatusText.Text = "Idle";
@@ -673,6 +667,14 @@ namespace RobotControllerApp
             SpeedLowText.Text = $"{low:F1} Mbps";
             SpeedHighText.Text = $"{high:F1} Mbps";
             SpeedAvgText.Text = $"{avg:F1} Mbps";
+
+            if (_uploadHistory.Count > 0)
+            {
+                double upLow = _uploadHistory.Min();
+                double upHigh = _uploadHistory.Max();
+                double upAvg = _uploadHistory.Average();
+                // Optionally can populate texts for upload here as well if UI handles it. But for now only graph is strictly required. 
+            }
         }
 
         private DateTime _nextSpeedTest = DateTime.MinValue;
@@ -694,6 +696,7 @@ namespace RobotControllerApp
             if (NetworkView.Visibility != Visibility.Visible) return;
 
             SpeedPath.Points.Clear();
+            UploadPath.Points.Clear();
             if (_speedHistory.Count < 2) return;
 
             double width = SpeedCanvas.ActualWidth > 0 ? SpeedCanvas.ActualWidth : 400;
@@ -704,6 +707,10 @@ namespace RobotControllerApp
             double stepX = width / (divisor - 1);
 
             double maxSpeed = Math.Max(100.0, _speedHistory.Max() * 1.2);
+            if (_uploadHistory.Count > 0)
+            {
+                maxSpeed = Math.Max(maxSpeed, _uploadHistory.Max() * 1.2);
+            }
             double scaleY = height / maxSpeed;
 
             for (int i = 0; i < _speedHistory.Count; i++)
@@ -712,6 +719,14 @@ namespace RobotControllerApp
                 double val = Math.Min(_speedHistory[i], maxSpeed);
                 double y = height - (val * scaleY);
                 SpeedPath.Points.Add(new Windows.Foundation.Point(x, y));
+            }
+
+            for (int i = 0; i < _uploadHistory.Count; i++)
+            {
+                double x = i * stepX;
+                double val = Math.Min(_uploadHistory[i], maxSpeed);
+                double y = height - (val * scaleY);
+                UploadPath.Points.Add(new Windows.Foundation.Point(x, y));
             }
         }
 
