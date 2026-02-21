@@ -199,8 +199,8 @@
                                 </Border>
                             </Grid>
 
-                            <!-- VIDEO FEEDS -->
-                            <Grid Grid.Row="2" ColumnSpacing="24" Margin="0,0,0,24">
+                            <!-- VIDEO FEEDS — fixed height so both cards are always equal -->
+                            <Grid Grid.Row="2" ColumnSpacing="24" Margin="0,0,0,24" Height="360">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
@@ -213,7 +213,7 @@
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="280"/>
+                                            <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
 
                                         <!-- Header -->
@@ -271,7 +271,7 @@
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="280"/>
+                                            <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
 
                                         <!-- Header row 1: icon + title -->

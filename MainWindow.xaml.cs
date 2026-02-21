@@ -310,14 +310,19 @@ namespace RobotControllerApp
 
                 if (frameSource != null)
                 {
-                    // WinUI 3 correct approach: MediaPlayer → SetMediaPlayer()
-                    _webcamPlayer = new MediaPlayer();
-                    _webcamPlayer.AutoPlay = true;
-                    _webcamPlayer.Source = Windows.Media.Core.MediaSource
-                                                .CreateFromMediaFrameSource(frameSource);
+                    // Set format (prefer 720p, fallback to highest res)
+                    var format = frameSource.SupportedFormats
+                        .FirstOrDefault(f => f.VideoFormat.Width == 1280)
+                        ?? frameSource.SupportedFormats
+                           .OrderByDescending(f => f.VideoFormat.Width)
+                           .FirstOrDefault();
+                    if (format != null)
+                        await frameSource.SetFormatAsync(format);
 
-                    // Must assign on the UI thread
-                    DispatcherQueue.TryEnqueue(() => LocalWebcamPreview.SetMediaPlayer(_webcamPlayer));
+                    // Simplest WinUI 3 pattern: set Source directly on MediaPlayerElement
+                    // (MediaSource implements IMediaPlaybackSource)
+                    var mediaSource = MediaSource.CreateFromMediaFrameSource(frameSource);
+                    LocalWebcamPreview.Source = mediaSource;
 
                     Log($"[Webcam] Streaming: {selected.Name}");
                 }
@@ -1039,18 +1044,24 @@ namespace RobotControllerApp
                 if (isExpertReachable)
                 {
                     RelayActiveText.Text = "QUEST REACHABLE";
-                    RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                    var green = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                    RelayActiveText.Foreground = green;
+                    RelayIcon.Foreground = green;   // ← icon also green
                 }
                 else
                 {
                     RelayActiveText.Text = "WAITING FOR QUEST";
+                    var muted = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
                     RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Error"];
+                    RelayIcon.Foreground = muted;   // ← icon stays muted when not reachable
                 }
             }
             else
             {
                 RelayActiveText.Text = "ACTIVE";
-                RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                var activeGreen = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                RelayActiveText.Foreground = activeGreen;
+                RelayIcon.Foreground = activeGreen; // ← icon green when fully active
             }
 
             // 2. Discovery updates
