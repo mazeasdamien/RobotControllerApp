@@ -30,8 +30,14 @@ namespace RobotControllerApp
         private DispatcherTimer? _networkTimer;
         private DispatcherTimer? _speedTestTimer;
         private readonly Ping _pinger = new();
+        private bool _isNetworkPinging = false;
         private const int MaxHistory = 300; // 5 minutes (at 1 ping / second)
         private const int MaxSpeedHistory = 20;
+
+        // Custom Telemetry from Unity Client
+        private string _questLocation = "Unknown Location";
+        private float _questRxKbps = 0f;
+        private float _questTxKbps = 0f;
 
         public MainWindow()
         {
@@ -91,6 +97,13 @@ namespace RobotControllerApp
             {
                 this.DispatcherQueue.TryEnqueue(() => UpdateExpertStatus(connected));
             };
+
+            RelayServerHost.OnUnityTelemetryReceived += (loc, rx, tx) => this.DispatcherQueue.TryEnqueue(() =>
+            {
+                _questLocation = loc;
+                _questRxKbps = rx;
+                _questTxKbps = tx;
+            });
 
             // Telemetry Subscriptions
             RelayServerHost.OnJointsReceived += (joints) => this.DispatcherQueue.TryEnqueue(() =>
@@ -1022,75 +1035,85 @@ namespace RobotControllerApp
             _networkTimer.Interval = TimeSpan.FromMilliseconds(1000);
             _networkTimer.Tick += async (s, e) =>
             {
-                // 1. Measure expert latency (Unity Client)
-                double unityLat = 0;
-                string? expertTarget = RelayServerHost.UnityClientIp;
-                // Fallback to static IP from settings if not connected
-                if (string.IsNullOrEmpty(expertTarget)) expertTarget = _settings.ExpertIp;
+                if (_isNetworkPinging) return;
+                _isNetworkPinging = true;
 
-                if (!string.IsNullOrEmpty(expertTarget))
-                {
-                    try
-                    {
-                        string host = expertTarget;
-                        if (host == "::1" || host.ToLower() == "localhost") host = "127.0.0.1";
-                        var reply = await _pinger.SendPingAsync(host, 1000);
-                        if (reply.Status == IPStatus.Success) unityLat = reply.RoundtripTime;
-                    }
-                    catch { }
-                }
-
-                // 2. Measure Robot 1 latency (Ethernet)
-                double r1Lat = 0;
-                if (!string.IsNullOrEmpty(_settings.RobotIp))
-                {
-                    try
-                    {
-                        string host = ExtractIp(_settings.RobotIp);
-                        var reply = await _pinger.SendPingAsync(host, 500);
-                        if (reply.Status == IPStatus.Success) r1Lat = reply.RoundtripTime;
-                    }
-                    catch { }
-                }
-
-                // 3. Measure Robot 2 latency (Ethernet)
-                double r2Lat = 0;
-                if (!string.IsNullOrEmpty(_settings.Robot2Ip))
-                {
-                    try
-                    {
-                        string host = ExtractIp(_settings.Robot2Ip);
-                        var reply = await _pinger.SendPingAsync(host, 500);
-                        if (reply.Status == IPStatus.Success) r2Lat = reply.RoundtripTime;
-                    }
-                    catch { }
-                }
-
-                // Update dashboard and discovery labels before internet ping
-                UpdateDashboardAndDiscovery(unityLat, r1Lat, r2Lat);
-
-                // 4. Measure Internet Latency (Real-time)
-                double internetLat = 0;
                 try
                 {
-                    var reply = await _pinger.SendPingAsync("speed.cloudflare.com", 1000);
-                    if (reply.Status == IPStatus.Success)
+                    // 1. Measure expert latency (Unity Client)
+                    double unityLat = 0;
+                    string? expertTarget = RelayServerHost.UnityClientIp;
+                    // Fallback to static IP from settings if not connected
+                    if (string.IsNullOrEmpty(expertTarget)) expertTarget = _settings.ExpertIp;
+
+                    if (!string.IsNullOrEmpty(expertTarget))
                     {
-                        internetLat = reply.RoundtripTime;
-                        InternetLatencyText.Text = $"{internetLat} ms";
+                        try
+                        {
+                            string host = expertTarget;
+                            if (host == "::1" || host.ToLower() == "localhost") host = "127.0.0.1";
+                            var reply = await _pinger.SendPingAsync(host, 1000);
+                            if (reply.Status == IPStatus.Success) unityLat = reply.RoundtripTime;
+                        }
+                        catch { }
                     }
+
+                    // 2. Measure Robot 1 latency (Ethernet)
+                    double r1Lat = 0;
+                    if (!string.IsNullOrEmpty(_settings.RobotIp))
+                    {
+                        try
+                        {
+                            string host = ExtractIp(_settings.RobotIp);
+                            var reply = await _pinger.SendPingAsync(host, 500);
+                            if (reply.Status == IPStatus.Success) r1Lat = reply.RoundtripTime;
+                        }
+                        catch { }
+                    }
+
+                    // 3. Measure Robot 2 latency (Ethernet)
+                    double r2Lat = 0;
+                    if (!string.IsNullOrEmpty(_settings.Robot2Ip))
+                    {
+                        try
+                        {
+                            string host = ExtractIp(_settings.Robot2Ip);
+                            var reply = await _pinger.SendPingAsync(host, 500);
+                            if (reply.Status == IPStatus.Success) r2Lat = reply.RoundtripTime;
+                        }
+                        catch { }
+                    }
+
+                    // Update dashboard and discovery labels before internet ping
+                    UpdateDashboardAndDiscovery(unityLat, r1Lat, r2Lat);
+
+                    // 4. Measure Internet Latency (Real-time)
+                    double internetLat = 0;
+                    try
+                    {
+                        var reply = await _pinger.SendPingAsync("speed.cloudflare.com", 1000);
+                        if (reply.Status == IPStatus.Success)
+                        {
+                            internetLat = reply.RoundtripTime;
+                            InternetLatencyText.Text = $"{internetLat} ms";
+                        }
+                    }
+                    catch { }
+
+                    // Update histories
+                    UpdateHistory(_unityLatencyHistory, unityLat, MaxHistory);
+                    UpdateHistory(_internetLatencyHistory, internetLat, MaxHistory);
+
+                    // Redraw graphs
+                    DrawNetworkGraph();
+                    DrawSpeedGraph();
+                    UpdateLatencyStats();
+                    UpdateSpeedCountdown();
                 }
-                catch { }
-
-                // Update histories
-                UpdateHistory(_unityLatencyHistory, unityLat, MaxHistory);
-                UpdateHistory(_internetLatencyHistory, internetLat, MaxHistory);
-
-                // Redraw graphs
-                DrawNetworkGraph();
-                DrawSpeedGraph();
-                UpdateLatencyStats();
-                UpdateSpeedCountdown();
+                finally
+                {
+                    _isNetworkPinging = false;
+                }
             };
             _networkTimer.Start();
 
@@ -1168,27 +1191,37 @@ namespace RobotControllerApp
             if (string.IsNullOrEmpty(expertDisplayIp)) expertDisplayIp = _settings.ExpertIp;
             if (string.IsNullOrEmpty(expertDisplayIp)) expertDisplayIp = "quest-3"; // Default fallback
 
-            QuestIpText.Text = expertDisplayIp;
-            R1IpText.Text = displayR1Lat > 0 ? ExtractIp(_settings.RobotIp) : "Disconnected";
+            if (!isExpertWsConnected && !isExpertReachable)
+            {
+                QuestIpText.Text = "Disconnected";
+            }
+            else
+            {
+                QuestIpText.Text = expertDisplayIp;
+            }
+            R1IpText.Text = (isR1Connected || displayR1Lat > 0) ? ExtractIp(_settings.RobotIp) : "Disconnected";
             R2IpText.Text = r2Lat > 0 ? ExtractIp(_settings.Robot2Ip) : "Offline";
 
             if (isExpertWsConnected)
             {
-                QuestRelayText.Text = "CONN: DIRECT P2P";
+                QuestRelayText.Text = "CONNECTED";
                 QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
                 QuestRelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                QuestLocText.Text = $"{_questLocation}  ↓ {_questRxKbps:0.0} KB/s  ↑ {_questTxKbps:0.0} KB/s";
             }
             else if (isExpertReachable)
             {
-                QuestRelayText.Text = "CONN: LAN REACHABLE";
+                QuestRelayText.Text = "REACHABLE";
                 QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
                 QuestRelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                QuestLocText.Text = "Tailscale Mesh";
             }
             else
             {
-                QuestRelayText.Text = "CONN: SEARCHING";
+                QuestRelayText.Text = "SEARCHING";
                 QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
                 QuestRelayDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 128, 128, 128));
+                QuestLocText.Text = "N/A";
             }
 
             if (isR1Connected || displayR1Lat > 0)
@@ -1281,6 +1314,10 @@ namespace RobotControllerApp
             for (int i = 0; i < history.Count; i++)
             {
                 double x = i * stepX;
+
+                // Skip 0 values to naturally interpolate a beautiful continuous curve
+                if (history[i] <= 0) continue;
+
                 // Clip value to maxHeight for display
                 double val = Math.Min(history[i], maxHeight);
                 double y = height - (val * scaleY);

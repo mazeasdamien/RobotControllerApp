@@ -88,16 +88,7 @@
                                 <RowDefinition Height="*"/>    <!-- Logs & Telemetry -->
                             </Grid.RowDefinitions>
 
-                            <!-- HEADER -->
-                            <StackPanel Grid.Row="0" Margin="0,0,0,24" Orientation="Horizontal" Spacing="20">
-                                <Border Background="{StaticResource Brush.Background.Card}" Padding="12" CornerRadius="12">
-                                    <Image Source="ms-appx:///Assets/AppLogo.png" Width="48" Height="48"/>
-                                </Border>
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Telepresence Control Station" Style="{StaticResource Text.Headline1}"/>
-                                    <TextBlock Text="Unified Relay &amp; Console Manager" Style="{StaticResource Text.Caption}" Margin="0,4,0,0"/>
-                                </StackPanel>
-                            </StackPanel>
+                            <!-- HEADER REMOVED -->
 
                             <!-- STATUS CARDS -->
                             <Grid Grid.Row="1" ColumnSpacing="8" Margin="{StaticResource Margin.Card}">
@@ -296,11 +287,7 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24">
-                                <Image Source="ms-appx:///Assets/AppLogo.png" Width="36" Height="36"/>
-                                <TextBlock Text="Telemetry" Style="{StaticResource Text.Headline1}" VerticalAlignment="Center"/>
-                            </StackPanel>
-
+                            <!-- HEADER REMOVED -->
                             <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                                 <Grid RowSpacing="24" ColumnSpacing="24">
                                     <Grid.RowDefinitions>
@@ -426,8 +413,7 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
                             
-                            <TextBlock Text="WhatsApp Interaction History" Style="{StaticResource Text.Headline1}"/>
-                            
+                            <!-- HEADER REMOVED -->                            
                             <Border Grid.Row="1" Background="#111B21" CornerRadius="{StaticResource Radius.Small}" Margin="0,16,0,0">
                                 <Grid>
                                     <Grid.RowDefinitions>
@@ -741,7 +727,7 @@
                                                         <TextBlock x:Name="HubLocText" Text="Locating Hub..." FontSize="11" Opacity="0.5"/>
                                                         <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
                                                             <Ellipse Width="6" Height="6" Fill="#00CC6A"/>
-                                                            <TextBlock Text="MASTER COUPLER" FontSize="10" FontWeight="SemiBold" Foreground="#00CC6A"/>
+                                                            <TextBlock x:Name="HubRelayText" Text="CONNECTED" FontSize="10" FontWeight="SemiBold" Foreground="#00CC6A"/>
                                                         </StackPanel>
                                                     </StackPanel>
                                                 </Border>
@@ -753,7 +739,7 @@
                                                 <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="16" CornerRadius="12">
                                                     <StackPanel Spacing="6">
                                                         <TextBlock x:Name="QuestIpText" Text="Searching..." FontSize="13" FontWeight="SemiBold"/>
-                                                        <TextBlock x:Name="QuestLocText" Text="Local Mesh" FontSize="11" Opacity="0.5"/>
+                                                        <TextBlock x:Name="QuestLocText" Text="Tailscale Mesh" FontSize="11" Opacity="0.5"/>
                                                         <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
                                                             <Ellipse x:Name="QuestRelayDot" Width="6" Height="6" Fill="#0078D7"/>
                                                             <TextBlock x:Name="QuestRelayText" Text="DIRECT P2P" FontSize="10" FontWeight="SemiBold" Foreground="#0078D7"/>
