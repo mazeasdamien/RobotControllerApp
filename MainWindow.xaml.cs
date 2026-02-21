@@ -310,17 +310,22 @@ namespace RobotControllerApp
 
                 if (frameSource != null)
                 {
-                    // Set format (prefer 720p, fallback to highest res)
-                    var format = frameSource.SupportedFormats
-                        .FirstOrDefault(f => f.VideoFormat.Width == 1280)
-                        ?? frameSource.SupportedFormats
-                           .OrderByDescending(f => f.VideoFormat.Width)
-                           .FirstOrDefault();
-                    if (format != null)
-                        await frameSource.SetFormatAsync(format);
+                    // En WinUI 3, le MediaPlayer affiche souvent un écran noir avec le MJPEG des vieilles webcams.
+                    // On force des formats bruts (YUY2 / NV12) qui sont correctement décodés par le système.
+                    var preferredFormats = frameSource.SupportedFormats
+                        .OrderByDescending(f => f.Subtype == "YUY2" || f.Subtype == "NV12" ? 1 : 0)
+                        .ThenByDescending(f => f.VideoFormat.Width == 1280 ? 1 : 0)
+                        .ThenByDescending(f => f.VideoFormat.Width)
+                        .ToList();
 
-                    // Simplest WinUI 3 pattern for webcam preview
-                    var mediaSource = MediaSource.CreateFromMediaFrameSource(frameSource);
+                    var format = preferredFormats.FirstOrDefault();
+                    if (format != null)
+                    {
+                        await frameSource.SetFormatAsync(format);
+                        Log($"[Webcam] Set format: {format.VideoFormat.Width}x{format.VideoFormat.Height} ({format.Subtype}) at {format.FrameRate.Numerator}/{format.FrameRate.Denominator}fps");
+                    }
+
+                    var mediaSource = Windows.Media.Core.MediaSource.CreateFromMediaFrameSource(frameSource);
 
                     var player = new MediaPlayer();
                     player.Source = mediaSource;
