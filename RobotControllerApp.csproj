@@ -44,6 +44,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.7705" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260209005" />
+    <PackageReference Include="SIPSorcery" Version="10.0.3" />
   </ItemGroup>
 
   <!-- ASP.NET Core Framework for Hosting Kestrel -->

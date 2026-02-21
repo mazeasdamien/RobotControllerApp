@@ -36,6 +36,18 @@ namespace RobotControllerApp.Services
             _unityClients.TryRemove(robotId, out _);
         }
 
+        private readonly ConcurrentDictionary<string, WebRtcManager> _webRtcManagers = new();
+
+        public void SetWebRtcManager(string robotId, WebRtcManager webRtc)
+        {
+            _webRtcManagers[robotId] = webRtc;
+        }
+
+        public void RemoveWebRtcManager(string robotId)
+        {
+            _webRtcManagers.TryRemove(robotId, out _);
+        }
+
         public void UpdateLatestImage(byte[] image)
         {
             _latestImage = image;
@@ -77,7 +89,11 @@ namespace RobotControllerApp.Services
 
         public async Task SendToUnityClient(string robotId, string message)
         {
-            if (_unityClients.TryGetValue(robotId, out var ws) && ws.State == WebSocketState.Open)
+            if (_webRtcManagers.TryGetValue(robotId, out var webRtc))
+            {
+                webRtc.SendData(message);
+            }
+            else if (_unityClients.TryGetValue(robotId, out var ws) && ws.State == WebSocketState.Open)
             {
                 var bytes = Encoding.UTF8.GetBytes(message);
                 await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);

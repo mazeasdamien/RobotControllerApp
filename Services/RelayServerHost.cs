@@ -324,6 +324,46 @@ namespace RobotControllerApp.Services
             var buffer = new byte[1024 * 1024]; // 1MB buffer
             var pingWatch = new System.Diagnostics.Stopwatch();
 
+            // WebRTC Setup
+            var webRtc = new WebRtcManager();
+            webRtc.OnLocalOfferReady += async (sdp) =>
+            {
+                var offerMsg = new { type = "offer", sdp = sdp };
+                var offerBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(offerMsg));
+                if (ws.State == WebSocketState.Open)
+                {
+                    await ws.SendAsync(new ArraySegment<byte>(offerBytes), WebSocketMessageType.Text, true, CancellationToken.None);
+                    Log("[WebRTC] Sent Offer to Unity");
+                }
+            };
+
+            webRtc.OnLocalIceCandidate += async (candidateJson) =>
+            {
+                try
+                {
+                    // SIPSorcery returns candidate as string, format it into json manually or rely on its formatting
+                    // Actually, SIPSorcery Candidate.toJSON() returns standard JSON object.
+                    var payload = "{\"type\":\"candidate\",\"candidate\":" + candidateJson + "}";
+                    var candBytes = Encoding.UTF8.GetBytes(payload);
+                    if (ws.State == WebSocketState.Open)
+                    {
+                        await ws.SendAsync(new ArraySegment<byte>(candBytes), WebSocketMessageType.Text, true, CancellationToken.None);
+                    }
+                }
+                catch { }
+            };
+
+            webRtc.OnMessageReceived += async (message) =>
+            {
+                // Message from Unity via WebRTC DataChannel (e.g. IK solutions)
+                OnUnityMessageReceived?.Invoke(message);
+                await manager.SendToRobotClient(robotId, message);
+            };
+
+            // Start WebRTC connection process
+            _ = webRtc.InitializeAndOffer();
+            manager.SetWebRtcManager(robotId, webRtc); // Store it if we need to send data FROM robot -> unity via WebRTC
+
             // Start local heartbeat to measure Quest latency
             var pingTimer = new Timer(async _ =>
             {
@@ -358,6 +398,38 @@ namespace RobotControllerApp.Services
                     }
 
                     var message = Encoding.UTF8.GetString(ms.ToArray());
+
+                    // WebRTC Signaling Interception
+                    if (message.Contains("\"type\":\"answer\""))
+                    {
+                        try
+                        {
+                            using (var doc = JsonDocument.Parse(message))
+                            {
+                                var sdp = doc.RootElement.GetProperty("sdp").GetString();
+                                if (sdp != null)
+                                {
+                                    webRtc.SetRemoteAnswer(sdp);
+                                    Log("[WebRTC] Received Answer from Unity");
+                                }
+                            }
+                        }
+                        catch { }
+                        continue;
+                    }
+                    else if (message.Contains("\"type\":\"candidate\""))
+                    {
+                        try
+                        {
+                            using (var doc = JsonDocument.Parse(message))
+                            {
+                                var cand = doc.RootElement.GetProperty("candidate").GetRawText();
+                                webRtc.AddIceCandidate(cand);
+                            }
+                        }
+                        catch { }
+                        continue;
+                    }
 
                     // Intercept Pong from Quest
                     if (message.Contains("\"op\":\"pong\""))
@@ -394,6 +466,8 @@ namespace RobotControllerApp.Services
             finally
             {
                 pingTimer.Dispose();
+                webRtc.Close();
+                manager.RemoveWebRtcManager(robotId);
             }
         }
 

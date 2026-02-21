@@ -170,8 +170,6 @@ namespace RobotControllerApp
                 }
                 lastUnityMsg = now;
 
-                TelemLastCmd.Text = msg.Length > 60 ? string.Concat(msg.AsSpan(0, 57), "...") : msg;
-                TelemCmdSource.Text = "Unity Client";
 
                 try
                 {
@@ -280,9 +278,20 @@ namespace RobotControllerApp
         {
             try
             {
+                var videoDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(Windows.Devices.Enumeration.DeviceClass.VideoCapture);
+                if (videoDevices.Count == 0)
+                {
+                    Log("[Webcam] No cameras found");
+                    return;
+                }
+
+                // Pick the other webcam if there are multiple (assuming the second one is the desired one)
+                var selectedCamera = videoDevices.Count > 1 ? videoDevices.Last() : videoDevices[0];
+
                 _mediaCapture = new MediaCapture();
                 var settings = new MediaCaptureInitializationSettings
                 {
+                    VideoDeviceId = selectedCamera.Id,
                     StreamingCaptureMode = StreamingCaptureMode.Video,
                     PhotoCaptureSource = PhotoCaptureSource.VideoPreview
                 };
@@ -916,9 +925,9 @@ namespace RobotControllerApp
                 displayR1Lat = _robotBridge.LastLatencyMs;
 
             // DISPLAY LOGIC: Show ms if reachable or connected
-            RelayLatencyText.Text = (displayULat > 0) ? $"{displayULat:F0} ms" : "-- ms";
-            Robot1LatencyText.Text = (isR1Connected && displayR1Lat > 0) ? $"{displayR1Lat:F0} ms" : "-- ms";
-            Robot2LatencyText.Text = (isR2Connected) ? $"{r2Lat:F0} ms" : "-- ms";
+            RelayLatencyText.Text = (displayULat > 0) ? $"{displayULat:F0}" : "--";
+            Robot1LatencyText.Text = (isR1Connected && displayR1Lat > 0) ? $"{displayR1Lat:F0}" : "--";
+            Robot2LatencyText.Text = (isR2Connected) ? $"{r2Lat:F0}" : "--";
 
             // Dashboard Status Update based on Ping (if WS is offline)
             if (!isExpertWsConnected)
@@ -1049,7 +1058,6 @@ namespace RobotControllerApp
             if (NetworkView.Visibility != Visibility.Visible) return;
 
             UpdatePath(UnityPath, _unityLatencyHistory);
-            UpdatePath(InternetPath, _internetLatencyHistory);
         }
 
         private void UpdatePath(Microsoft.UI.Xaml.Shapes.Polyline polyline, List<double> history)
@@ -1062,7 +1070,7 @@ namespace RobotControllerApp
             double height = LatencyCanvas.ActualHeight > 0 ? LatencyCanvas.ActualHeight : 120;
 
             double stepX = width / (MaxHistory - 1);
-            double maxHeight = 150.0; // 150ms max scale
+            double maxHeight = 300.0; // 300ms max scale
             double scaleY = height / maxHeight;
 
             for (int i = 0; i < history.Count; i++)

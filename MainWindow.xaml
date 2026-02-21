@@ -108,8 +108,8 @@
                                             <TextBlock x:Name="RelayStatusText" Text="Listening for Quest 3..." Style="{StaticResource Text.Caption}" Margin="0,8,0,0"/>
                                             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
                                                 <TextBlock x:Name="RelayActiveText" Text="STANDBY" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}"/>
-                                                <TextBlock Text="|" Opacity="0.3"/>
-                                                <TextBlock x:Name="RelayLatencyText" Text="-- ms" Opacity="0.7" FontSize="12" VerticalAlignment="Center"/>
+                                                <TextBlock Text="|" Opacity="0.3" Visibility="Collapsed"/>
+                                                <TextBlock x:Name="RelayLatencyText" Text="--" Opacity="0.7" FontSize="12" VerticalAlignment="Center" Visibility="Collapsed"/>
                                             </StackPanel>
                                         </StackPanel>
 
@@ -141,7 +141,7 @@
                                             </StackPanel>
                                             <TextBlock x:Name="RobotStatusText" Text="Connecting..." Style="{StaticResource Text.Caption}" Margin="0,8,0,0"/>
                                             <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
-                                                <TextBlock x:Name="Robot1LatencyText" Text="-- ms" Opacity="0.7" FontSize="12" VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="Robot1LatencyText" Text="--" Opacity="0.7" FontSize="12" VerticalAlignment="Center" Visibility="Collapsed"/>
                                                 <StackPanel x:Name="RobotConnectingState" Orientation="Horizontal" Spacing="8">
                                                     <ProgressRing IsActive="True" Width="14" Height="14" Foreground="{StaticResource Brush.Primary}"/>
                                                     <TextBlock Text="Searching..." FontSize="11" VerticalAlignment="Center" Opacity="0.6"/>
@@ -177,7 +177,7 @@
                                             </StackPanel>
                                             <TextBlock x:Name="Robot2StatusText" Text="Offline" Style="{StaticResource Text.Caption}" Margin="0,8,0,0"/>
                                             <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
-                                                <TextBlock x:Name="Robot2LatencyText" Text="-- ms" Opacity="0.7" FontSize="12" VerticalAlignment="Center"/>
+                                                <TextBlock x:Name="Robot2LatencyText" Text="--" Opacity="0.7" FontSize="12" VerticalAlignment="Center" Visibility="Collapsed"/>
                                                 <StackPanel x:Name="Robot2ConnectingState" Orientation="Horizontal" Spacing="8">
                                                     <ProgressRing IsActive="True" Width="14" Height="14" Foreground="{StaticResource Brush.Primary}"/>
                                                     <TextBlock Text="Searching..." FontSize="11" VerticalAlignment="Center" Opacity="0.6"/>
@@ -375,23 +375,7 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- 4. Command Dispatcher -->
-                                    <Border Grid.Row="1" Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="24">
-                                        <StackPanel Spacing="16">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE8BD;" FontSize="20" Foreground="#25D366"/>
-                                                <TextBlock Text="Command Dispatch" Style="{StaticResource Text.Headline3}"/>
-                                            </StackPanel>
-                                            <TextBlock Text="Last Instruction Received:" Opacity="0.6"/>
-                                            <Border Background="#202C33" Padding="16" CornerRadius="8">
-                                                <TextBlock x:Name="TelemLastCmd" Text="Hub idle. Awaiting instruction..." FontStyle="Italic" TextWrapping="Wrap" MaxLines="3" Foreground="#8696A0"/>
-                                            </Border>
-                                            <Grid>
-                                                <TextBlock Text="Active Provider:" Opacity="0.6"/>
-                                                <TextBlock x:Name="TelemCmdSource" Text="SYSTEM" HorizontalAlignment="Right" Foreground="#25D366" FontWeight="Bold"/>
-                                            </Grid>
-                                        </StackPanel>
-                                    </Border>
+
                                 </Grid>
                             </ScrollViewer>
                         </Grid>
@@ -411,7 +395,7 @@
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
 
-                                <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24">
+                                <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24" Visibility="Collapsed">
                                     <Image Source="ms-appx:///Assets/AppLogo.png" Width="36" Height="36"/>
                                     <TextBlock Text="Network &amp; Latency" Style="{StaticResource Text.Headline1}" VerticalAlignment="Center"/>
                                 </StackPanel>
@@ -443,7 +427,23 @@
                                                 
                                                 <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,16">
                                                     <TextBlock Text="LATENCY" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
-                                                    <TextBlock Text="-- ms" FontSize="20" FontWeight="SemiBold" x:Name="InternetLatencyText"/>
+                                                    <StackPanel Orientation="Horizontal" Spacing="24">
+                                                        <TextBlock Text="-- ms" FontSize="20" FontWeight="SemiBold" x:Name="InternetLatencyText" VerticalAlignment="Center"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
+                                                            <StackPanel>
+                                                                <TextBlock Text="MIN" FontSize="9" Opacity="0.5"/>
+                                                                <TextBlock x:Name="InternetMinText" Text="-- ms" FontSize="13" FontWeight="Bold"/>
+                                                            </StackPanel>
+                                                            <StackPanel>
+                                                                <TextBlock Text="MAX" FontSize="9" Opacity="0.5"/>
+                                                                <TextBlock x:Name="InternetMaxText" Text="-- ms" FontSize="13" FontWeight="Bold"/>
+                                                            </StackPanel>
+                                                            <StackPanel>
+                                                                <TextBlock Text="AVG" FontSize="9" Opacity="0.5"/>
+                                                                <TextBlock x:Name="InternetAvgText" Text="-- ms" FontSize="13" FontWeight="Bold" Foreground="#00E5FF"/>
+                                                            </StackPanel>
+                                                        </StackPanel>
+                                                    </StackPanel>
                                                 </StackPanel>
 
                                                 <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,16">
@@ -512,7 +512,7 @@
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="150"/>
+                                            <RowDefinition Height="300"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
@@ -528,10 +528,6 @@
                                                     <Rectangle Width="12" Height="12" Fill="#0078D7"/>
                                                     <TextBlock Text="Expert (Quest)" FontSize="12" Opacity="0.8"/>
                                                 </StackPanel>
-                                                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                                    <Ellipse Width="8" Height="8" Fill="#00E5FF"/>
-                                                    <TextBlock Text="Internet (Google)" FontSize="12" Opacity="0.8"/>
-                                                </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
 
@@ -539,24 +535,23 @@
                                         <Grid Grid.Row="2" Margin="0,0,0,10">
                                             <!-- Y-Axis Labels -->
                                             <Grid VerticalAlignment="Stretch" HorizontalAlignment="Left" Width="40" Margin="0,0,10,0">
-                                                <TextBlock Text="150ms" FontSize="10" Opacity="0.4" VerticalAlignment="Top"/>
-                                                <TextBlock Text="100ms" FontSize="10" Opacity="0.4" Margin="0,50,0,0" VerticalAlignment="Top"/>
-                                                <TextBlock Text="50ms" FontSize="10" Opacity="0.4" Margin="0,100,0,0" VerticalAlignment="Top"/>
+                                                <TextBlock Text="300ms" FontSize="10" Opacity="0.4" VerticalAlignment="Top"/>
+                                                <TextBlock Text="200ms" FontSize="10" Opacity="0.4" Margin="0,100,0,0" VerticalAlignment="Top"/>
+                                                <TextBlock Text="100ms" FontSize="10" Opacity="0.4" Margin="0,200,0,0" VerticalAlignment="Top"/>
                                                 <TextBlock Text="0ms" FontSize="10" Opacity="0.4" VerticalAlignment="Bottom"/>
                                             </Grid>
 
                                             <!-- Grid Lines -->
                                             <Canvas Margin="40,0,0,0" Opacity="0.1" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                                                 <Line X1="0" Y1="0" X2="2000" Y2="0" Stroke="White" StrokeThickness="1"/>
-                                                <Line X1="0" Y1="50" X2="2000" Y2="50" Stroke="White" StrokeThickness="1"/>
                                                 <Line X1="0" Y1="100" X2="2000" Y2="100" Stroke="White" StrokeThickness="1"/>
-                                                <Line X1="0" Y1="150" X2="2000" Y2="150" Stroke="White" StrokeThickness="1"/>
+                                                <Line X1="0" Y1="200" X2="2000" Y2="200" Stroke="White" StrokeThickness="1"/>
+                                                <Line X1="0" Y1="300" X2="2000" Y2="300" Stroke="White" StrokeThickness="1"/>
                                             </Canvas>
 
                                             <!-- Plot Layers -->
                                             <Canvas x:Name="LatencyCanvas" Margin="40,0,0,0" Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                                                 <Polyline x:Name="UnityPath" Stroke="#0078D7" StrokeThickness="2" StrokeLineJoin="Round"/>
-                                                <Polyline x:Name="InternetPath" Stroke="#00E5FF" StrokeThickness="2" StrokeDashArray="2,1" StrokeLineJoin="Round"/>
                                             </Canvas>
                                         </Grid>
 
@@ -587,24 +582,7 @@
                                                 </StackPanel>
                                             </StackPanel>
 
-                                            <!-- Internet Stats -->
-                                            <StackPanel Grid.Column="1" Spacing="4">
-                                                <TextBlock Text="INTERNET (GOOGLE) LATENCY" FontSize="10" FontWeight="Bold" Foreground="#00E5FF" Margin="0,0,0,4"/>
-                                                <StackPanel Orientation="Horizontal" Spacing="16">
-                                                    <StackPanel>
-                                                        <TextBlock Text="MIN" FontSize="9" Opacity="0.5"/>
-                                                        <TextBlock x:Name="InternetMinText" Text="-- ms" FontSize="13" FontWeight="Bold"/>
-                                                    </StackPanel>
-                                                    <StackPanel>
-                                                        <TextBlock Text="MAX" FontSize="9" Opacity="0.5"/>
-                                                        <TextBlock x:Name="InternetMaxText" Text="-- ms" FontSize="13" FontWeight="Bold"/>
-                                                    </StackPanel>
-                                                    <StackPanel>
-                                                        <TextBlock Text="AVG" FontSize="9" Opacity="0.5"/>
-                                                        <TextBlock x:Name="InternetAvgText" Text="-- ms" FontSize="13" FontWeight="Bold" Foreground="#00E5FF"/>
-                                                    </StackPanel>
-                                                </StackPanel>
-                                            </StackPanel>
+
                                         </Grid>
                                     </Grid>
                                 </Border>
