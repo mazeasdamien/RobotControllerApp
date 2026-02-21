@@ -61,11 +61,13 @@
     <HasPackageAndPublishMenu>true</HasPackageAndPublishMenu>
   </PropertyGroup>
 
-  <!-- Publish Properties -->
+  <!-- Publish / Standalone Properties -->
   <PropertyGroup>
-    <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
-    <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
-    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
-    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+    <!-- SelfContained: bundle .NET runtime so the exe works on any PC without .NET installed -->
+    <SelfContained>true</SelfContained>
+    <!-- PublishTrimmed is DISABLED: WinUI 3 relies on reflection and trimming breaks it -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <!-- ReadyToRun improves startup time without trimming risk -->
+    <PublishReadyToRun>true</PublishReadyToRun>
   </PropertyGroup>
 </Project>
