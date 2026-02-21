@@ -13,7 +13,9 @@ using System.Threading.Tasks;
 using Windows.Graphics.Imaging;
 using Windows.Media.Capture;
 using Windows.Media.Capture.Frames;
+using Windows.Media.Core;
 using Windows.Media.MediaProperties;
+using Windows.Media.Playback;
 
 namespace RobotControllerApp
 {
@@ -264,7 +266,72 @@ namespace RobotControllerApp
         }
 
         private MediaCapture? _mediaCapture;
+        private MediaPlayer? _webcamPlayer;   // owns the frame source, handed to MediaPlayerElement
         private Windows.Devices.Enumeration.DeviceInformationCollection? _videoDevices;
+
+        /// <summary>Start the selected camera using MediaPlayer + SetMediaPlayer (WinUI 3 correct pattern).</summary>
+        private async Task StartCameraByIndex(int index)
+        {
+            if (_videoDevices == null || index < 0 || index >= _videoDevices.Count) return;
+
+            // ── Cleanup existing session ────────────────────────────────────────
+            if (_webcamPlayer != null)
+            {
+                _webcamPlayer.Pause();
+                DispatcherQueue.TryEnqueue(() => LocalWebcamPreview.SetMediaPlayer(null));
+                _webcamPlayer.Dispose();
+                _webcamPlayer = null;
+            }
+            if (_mediaCapture != null)
+            {
+                try { await _mediaCapture.StopPreviewAsync(); } catch { }
+                _mediaCapture.Dispose();
+                _mediaCapture = null;
+            }
+
+            // ── Initialize new capture session ──────────────────────────────────
+            try
+            {
+                var selected = _videoDevices[index];
+                _mediaCapture = new MediaCapture();
+
+                await _mediaCapture.InitializeAsync(new MediaCaptureInitializationSettings
+                {
+                    VideoDeviceId = selected.Id,
+                    StreamingCaptureMode = StreamingCaptureMode.Video,
+                    PhotoCaptureSource = PhotoCaptureSource.VideoPreview,
+                    MemoryPreference = MediaCaptureMemoryPreference.Cpu
+                });
+
+                // Prefer VideoPreview stream; fall back to any available source
+                var frameSource = _mediaCapture.FrameSources.Values
+                    .FirstOrDefault(s => s.Info.MediaStreamType == MediaStreamType.VideoPreview)
+                    ?? _mediaCapture.FrameSources.Values.FirstOrDefault();
+
+                if (frameSource != null)
+                {
+                    // WinUI 3 correct approach: MediaPlayer → SetMediaPlayer()
+                    _webcamPlayer = new MediaPlayer();
+                    _webcamPlayer.AutoPlay = true;
+                    _webcamPlayer.Source = Windows.Media.Core.MediaSource
+                                                .CreateFromMediaFrameSource(frameSource);
+
+                    // Must assign on the UI thread
+                    DispatcherQueue.TryEnqueue(() => LocalWebcamPreview.SetMediaPlayer(_webcamPlayer));
+
+                    Log($"[Webcam] Streaming: {selected.Name}");
+                }
+                else
+                {
+                    Log($"[Webcam] No usable frame source for: {selected.Name}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"[Webcam] Failed to start '{(_videoDevices?[index].Name ?? "?")}': {ex.Message}");
+                _mediaCapture = null;
+            }
+        }
 
         /// <summary>Enumerate cameras and populate the ComboBox.</summary>
         private async Task LoadCameraList()
@@ -302,56 +369,6 @@ namespace RobotControllerApp
             }
         }
 
-        /// <summary>Start the selected camera by its index in the ComboBox.</summary>
-        private async Task StartCameraByIndex(int index)
-        {
-            if (_videoDevices == null || index < 0 || index >= _videoDevices.Count) return;
-
-            // Stop and dispose existing capture
-            if (_mediaCapture != null)
-            {
-                try
-                {
-                    LocalWebcamPreview.Source = null;
-                    _mediaCapture.Dispose();
-                    _mediaCapture = null;
-                }
-                catch { }
-            }
-
-            try
-            {
-                var selected = _videoDevices[index];
-                _mediaCapture = new MediaCapture();
-                var settings = new MediaCaptureInitializationSettings
-                {
-                    VideoDeviceId = selected.Id,
-                    StreamingCaptureMode = StreamingCaptureMode.Video,
-                    PhotoCaptureSource = PhotoCaptureSource.VideoPreview
-                };
-                await _mediaCapture.InitializeAsync(settings);
-
-                var frameSource = _mediaCapture.FrameSources.Values
-                    .FirstOrDefault(s => s.Info.MediaStreamType == MediaStreamType.VideoPreview)
-                    ?? _mediaCapture.FrameSources.Values.FirstOrDefault();
-
-                if (frameSource != null)
-                {
-                    var format = frameSource.SupportedFormats
-                        .FirstOrDefault(f => f.VideoFormat.Width == 1280 && f.VideoFormat.Height == 720)
-                        ?? frameSource.SupportedFormats.OrderByDescending(f => f.VideoFormat.Width).FirstOrDefault();
-
-                    if (format != null) await frameSource.SetFormatAsync(format);
-
-                    LocalWebcamPreview.Source = Windows.Media.Core.MediaSource.CreateFromMediaFrameSource(frameSource);
-                    Log($"[Webcam] Streaming: {selected.Name}");
-                }
-            }
-            catch (Exception ex)
-            {
-                Log($"[Webcam] Failed to start camera: {ex.Message}");
-            }
-        }
 
         private async void CameraComboBox_SelectionChanged(object sender, Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs e)
         {
