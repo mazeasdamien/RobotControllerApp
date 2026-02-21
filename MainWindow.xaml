@@ -36,7 +36,7 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
-                <NavigationViewItem Content="Expert Network" Tag="network">
+                <NavigationViewItem Content="Networks" Tag="network">
                     <NavigationViewItem.Icon>
                         <SymbolIcon Symbol="World"/>
                     </NavigationViewItem.Icon>
@@ -562,9 +562,9 @@
                                                     <TextBlock Text="Idle" FontSize="16" FontWeight="SemiBold" x:Name="NetworkStatusText"/>
                                                 </StackPanel>
                                                 
-                                                <StackPanel Grid.Row="1" Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
+                                                <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" VerticalAlignment="Center" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
                                                     <TextBlock Text="AUTO-MONITORING" FontSize="11" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" VerticalAlignment="Center" Opacity="0.8"/>
-                                                    <ToggleSwitch x:Name="AutoMonitorToggle" IsOn="True" MinWidth="0" Margin="0,0,0,-8" Toggled="AutoMonitorToggle_Toggled"/>
+                                                    <ToggleSwitch x:Name="AutoMonitorToggle" IsOn="True" OnContent="Active" OffContent="Paused" MinWidth="0" Margin="0,0,0,-8" Toggled="AutoMonitorToggle_Toggled"/>
                                                 </StackPanel>
                                                 <Button x:Name="RunSpeedTestButton" Visibility="Collapsed" IsEnabled="True"/>
                                             </Grid>
@@ -631,12 +631,8 @@
                                                     <TextBlock Text="Expert (Quest)" FontSize="12" Opacity="0.8"/>
                                                 </StackPanel>
                                                 <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <Rectangle Width="12" Height="12" Fill="{StaticResource Brush.Primary}"/>
-                                                    <TextBlock Text="Robot 1" FontSize="12" Opacity="0.8"/>
-                                                </StackPanel>
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <Rectangle Width="12" Height="12" Fill="#FFD279"/>
-                                                    <TextBlock Text="Robot 2" FontSize="12" Opacity="0.8"/>
+                                                    <Rectangle Width="12" Height="12" Fill="#00E5FF"/>
+                                                    <TextBlock Text="Internet (Cloudflare)" FontSize="12" Opacity="0.8"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
@@ -662,8 +658,7 @@
                                             <!-- Plot Layers -->
                                             <Canvas x:Name="LatencyCanvas" Margin="40,0,0,0" Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                                                 <Polyline x:Name="UnityPath" Stroke="#0078D7" StrokeThickness="2" StrokeLineJoin="Round"/>
-                                                <Polyline x:Name="Robot1Path" Stroke="{StaticResource Brush.Primary}" StrokeThickness="3" StrokeDashArray="2,1" StrokeLineJoin="Round"/>
-                                                <Polyline x:Name="Robot2Path" Stroke="#FFD279" StrokeThickness="3" StrokeDashArray="4,2" StrokeLineJoin="Round"/>
+                                                <Polyline x:Name="InternetPath" Stroke="#00E5FF" StrokeThickness="2" StrokeDashArray="2,1" StrokeLineJoin="Round"/>
                                             </Canvas>
                                         </Grid>
 
@@ -694,40 +689,21 @@
                                                 </StackPanel>
                                             </StackPanel>
 
-                                            <!-- Robot 1 Stats -->
+                                            <!-- Internet Stats -->
                                             <StackPanel Grid.Column="1" Spacing="4">
-                                                <TextBlock Text="ROBOT 1 LATENCY" FontSize="11" FontWeight="Bold" Opacity="0.6" Foreground="{StaticResource Brush.Primary}"/>
+                                                <TextBlock Text="INTERNET LATENCY" FontSize="11" FontWeight="Bold" Opacity="0.6" Foreground="#00E5FF"/>
                                                 <StackPanel Orientation="Horizontal" Spacing="16">
                                                     <StackPanel>
                                                         <TextBlock Text="MIN" FontSize="9" Opacity="0.4"/>
-                                                        <TextBlock x:Name="R1MinText" Text="-- ms" FontSize="13"/>
+                                                        <TextBlock x:Name="InternetMinText" Text="-- ms" FontSize="13"/>
                                                     </StackPanel>
                                                     <StackPanel>
                                                         <TextBlock Text="MAX" FontSize="9" Opacity="0.4"/>
-                                                        <TextBlock x:Name="R1MaxText" Text="-- ms" FontSize="13"/>
+                                                        <TextBlock x:Name="InternetMaxText" Text="-- ms" FontSize="13"/>
                                                     </StackPanel>
                                                     <StackPanel>
                                                         <TextBlock Text="AVG" FontSize="9" Opacity="0.4"/>
-                                                        <TextBlock x:Name="R1AvgText" Text="-- ms" FontSize="13" FontWeight="SemiBold"/>
-                                                    </StackPanel>
-                                                </StackPanel>
-                                            </StackPanel>
-
-                                            <!-- Robot 2 Stats -->
-                                            <StackPanel Grid.Column="2" Spacing="4">
-                                                <TextBlock Text="ROBOT 2 LATENCY" FontSize="11" FontWeight="Bold" Opacity="0.6" Foreground="#FFD279"/>
-                                                <StackPanel Orientation="Horizontal" Spacing="16">
-                                                    <StackPanel>
-                                                        <TextBlock Text="MIN" FontSize="9" Opacity="0.4"/>
-                                                        <TextBlock x:Name="R2MinText" Text="-- ms" FontSize="13"/>
-                                                    </StackPanel>
-                                                    <StackPanel>
-                                                        <TextBlock Text="MAX" FontSize="9" Opacity="0.4"/>
-                                                        <TextBlock x:Name="R2MaxText" Text="-- ms" FontSize="13"/>
-                                                    </StackPanel>
-                                                    <StackPanel>
-                                                        <TextBlock Text="AVG" FontSize="9" Opacity="0.4"/>
-                                                        <TextBlock x:Name="R2AvgText" Text="-- ms" FontSize="13" FontWeight="SemiBold"/>
+                                                        <TextBlock x:Name="InternetAvgText" Text="-- ms" FontSize="13" FontWeight="SemiBold"/>
                                                     </StackPanel>
                                                 </StackPanel>
                                             </StackPanel>
@@ -779,7 +755,7 @@
                                                         <TextBlock x:Name="QuestIpText" Text="Searching..." FontSize="13" FontWeight="SemiBold"/>
                                                         <TextBlock x:Name="QuestLocText" Text="Local Mesh" FontSize="11" Opacity="0.5"/>
                                                         <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
-                                                            <Ellipse Width="6" Height="6" Fill="#0078D7"/>
+                                                            <Ellipse x:Name="QuestRelayDot" Width="6" Height="6" Fill="#0078D7"/>
                                                             <TextBlock x:Name="QuestRelayText" Text="DIRECT P2P" FontSize="10" FontWeight="SemiBold" Foreground="#0078D7"/>
                                                         </StackPanel>
                                                     </StackPanel>
@@ -794,8 +770,8 @@
                                                         <TextBlock x:Name="R1IpText" Text="Disconnected" FontSize="13" FontWeight="SemiBold"/>
                                                         <TextBlock x:Name="R1LocText" Text="LAN / Ethernet" FontSize="11" Opacity="0.5"/>
                                                         <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
-                                                            <Ellipse Width="6" Height="6" Fill="{StaticResource Brush.Primary}"/>
-                                                            <TextBlock Text="ROS BRIDGE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Brush.Primary}"/>
+                                                            <Ellipse x:Name="R1RelayDot" Width="6" Height="6" Fill="{StaticResource Brush.Primary}"/>
+                                                            <TextBlock x:Name="R1RelayText" Text="ROS BRIDGE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Brush.Primary}"/>
                                                         </StackPanel>
                                                     </StackPanel>
                                                 </Border>
@@ -809,8 +785,8 @@
                                                         <TextBlock x:Name="R2IpText" Text="Offline" FontSize="13" FontWeight="SemiBold"/>
                                                         <TextBlock x:Name="R2LocText" Text="N/A" FontSize="11" Opacity="0.5"/>
                                                         <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
-                                                            <Ellipse Width="6" Height="6" Fill="#808080"/>
-                                                            <TextBlock Text="PENDING" FontSize="10" FontWeight="SemiBold" Opacity="0.8"/>
+                                                            <Ellipse x:Name="R2RelayDot" Width="6" Height="6" Fill="#808080"/>
+                                                            <TextBlock x:Name="R2RelayText" Text="PENDING" FontSize="10" FontWeight="SemiBold" Opacity="0.8"/>
                                                         </StackPanel>
                                                     </StackPanel>
                                                 </Border>
@@ -849,7 +825,7 @@
 
                             <StackPanel Spacing="8">
                                 <TextBlock Text="Expert / Quest IP Address (For Monitoring)" Style="{StaticResource Text.Body1}"/>
-                                <TextBox x:Name="ExpertIpInput" PlaceholderText="127.0.0.1" MinWidth="300"/>
+                                <TextBox x:Name="ExpertIpInput" PlaceholderText="quest-3" MinWidth="300"/>
                                 <TextBlock Text="The IP of your Quest headset for proactive latency and health pings." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
                             </StackPanel>
 

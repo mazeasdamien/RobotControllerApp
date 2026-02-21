@@ -124,10 +124,10 @@ namespace RobotControllerApp.Services
                 try
                 {
                     _relayWebSocket = new ClientWebSocket();
-                    Log($"[Hub] Connecting to Expert Hub at {relayUrl}...");
+                    Log($"[Bridge] Connecting to Local Relay at {relayUrl}...");
 
                     await _relayWebSocket.ConnectAsync(new Uri(relayUrl), token);
-                    Log("[Hub] ✓ Connected to Expert Hub");
+                    Log("[Bridge] ✓ Connected to Local Relay");
                     StartRelayHeartbeat();
 
                     // Register
@@ -162,7 +162,7 @@ namespace RobotControllerApp.Services
 
                         if (message.Contains("publish") || message.Contains("call_service"))
                         {
-                            Log("[Hub] 📥 Received command from Expert Hub, forwarding to ROS...");
+                            Log("[Bridge] 📥 Received command from Unity, forwarding to ROS...");
                         }
                         await SendToRobot(message); // Forward to Robot
                     }
@@ -170,7 +170,7 @@ namespace RobotControllerApp.Services
                 catch (Exception)
                 {
                     if (!token.IsCancellationRequested)
-                        Log($"[Hub] Failed to connect to Expert Hub.");
+                        Log($"[Bridge] Failed to connect to Local Relay.");
                 }
                 finally
                 {
@@ -251,7 +251,7 @@ namespace RobotControllerApp.Services
             }
             else
             {
-                Log("[Hub] ⚠️ Cannot forward command: Not connected to Robot (ROS).");
+                Log("[Bridge] ⚠️ Cannot forward command: Not connected to Robot (ROS).");
             }
         }
 

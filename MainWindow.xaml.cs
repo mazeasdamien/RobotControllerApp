@@ -25,13 +25,12 @@ namespace RobotControllerApp
 
         // Network Performance History
         private readonly List<double> _unityLatencyHistory = [];
-        private readonly List<double> _robot1LatencyHistory = [];
-        private readonly List<double> _robot2LatencyHistory = [];
+        private readonly List<double> _internetLatencyHistory = [];
         private readonly List<double> _speedHistory = [];
         private DispatcherTimer? _networkTimer;
         private DispatcherTimer? _speedTestTimer;
         private readonly Ping _pinger = new();
-        private const int MaxHistory = 50;
+        private const int MaxHistory = 300; // 5 minutes (at 1 ping / second)
         private const int MaxSpeedHistory = 20;
 
         public MainWindow()
@@ -1047,12 +1046,7 @@ namespace RobotControllerApp
                 {
                     try
                     {
-                        // Parse IP from ws:// URL if necessary
-                        string host = _settings.RobotIp;
-                        if (host.StartsWith("ws://"))
-                        {
-                            host = host.Substring(5).Split(':')[0];
-                        }
+                        string host = ExtractIp(_settings.RobotIp);
                         var reply = await _pinger.SendPingAsync(host, 500);
                         if (reply.Status == IPStatus.Success) r1Lat = reply.RoundtripTime;
                     }
@@ -1065,30 +1059,32 @@ namespace RobotControllerApp
                 {
                     try
                     {
-                        var reply = await _pinger.SendPingAsync(_settings.Robot2Ip, 500);
+                        string host = ExtractIp(_settings.Robot2Ip);
+                        var reply = await _pinger.SendPingAsync(host, 500);
                         if (reply.Status == IPStatus.Success) r2Lat = reply.RoundtripTime;
                     }
                     catch { }
                 }
 
-                // Update histories
-                UpdateHistory(_unityLatencyHistory, unityLat, MaxHistory);
-                UpdateHistory(_robot1LatencyHistory, r1Lat, MaxHistory);
-                UpdateHistory(_robot2LatencyHistory, r2Lat, MaxHistory);
-
-                // Update Dashboard & Discovery Labels
+                // Update dashboard and discovery labels before internet ping
                 UpdateDashboardAndDiscovery(unityLat, r1Lat, r2Lat);
 
                 // 4. Measure Internet Latency (Real-time)
+                double internetLat = 0;
                 try
                 {
                     var reply = await _pinger.SendPingAsync("speed.cloudflare.com", 1000);
                     if (reply.Status == IPStatus.Success)
                     {
-                        InternetLatencyText.Text = $"{reply.RoundtripTime} ms";
+                        internetLat = reply.RoundtripTime;
+                        InternetLatencyText.Text = $"{internetLat} ms";
                     }
                 }
                 catch { }
+
+                // Update histories
+                UpdateHistory(_unityLatencyHistory, unityLat, MaxHistory);
+                UpdateHistory(_internetLatencyHistory, internetLat, MaxHistory);
 
                 // Redraw graphs
                 DrawNetworkGraph();
@@ -1123,7 +1119,9 @@ namespace RobotControllerApp
         {
             // 1. Dashboard updates (Latencies)
             bool isExpertWsConnected = RelayServerHost.UnityClientConnected;
-            bool isExpertReachable = uLat > 0;
+            // Add a 3-second buffer to prevent flickering due to dropped ICMP pings over Wi-Fi
+            int uCount = _unityLatencyHistory.Count;
+            bool isExpertReachable = uLat > 0 || (uCount > 0 && _unityLatencyHistory.Skip(System.Math.Max(0, uCount - 3)).Any(v => v > 0));
             // Robot 1 is logically connected ONLY if the bridge is sending heartbeats
             bool isR1Connected = _robotBridge.LastLatencyMs > 0;
 
@@ -1151,7 +1149,7 @@ namespace RobotControllerApp
                 if (isExpertReachable)
                 {
                     RelayActiveText.Text = "QUEST REACHABLE";
-                    RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
+                    RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
                 }
                 else
                 {
@@ -1172,23 +1170,51 @@ namespace RobotControllerApp
 
             QuestIpText.Text = expertDisplayIp;
             R1IpText.Text = displayR1Lat > 0 ? ExtractIp(_settings.RobotIp) : "Disconnected";
-            R2IpText.Text = r2Lat > 0 ? _settings.Robot2Ip : "Offline";
+            R2IpText.Text = r2Lat > 0 ? ExtractIp(_settings.Robot2Ip) : "Offline";
 
-            // 3. Status logic for Discovery cards
             if (isExpertWsConnected)
             {
                 QuestRelayText.Text = "CONN: DIRECT P2P";
                 QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                QuestRelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
             }
             else if (isExpertReachable)
             {
                 QuestRelayText.Text = "CONN: LAN REACHABLE";
-                QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
+                QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                QuestRelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
             }
             else
             {
                 QuestRelayText.Text = "CONN: SEARCHING";
                 QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+                QuestRelayDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 128, 128, 128));
+            }
+
+            if (isR1Connected || displayR1Lat > 0)
+            {
+                R1RelayText.Text = "ROS BRIDGE";
+                R1RelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                R1RelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+            }
+            else
+            {
+                R1RelayText.Text = "SEARCHING";
+                R1RelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+                R1RelayDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 128, 128, 128));
+            }
+
+            if (isR2Connected)
+            {
+                R2RelayText.Text = "REACHABLE";
+                R2RelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                R2RelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+            }
+            else
+            {
+                R2RelayText.Text = "PENDING";
+                R2RelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+                R2RelayDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 128, 128, 128));
             }
         }
 
@@ -1205,8 +1231,7 @@ namespace RobotControllerApp
         private void UpdateLatencyStats()
         {
             UpdateStatTexts(_unityLatencyHistory, QuestMinText, QuestMaxText, QuestAvgText);
-            UpdateStatTexts(_robot1LatencyHistory, R1MinText, R1MaxText, R1AvgText);
-            UpdateStatTexts(_robot2LatencyHistory, R2MinText, R2MaxText, R2AvgText);
+            UpdateStatTexts(_internetLatencyHistory, InternetMinText, InternetMaxText, InternetAvgText);
         }
 
         private void UpdateStatTexts(List<double> history, TextBlock minT, TextBlock maxT, TextBlock avgT)
@@ -1237,8 +1262,7 @@ namespace RobotControllerApp
             if (NetworkView.Visibility != Visibility.Visible) return;
 
             UpdatePath(UnityPath, _unityLatencyHistory);
-            UpdatePath(Robot1Path, _robot1LatencyHistory);
-            UpdatePath(Robot2Path, _robot2LatencyHistory);
+            UpdatePath(InternetPath, _internetLatencyHistory);
         }
 
         private void UpdatePath(Microsoft.UI.Xaml.Shapes.Polyline polyline, List<double> history)
