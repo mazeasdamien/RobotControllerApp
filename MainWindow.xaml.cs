@@ -270,26 +270,28 @@ namespace RobotControllerApp
         }
 
         private MediaCapture? _mediaCapture;
-        private MediaPlayer? _webcamPlayer;   // owns the frame source, handed to MediaPlayerElement
+        private MediaFrameReader? _frameReader;
         private Windows.Devices.Enumeration.DeviceInformationCollection? _videoDevices;
+        private Microsoft.UI.Xaml.Media.Imaging.SoftwareBitmapSource _bitmapSource = new();
 
-        /// <summary>Start the selected camera using MediaPlayer + SetMediaPlayer (WinUI 3 correct pattern).</summary>
+        /// <summary>Start the selected camera safely using SoftwareBitmap and MediaFrameReader.</summary>
         private async Task StartCameraByIndex(int index)
         {
             if (_videoDevices == null || index < 0 || index >= _videoDevices.Count) return;
 
-            // ── Cleanup existing session ────────────────────────────────────────
-            if (_webcamPlayer != null)
+            // ── Cleanup existing session safely ─────────────────────────────────
+            LocalWebcamPreview.Source = null;
+
+            if (_frameReader != null)
             {
-                _webcamPlayer.Pause();
-                DispatcherQueue.TryEnqueue(() => LocalWebcamPreview.SetMediaPlayer(null));
-                _webcamPlayer.Dispose();
-                _webcamPlayer = null;
+                _frameReader.FrameArrived -= FrameReader_FrameArrived;
+                await _frameReader.StopAsync();
+                _frameReader.Dispose();
+                _frameReader = null;
             }
             if (_mediaCapture != null)
             {
-                try { await _mediaCapture.StopPreviewAsync(); } catch { }
-                _mediaCapture.Dispose();
+                try { _mediaCapture.Dispose(); } catch { }
                 _mediaCapture = null;
             }
 
@@ -303,20 +305,17 @@ namespace RobotControllerApp
                 {
                     VideoDeviceId = selected.Id,
                     StreamingCaptureMode = StreamingCaptureMode.Video,
-                    PhotoCaptureSource = PhotoCaptureSource.VideoPreview,
                     MemoryPreference = MediaCaptureMemoryPreference.Cpu
                 });
 
-                // Prefer VideoPreview stream; fall back to any available source
+                // Pick color source explicitly if possible
                 var frameSource = _mediaCapture.FrameSources.Values
-                    .FirstOrDefault(s => s.Info.MediaStreamType == MediaStreamType.VideoPreview)
+                    .FirstOrDefault(s => s.Info.SourceKind == MediaFrameSourceKind.Color)
                     ?? _mediaCapture.FrameSources.Values.FirstOrDefault();
 
                 if (frameSource != null)
                 {
-                    // En WinUI 3, le MediaPlayer affiche souvent un écran noir avec le MJPEG des vieilles webcams.
-                    // On force des formats bruts (YUY2 / NV12) qui sont correctement décodés par le système.
-                    // Avoid weird ultra-wide depth map resolutions like 640x240 by prioritizing standard aspect ratios
+                    // Prioritize standard aspect ratios and formats cleanly
                     var preferredFormats = frameSource.SupportedFormats
                         .OrderByDescending(f => f.Subtype.Equals("YUY2", StringComparison.OrdinalIgnoreCase) || f.Subtype.Equals("NV12", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
                         .ThenByDescending(f => f.VideoFormat.Width == 1280 && f.VideoFormat.Height == 720 ? 1 : 0)
@@ -327,40 +326,64 @@ namespace RobotControllerApp
                     var format = preferredFormats.FirstOrDefault();
                     if (format != null)
                     {
-                        try
-                        {
-                            await frameSource.SetFormatAsync(format);
-                            Log($"[Webcam] Set format: {format.VideoFormat.Width}x{format.VideoFormat.Height} ({format.Subtype}) at {format.FrameRate.Numerator}/{format.FrameRate.Denominator}fps");
-                        }
-                        catch (Exception fmtEx)
-                        {
-                            Log($"[Webcam] Warning: Could not set format {format.Subtype}. {fmtEx.Message}");
-                        }
+                        try { await frameSource.SetFormatAsync(format); } catch { }
                     }
 
-                    var mediaSource = Windows.Media.Core.MediaSource.CreateFromMediaFrameSource(frameSource);
-
-                    var player = new MediaPlayer();
-                    player.Source = mediaSource;
-                    player.AutoPlay = true;
-
-                    // Keep strong reference so GC doesn't kill the player
-                    _webcamPlayer = player;
-
-                    LocalWebcamPreview.SetMediaPlayer(_webcamPlayer);
-                    _webcamPlayer.Play();
+                    _frameReader = await _mediaCapture.CreateFrameReaderAsync(frameSource);
+                    _frameReader.FrameArrived += FrameReader_FrameArrived;
+                    await _frameReader.StartAsync();
 
                     Log($"[Webcam] Streaming: {selected.Name}");
                 }
                 else
                 {
-                    Log($"[Webcam] No usable frame source for: {selected.Name}");
+                    Log($"[Webcam] No usable color frame source for: {selected.Name}");
                 }
             }
             catch (Exception ex)
             {
                 Log($"[Webcam] Failed to start '{(_videoDevices?[index].Name ?? "?")}': {ex.Message}");
                 _mediaCapture = null;
+            }
+        }
+
+        private void FrameReader_FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
+        {
+            using var frame = sender.TryAcquireLatestFrame();
+            if (frame != null)
+            {
+                var bitmap = frame.VideoMediaFrame?.SoftwareBitmap;
+                if (bitmap != null)
+                {
+                    // WinUI 3 Image source requires BGRA8, Premultiplied
+                    if (bitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 || bitmap.BitmapAlphaMode == BitmapAlphaMode.Straight)
+                    {
+                        var converted = SoftwareBitmap.Convert(bitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
+                        bitmap.Dispose();
+                        bitmap = converted;
+                    }
+
+                    this.DispatcherQueue.TryEnqueue(async () =>
+                    {
+                        var imageControl = LocalWebcamPreview as Microsoft.UI.Xaml.Controls.Image;
+                        if (imageControl != null)
+                        {
+                            if (imageControl.Source != _bitmapSource)
+                            {
+                                imageControl.Source = _bitmapSource;
+                            }
+                            try
+                            {
+                                await _bitmapSource.SetBitmapAsync(bitmap);
+                            }
+                            catch { } // ignore
+                            finally
+                            {
+                                bitmap.Dispose();
+                            }
+                        }
+                    });
+                }
             }
         }
 
@@ -878,7 +901,31 @@ namespace RobotControllerApp
 
                 // Keep buffer size manageable
                 if (ConsoleLog.Blocks.Count > 200) ConsoleLog.Blocks.RemoveAt(0);
+
+                // Auto-scroll to bottom
+                var scrollViewer = FindVisualChild<ScrollViewer>(ConsoleLog);
+                if (scrollViewer != null)
+                {
+                    scrollViewer.UpdateLayout();
+                    scrollViewer.ChangeView(null, scrollViewer.ScrollableHeight, null);
+                }
             });
+        }
+
+        private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            if (parent == null) return null;
+            DependencyObject? current = parent;
+
+            while (current != null)
+            {
+                current = VisualTreeHelper.GetParent(current);
+                if (current is T match)
+                {
+                    return match;
+                }
+            }
+            return null;
         }
 
 

@@ -315,8 +315,7 @@
                                         <!-- Preview — CaptureElement works with USB webcams -->
                                         <Border Grid.Row="2" Background="#0A0A0A" CornerRadius="10"
                                                 BorderBrush="#1E1E1E" BorderThickness="1">
-                                            <MediaPlayerElement x:Name="LocalWebcamPreview"
-                                                                Stretch="Uniform" AutoPlay="True"/>
+                                            <Image x:Name="LocalWebcamPreview" Stretch="Uniform" />
                                         </Border>
                                     </Grid>
                                 </Border>
@@ -337,7 +336,7 @@
                                     </Grid.RowDefinitions>
                                     <TextBlock Text="System Logs" Style="{StaticResource Text.Headline3}" Margin="{StaticResource Margin.Component}"/>
                                     <Border Grid.Row="1" Background="Black" CornerRadius="{StaticResource Radius.Small}" Padding="{StaticResource Padding.Small}">
-                                        <ScrollViewer>
+                                        <ScrollViewer x:Name="LogScroll">
                                             <RichTextBlock x:Name="ConsoleLog" IsTextSelectionEnabled="True" Foreground="#00FF00" FontFamily="Consolas" FontSize="12"/>
                                         </ScrollViewer>
                                     </Border>
