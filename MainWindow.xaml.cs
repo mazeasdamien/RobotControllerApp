@@ -226,6 +226,10 @@ namespace RobotControllerApp
                     {
                         CameraImage.Visibility = Visibility.Visible;
                         CameraOfflineState.Visibility = Visibility.Collapsed;
+                        RobotFeedBadgeText.Text = "LIVE";
+                        RobotFeedBadgeText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
+                        RobotFeedBadge.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 180, 0, 0)); // Red background for LIVE
+                        RobotFeedDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 0, 0)); // Bright Red Dot
                         Log("[UI] Camera feed active.");
                     }
                 }
@@ -312,17 +316,26 @@ namespace RobotControllerApp
                 {
                     // En WinUI 3, le MediaPlayer affiche souvent un écran noir avec le MJPEG des vieilles webcams.
                     // On force des formats bruts (YUY2 / NV12) qui sont correctement décodés par le système.
+                    // Avoid weird ultra-wide depth map resolutions like 640x240 by prioritizing standard aspect ratios
                     var preferredFormats = frameSource.SupportedFormats
-                        .OrderByDescending(f => f.Subtype == "YUY2" || f.Subtype == "NV12" ? 1 : 0)
-                        .ThenByDescending(f => f.VideoFormat.Width == 1280 ? 1 : 0)
+                        .OrderByDescending(f => f.Subtype.Equals("YUY2", StringComparison.OrdinalIgnoreCase) || f.Subtype.Equals("NV12", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
+                        .ThenByDescending(f => f.VideoFormat.Width == 1280 && f.VideoFormat.Height == 720 ? 1 : 0)
+                        .ThenByDescending(f => f.VideoFormat.Width == 640 && f.VideoFormat.Height == 480 ? 1 : 0)
                         .ThenByDescending(f => f.VideoFormat.Width)
                         .ToList();
 
                     var format = preferredFormats.FirstOrDefault();
                     if (format != null)
                     {
-                        await frameSource.SetFormatAsync(format);
-                        Log($"[Webcam] Set format: {format.VideoFormat.Width}x{format.VideoFormat.Height} ({format.Subtype}) at {format.FrameRate.Numerator}/{format.FrameRate.Denominator}fps");
+                        try
+                        {
+                            await frameSource.SetFormatAsync(format);
+                            Log($"[Webcam] Set format: {format.VideoFormat.Width}x{format.VideoFormat.Height} ({format.Subtype}) at {format.FrameRate.Numerator}/{format.FrameRate.Denominator}fps");
+                        }
+                        catch (Exception fmtEx)
+                        {
+                            Log($"[Webcam] Warning: Could not set format {format.Subtype}. {fmtEx.Message}");
+                        }
                     }
 
                     var mediaSource = Windows.Media.Core.MediaSource.CreateFromMediaFrameSource(frameSource);
@@ -331,8 +344,11 @@ namespace RobotControllerApp
                     player.Source = mediaSource;
                     player.AutoPlay = true;
 
-                    LocalWebcamPreview.SetMediaPlayer(player);
-                    player.Play();
+                    // Keep strong reference so GC doesn't kill the player
+                    _webcamPlayer = player;
+
+                    LocalWebcamPreview.SetMediaPlayer(_webcamPlayer);
+                    _webcamPlayer.Play();
 
                     Log($"[Webcam] Streaming: {selected.Name}");
                 }
