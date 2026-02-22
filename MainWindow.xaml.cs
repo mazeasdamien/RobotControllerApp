@@ -272,7 +272,6 @@ namespace RobotControllerApp
 
         private OpenCvSharp.VideoCapture? _cvCapture;
         private CancellationTokenSource? _cvCaptureCts;
-        private bool _isUpdatingFrame = false;
         private int _operatorFpsCount = 0;
         private int _operatorFramesTotal = 0;
         private DateTime _operatorLastFpsReset = DateTime.Now;
@@ -285,7 +284,6 @@ namespace RobotControllerApp
 
             // ── Cleanup existing session safely ─────────────────────────────────
             _cvCaptureCts?.Cancel();
-            _isUpdatingFrame = false;
 
             if (_cvCapture != null)
             {
@@ -403,6 +401,8 @@ namespace RobotControllerApp
                     _cvCapture = null;
                 }
             }
+
+            await Task.CompletedTask;
         }
 
         /// <summary>Enumerate cameras and populate the ComboBox.</summary>
@@ -428,7 +428,7 @@ namespace RobotControllerApp
                 int defaultIdx = 0;
                 for (int i = 0; i < _videoDevices.Count; i++)
                 {
-                    if (_videoDevices[i].Name.IndexOf("Creative", StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (_videoDevices[i].Name.Contains("Creative", StringComparison.OrdinalIgnoreCase))
                     { defaultIdx = i; break; }
                 }
 
@@ -718,7 +718,7 @@ namespace RobotControllerApp
                     using var stream = await response.Content.ReadAsStreamAsync();
                     byte[] buf = new byte[65536]; // 64 KB chunks
                     int read;
-                    while ((read = await stream.ReadAsync(buf, 0, buf.Length)) > 0)
+                    while ((read = await stream.ReadAsync(buf.AsMemory())) > 0)
                         totalBytes += read;
 
                     sw.Stop();
@@ -791,8 +791,7 @@ namespace RobotControllerApp
         private void StartSpeedTestInterval()
         {
             _speedTestTimer?.Stop();
-            _speedTestTimer = new DispatcherTimer();
-            _speedTestTimer.Interval = TimeSpan.FromMinutes(1); // Run every 60s to save bandwidth
+            _speedTestTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) }; // Run every 60s to save bandwidth
             _nextSpeedTest = DateTime.Now.Add(_speedTestTimer.Interval);
 
             _speedTestTimer.Tick += async (s, e) =>
@@ -839,9 +838,6 @@ namespace RobotControllerApp
 
             if (_uploadHistory.Count > 0)
             {
-                double upLow = _uploadHistory.Min();
-                double upHigh = _uploadHistory.Max();
-                double upAvg = _uploadHistory.Average();
                 // Optionally can populate texts for upload here as well if UI handles it. But for now only graph is strictly required. 
             }
         }
@@ -1029,8 +1025,7 @@ namespace RobotControllerApp
         // WhatsApp block removed completely
         private void StartNetworkMonitoring()
         {
-            _networkTimer = new DispatcherTimer();
-            _networkTimer.Interval = TimeSpan.FromMilliseconds(1000);
+            _networkTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000) };
             _networkTimer.Tick += async (s, e) =>
             {
                 if (_isNetworkPinging) return;
@@ -1049,7 +1044,7 @@ namespace RobotControllerApp
                         try
                         {
                             string host = expertTarget;
-                            if (host == "::1" || host.ToLower() == "localhost") host = "127.0.0.1";
+                            if (host == "::1" || string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)) host = "127.0.0.1";
                             var reply = await _pinger.SendPingAsync(host, 1000);
                             if (reply.Status == IPStatus.Success) unityLat = reply.RoundtripTime;
                         }
@@ -1260,7 +1255,7 @@ namespace RobotControllerApp
             if (string.IsNullOrEmpty(input)) return "N/A";
             if (input.StartsWith("ws://"))
             {
-                return input.Substring(5).Split(':')[0];
+                return input[5..].Split(':')[0];
             }
             return input;
         }
@@ -1271,7 +1266,7 @@ namespace RobotControllerApp
             UpdateStatTexts(_internetLatencyHistory, InternetMinText, InternetMaxText, InternetAvgText);
         }
 
-        private void UpdateStatTexts(List<double> history, TextBlock minT, TextBlock maxT, TextBlock avgT)
+        private static void UpdateStatTexts(List<double> history, TextBlock minT, TextBlock maxT, TextBlock avgT)
         {
             var valid = history.Where(v => v > 0).ToList();
             if (valid.Count == 0)
