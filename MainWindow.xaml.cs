@@ -270,7 +270,9 @@ namespace RobotControllerApp
         }
 
         private MediaCapture? _mediaCapture;
-        private MediaPlayer? _webcamPlayer;
+        private Windows.Media.Capture.Frames.MediaFrameReader? _frameReader;
+        private Microsoft.UI.Xaml.Media.Imaging.SoftwareBitmapSource? _softwareBitmapSource;
+        private bool _isUpdatingFrame = false;
         private Windows.Devices.Enumeration.DeviceInformationCollection? _videoDevices;
 
         /// <summary>Start the selected camera safely using SoftwareBitmap and MediaFrameReader.</summary>
@@ -279,15 +281,12 @@ namespace RobotControllerApp
             if (_videoDevices == null || index < 0 || index >= _videoDevices.Count) return;
 
             // ── Cleanup existing session safely ─────────────────────────────────
-            if (_webcamPlayer != null)
+            if (_frameReader != null)
             {
-                var player = _webcamPlayer;
-                _webcamPlayer = null;
-
-                LocalWebcamPreview.SetMediaPlayer(null);
-                player.Pause();
-                player.Source = null;
-                player.Dispose();
+                _frameReader.FrameArrived -= FrameReader_FrameArrived;
+                await _frameReader.StopAsync();
+                _frameReader.Dispose();
+                _frameReader = null;
             }
 
             if (_mediaCapture != null)
@@ -295,6 +294,13 @@ namespace RobotControllerApp
                 try { _mediaCapture.Dispose(); } catch { }
                 _mediaCapture = null;
             }
+
+            LocalWebcamPreview.Source = null;
+            _softwareBitmapSource?.Dispose();
+
+            _softwareBitmapSource = new Microsoft.UI.Xaml.Media.Imaging.SoftwareBitmapSource();
+            LocalWebcamPreview.Source = _softwareBitmapSource;
+            _isUpdatingFrame = false;
 
             // ── Initialize new capture session ──────────────────────────────────
             try
@@ -306,30 +312,36 @@ namespace RobotControllerApp
                 {
                     VideoDeviceId = selected.Id,
                     StreamingCaptureMode = StreamingCaptureMode.Video,
-                    MemoryPreference = MediaCaptureMemoryPreference.Auto // Enable hardware rendering
+                    MemoryPreference = MediaCaptureMemoryPreference.Cpu // Demanded by SoftwareBitmap
                 });
 
                 // Pick best stream
-                var frameSource = _mediaCapture.FrameSources.Values
-                    .FirstOrDefault(s => s.Info.MediaStreamType == MediaStreamType.VideoPreview)
+                var frameSourceInfo = _mediaCapture.FrameSources.Values
+                    .FirstOrDefault(s => s.Info.MediaStreamType == Windows.Media.Capture.MediaStreamType.VideoPreview)
                     ?? _mediaCapture.FrameSources.Values.FirstOrDefault();
 
-                if (frameSource != null)
+                if (frameSourceInfo != null)
                 {
-                    // Do NOT force a manual format override here! 
-                    // Devices like the Creative GestureCam output MJPG by default and attempting 
-                    // to force uncompressed NV12/YUY2 causes a black screen pipeline crash in WinUI3.
+                    var format = frameSourceInfo.SupportedFormats
+                        .OrderByDescending(f => f.VideoFormat.Width * f.VideoFormat.Height)
+                        .FirstOrDefault();
 
-                    var mediaSource = Windows.Media.Core.MediaSource.CreateFromMediaFrameSource(frameSource);
+                    if (format != null) await frameSourceInfo.SetFormatAsync(format);
 
-                    _webcamPlayer = new MediaPlayer();
-                    _webcamPlayer.Source = mediaSource;
-                    _webcamPlayer.AutoPlay = true;
+                    // Create FrameReader extracting raw frames mapped to what UI allows
+                    _frameReader = await _mediaCapture.CreateFrameReaderAsync(frameSourceInfo, Windows.Media.MediaProperties.MediaEncodingSubtypes.Bgra8);
 
-                    LocalWebcamPreview.SetMediaPlayer(_webcamPlayer);
-                    _webcamPlayer.Play();
+                    _frameReader.FrameArrived += FrameReader_FrameArrived;
+                    var status = await _frameReader.StartAsync();
 
-                    Log($"[Webcam] Streaming: {selected.Name}");
+                    if (status == Windows.Media.Capture.Frames.MediaFrameReaderStartStatus.Success)
+                    {
+                        Log($"[Webcam] Streaming: {selected.Name}");
+                    }
+                    else
+                    {
+                        Log($"[Webcam] Failed to start frame reader: {status}");
+                    }
                 }
                 else
                 {
@@ -343,6 +355,52 @@ namespace RobotControllerApp
                 {
                     try { _mediaCapture.Dispose(); } catch { }
                     _mediaCapture = null;
+                }
+            }
+        }
+
+        private void FrameReader_FrameArrived(Windows.Media.Capture.Frames.MediaFrameReader sender, Windows.Media.Capture.Frames.MediaFrameArrivedEventArgs args)
+        {
+            if (_isUpdatingFrame || _softwareBitmapSource == null) return;
+
+            using var frame = sender.TryAcquireLatestFrame();
+            if (frame != null)
+            {
+                var softwareBitmap = frame.VideoMediaFrame?.SoftwareBitmap;
+                if (softwareBitmap != null)
+                {
+                    _isUpdatingFrame = true;
+
+                    if (softwareBitmap.BitmapPixelFormat != Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8 ||
+                        softwareBitmap.BitmapAlphaMode == Windows.Graphics.Imaging.BitmapAlphaMode.Straight)
+                    {
+                        softwareBitmap = Windows.Graphics.Imaging.SoftwareBitmap.Convert(
+                            softwareBitmap,
+                            Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
+                            Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
+                    }
+                    else
+                    {
+                        // Duplicate to stop pipeline lock
+                        softwareBitmap = Windows.Graphics.Imaging.SoftwareBitmap.Copy(softwareBitmap);
+                    }
+
+                    DispatcherQueue?.TryEnqueue(async () =>
+                    {
+                        try
+                        {
+                            if (_softwareBitmapSource != null)
+                            {
+                                await _softwareBitmapSource.SetBitmapAsync(softwareBitmap);
+                            }
+                        }
+                        catch { /* Ignore swap race-conditions safely */ }
+                        finally
+                        {
+                            softwareBitmap.Dispose();
+                            _isUpdatingFrame = false;
+                        }
+                    });
                 }
             }
         }
