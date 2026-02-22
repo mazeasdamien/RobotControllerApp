@@ -270,9 +270,8 @@ namespace RobotControllerApp
         }
 
         private MediaCapture? _mediaCapture;
-        private MediaFrameReader? _frameReader;
+        private MediaPlayer? _webcamPlayer;
         private Windows.Devices.Enumeration.DeviceInformationCollection? _videoDevices;
-        private Microsoft.UI.Xaml.Media.Imaging.SoftwareBitmapSource _bitmapSource = new();
 
         /// <summary>Start the selected camera safely using SoftwareBitmap and MediaFrameReader.</summary>
         private async Task StartCameraByIndex(int index)
@@ -280,15 +279,17 @@ namespace RobotControllerApp
             if (_videoDevices == null || index < 0 || index >= _videoDevices.Count) return;
 
             // ── Cleanup existing session safely ─────────────────────────────────
-            LocalWebcamPreview.Source = null;
-
-            if (_frameReader != null)
+            if (_webcamPlayer != null)
             {
-                _frameReader.FrameArrived -= FrameReader_FrameArrived;
-                await _frameReader.StopAsync();
-                _frameReader.Dispose();
-                _frameReader = null;
+                var player = _webcamPlayer;
+                _webcamPlayer = null;
+
+                LocalWebcamPreview.SetMediaPlayer(null);
+                player.Pause();
+                player.Source = null;
+                player.Dispose();
             }
+
             if (_mediaCapture != null)
             {
                 try { _mediaCapture.Dispose(); } catch { }
@@ -305,17 +306,17 @@ namespace RobotControllerApp
                 {
                     VideoDeviceId = selected.Id,
                     StreamingCaptureMode = StreamingCaptureMode.Video,
-                    MemoryPreference = MediaCaptureMemoryPreference.Cpu
+                    // Auto or strictly required for hardware decoding. Not CPU!
                 });
 
-                // Pick color source explicitly if possible
+                // Pick best stream
                 var frameSource = _mediaCapture.FrameSources.Values
-                    .FirstOrDefault(s => s.Info.SourceKind == MediaFrameSourceKind.Color)
+                    .FirstOrDefault(s => s.Info.MediaStreamType == MediaStreamType.VideoPreview)
                     ?? _mediaCapture.FrameSources.Values.FirstOrDefault();
 
                 if (frameSource != null)
                 {
-                    // Prioritize standard aspect ratios and formats cleanly
+                    // Prioritize standard aspect ratios and uncompressed formats for WinUI3 compatibility
                     var preferredFormats = frameSource.SupportedFormats
                         .OrderByDescending(f => f.Subtype.Equals("YUY2", StringComparison.OrdinalIgnoreCase) || f.Subtype.Equals("NV12", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
                         .ThenByDescending(f => f.VideoFormat.Width == 1280 && f.VideoFormat.Height == 720 ? 1 : 0)
@@ -329,61 +330,26 @@ namespace RobotControllerApp
                         try { await frameSource.SetFormatAsync(format); } catch { }
                     }
 
-                    _frameReader = await _mediaCapture.CreateFrameReaderAsync(frameSource);
-                    _frameReader.FrameArrived += FrameReader_FrameArrived;
-                    await _frameReader.StartAsync();
+                    var mediaSource = Windows.Media.Core.MediaSource.CreateFromMediaFrameSource(frameSource);
+
+                    _webcamPlayer = new MediaPlayer();
+                    _webcamPlayer.Source = mediaSource;
+                    _webcamPlayer.AutoPlay = true;
+
+                    LocalWebcamPreview.SetMediaPlayer(_webcamPlayer);
+                    _webcamPlayer.Play();
 
                     Log($"[Webcam] Streaming: {selected.Name}");
                 }
                 else
                 {
-                    Log($"[Webcam] No usable color frame source for: {selected.Name}");
+                    Log($"[Webcam] No usable frame source for: {selected.Name}");
                 }
             }
             catch (Exception ex)
             {
                 Log($"[Webcam] Failed to start '{(_videoDevices?[index].Name ?? "?")}': {ex.Message}");
                 _mediaCapture = null;
-            }
-        }
-
-        private void FrameReader_FrameArrived(MediaFrameReader sender, MediaFrameArrivedEventArgs args)
-        {
-            using var frame = sender.TryAcquireLatestFrame();
-            if (frame != null)
-            {
-                var bitmap = frame.VideoMediaFrame?.SoftwareBitmap;
-                if (bitmap != null)
-                {
-                    // WinUI 3 Image source requires BGRA8, Premultiplied
-                    if (bitmap.BitmapPixelFormat != BitmapPixelFormat.Bgra8 || bitmap.BitmapAlphaMode == BitmapAlphaMode.Straight)
-                    {
-                        var converted = SoftwareBitmap.Convert(bitmap, BitmapPixelFormat.Bgra8, BitmapAlphaMode.Premultiplied);
-                        bitmap.Dispose();
-                        bitmap = converted;
-                    }
-
-                    this.DispatcherQueue.TryEnqueue(async () =>
-                    {
-                        var imageControl = LocalWebcamPreview as Microsoft.UI.Xaml.Controls.Image;
-                        if (imageControl != null)
-                        {
-                            if (imageControl.Source != _bitmapSource)
-                            {
-                                imageControl.Source = _bitmapSource;
-                            }
-                            try
-                            {
-                                await _bitmapSource.SetBitmapAsync(bitmap);
-                            }
-                            catch { } // ignore
-                            finally
-                            {
-                                bitmap.Dispose();
-                            }
-                        }
-                    });
-                }
             }
         }
 

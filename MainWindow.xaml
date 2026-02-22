@@ -315,7 +315,7 @@
                                         <!-- Preview — CaptureElement works with USB webcams -->
                                         <Border Grid.Row="2" Background="#0A0A0A" CornerRadius="10"
                                                 BorderBrush="#1E1E1E" BorderThickness="1">
-                                            <Image x:Name="LocalWebcamPreview" Stretch="Uniform" />
+                                            <MediaPlayerElement x:Name="LocalWebcamPreview" Stretch="Uniform" AutoPlay="True" />
                                         </Border>
                                     </Grid>
                                 </Border>
