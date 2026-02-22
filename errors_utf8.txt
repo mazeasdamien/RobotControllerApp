@@ -1,8 +1,0 @@
-﻿C:\Users\Damien Mazeas\Desktop\portfolio\Orange\RobotControllerApp\MainWindow.xaml.cs(273,17): error CS0246: The type or namespace name 'CancellationTokenSource' could not be found (are you missing a using directive or an assembly reference?) [C:\Users\Damien Mazeas\Desktop\portfolio\Orange\RobotControllerApp\RobotControllerApp.csproj]
-C:\NuGetPackages\microsoft.windowsappsdk.winui\1.8.260204000\buildTransitive\Microsoft.UI.Xaml.Markup.Compiler.interop.targets(845,9): error MSB3073: The command ""C:\NuGetPackages\microsoft.windowsappsdk.winui\1.8.260204000\buildTransitive\..\tools\net6.0\..\net472\XamlCompiler.exe" "obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\\input.json" "obj\ARM64\Debug\net8.0-windows10.0.19041.0\win-arm64\\output.json"" exited with code 1. [C:\Users\Damien Mazeas\Desktop\portfolio\Orange\RobotControllerApp\RobotControllerApp.csproj]
-
-Build FAILED.
-    0 Warning(s)
-    2 Error(s)
-
-Time Elapsed 00:00:10.31
