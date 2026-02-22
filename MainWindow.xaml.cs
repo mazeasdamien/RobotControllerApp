@@ -1,3 +1,4 @@
+#pragma warning disable IDE0060 // Suppress 'Remove unused parameter' for XAML UI Event Handlers
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Documents;
@@ -695,64 +696,65 @@ namespace RobotControllerApp
                 RunSpeedTestButton.IsEnabled = false;
             });
 
-            try
+            await Task.Run(async () =>
             {
-                double downMbps = -1;
-                double upMbps = -1;
-
-                using var client = new HttpClient();
-                client.Timeout = TimeSpan.FromSeconds(30);
-
-                // ── 1. DOWNLOAD TEST ──────────────────────────────────────────────────
-                // Stream chunks to avoid TCP slow-start skew and RAM spike.
-                // Requesting 10MB to maintain reliable measurement without 30s timeouts.
                 try
                 {
-                    long totalBytes = 0;
-                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    double downMbps = -1;
+                    double upMbps = -1;
 
-                    using var response = await client.GetAsync(
-                        "https://speed.cloudflare.com/__down?bytes=10000000",
-                        HttpCompletionOption.ResponseHeadersRead);
+                    using var client = new HttpClient();
+                    client.Timeout = TimeSpan.FromSeconds(30);
 
-                    using var stream = await response.Content.ReadAsStreamAsync();
-                    byte[] buf = new byte[65536]; // 64 KB chunks
-                    int read;
-                    while ((read = await stream.ReadAsync(buf.AsMemory())) > 0)
-                        totalBytes += read;
+                    // ── 1. DOWNLOAD TEST ──────────────────────────────────────────────────
+                    try
+                    {
+                        long totalBytes = 0;
+                        var sw = System.Diagnostics.Stopwatch.StartNew();
 
-                    sw.Stop();
-                    if (sw.Elapsed.TotalSeconds > 0)
-                        downMbps = (totalBytes * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
-                }
-                catch (Exception ex)
-                {
-                    downMbps = -1;
-                    Log($"[Network] Warn: Download speed test failed: {ex.Message}");
-                }
+                        using var response = await client.GetAsync(
+                            $"https://speed.cloudflare.com/__down?bytes=15000000&nocache={Guid.NewGuid()}",
+                            HttpCompletionOption.ResponseHeadersRead);
 
-                // ── 2. UPLOAD TEST ────────────────────────────────────────────────────
-                // 4 MB of random data — gives a reasonable signal on any connection.
-                try
-                {
-                    byte[] upData = new byte[4_000_000]; // 4 MB
-                    new Random().NextBytes(upData);
+                        response.EnsureSuccessStatusCode();
 
-                    var sw = System.Diagnostics.Stopwatch.StartNew();
-                    using var content = new ByteArrayContent(upData);
-                    var resp = await client.PostAsync("https://speed.cloudflare.com/__up", content);
-                    sw.Stop();
+                        using var stream = await response.Content.ReadAsStreamAsync();
+                        byte[] buf = new byte[65536]; // 64 KB chunks
+                        int read;
+                        while ((read = await stream.ReadAsync(buf.AsMemory())) > 0)
+                            totalBytes += read;
 
-                    if (resp.IsSuccessStatusCode && sw.Elapsed.TotalSeconds > 0)
-                        upMbps = (upData.Length * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
-                }
-                catch (Exception ex)
-                {
-                    upMbps = -1;
-                    Log($"[Network] Warn: Upload speed test failed: {ex.Message}");
-                }
+                        sw.Stop();
+                        if (sw.Elapsed.TotalSeconds > 0 && totalBytes > 1000)
+                            downMbps = (totalBytes * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
+                        else
+                            downMbps = -1; // Indicate error if almost no bytes were received
+                    }
+                    catch (Exception)
+                    {
+                        downMbps = -1;
+                    }
 
-                DispatcherQueue.TryEnqueue(() =>
+                    // ── 2. UPLOAD TEST ────────────────────────────────────────────────────
+                    try
+                    {
+                        byte[] upData = new byte[4_000_000]; // 4 MB
+                        new Random().NextBytes(upData);
+
+                        var sw = System.Diagnostics.Stopwatch.StartNew();
+                        using var content = new ByteArrayContent(upData);
+                        var resp = await client.PostAsync($"https://speed.cloudflare.com/__up?nocache={Guid.NewGuid()}", content);
+                        sw.Stop();
+
+                        if (resp.IsSuccessStatusCode && sw.Elapsed.TotalSeconds > 0)
+                            upMbps = (upData.Length * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
+                    }
+                    catch (Exception)
+                    {
+                        upMbps = -1;
+                    }
+
+                    DispatcherQueue.TryEnqueue(() =>
                 {
                     // Reset colors
                     InternetSpeedText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Primary"];
@@ -777,15 +779,16 @@ namespace RobotControllerApp
                     NetworkStatusText.Text = "Idle";
                     RunSpeedTestButton.IsEnabled = true;
                 });
-            }
-            catch
-            {
-                DispatcherQueue.TryEnqueue(() =>
+                }
+                catch
                 {
-                    NetworkStatusText.Text = "Failed";
-                    RunSpeedTestButton.IsEnabled = true;
-                });
-            }
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        NetworkStatusText.Text = "Failed";
+                        RunSpeedTestButton.IsEnabled = true;
+                    });
+                }
+            });
         }
 
         private void StartSpeedTestInterval()

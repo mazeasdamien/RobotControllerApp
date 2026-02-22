@@ -7,10 +7,10 @@ namespace RobotControllerApp.Services
     public class AppSettings
     {
         public int RelayPort { get; set; } = 5000;
-        public string PublicUrl { get; set; } = "http://damien:5000";
+        public string PublicUrl { get; set; } = "http://100.68.223.53:5000";
         public string RobotIp { get; set; } = "169.254.200.200";
         public string Robot2Ip { get; set; } = "169.254.200.201";
-        public string ExpertIp { get; set; } = "damien";
+        public string ExpertIp { get; set; } = "100.76.228.9";
 
 
         private static string SettingsPath => System.IO.Path.Combine(

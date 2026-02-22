@@ -817,13 +817,13 @@
 
                             <StackPanel Spacing="8">
                                 <TextBlock Text="Hub Address (To use in Quest)" Style="{StaticResource Text.Body1}"/>
-                                <TextBox x:Name="PublicUrlInput" PlaceholderText="http://damien:5000" MinWidth="300"/>
+                                <TextBox x:Name="PublicUrlInput" PlaceholderText="http://100.68.223.53:5000" MinWidth="300"/>
                                 <TextBlock Text="The URL or IP where this laptop is reachable from the Quest." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
                             </StackPanel>
 
                             <StackPanel Spacing="8">
                                 <TextBlock Text="Expert / Quest IP Address (For Monitoring)" Style="{StaticResource Text.Body1}"/>
-                                <TextBox x:Name="ExpertIpInput" PlaceholderText="damien" MinWidth="300"/>
+                                <TextBox x:Name="ExpertIpInput" PlaceholderText="100.76.228.9" MinWidth="300"/>
                                 <TextBlock Text="The IP of your Quest headset for proactive latency and health pings." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
                             </StackPanel>
 
