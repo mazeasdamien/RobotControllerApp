@@ -246,7 +246,6 @@
                                                 BorderBrush="#1E1E1E" BorderThickness="1">
                                             <Grid>
                                                 <Image x:Name="CameraImage" Stretch="Uniform"
-                                                       Width="640" Height="480"
                                                        Visibility="Collapsed"/>
                                                 <StackPanel x:Name="CameraOfflineState"
                                                             VerticalAlignment="Center"

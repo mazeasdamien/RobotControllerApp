@@ -11,6 +11,7 @@ using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using Windows.Graphics.Imaging;
+using System.Threading;
 using Windows.Media.Capture;
 using Windows.Media.Capture.Frames;
 using Windows.Media.Core;
@@ -269,147 +270,98 @@ namespace RobotControllerApp
             _ = LoadCameraList();
         }
 
-        private MediaCapture? _mediaCapture;
-        private Windows.Media.Capture.Frames.MediaFrameReader? _frameReader;
-        private Microsoft.UI.Xaml.Media.Imaging.SoftwareBitmapSource? _softwareBitmapSource;
+        private OpenCvSharp.VideoCapture? _cvCapture;
+        private CancellationTokenSource? _cvCaptureCts;
         private bool _isUpdatingFrame = false;
         private Windows.Devices.Enumeration.DeviceInformationCollection? _videoDevices;
 
-        /// <summary>Start the selected camera safely using SoftwareBitmap and MediaFrameReader.</summary>
+        /// <summary>Start the selected camera safely using OpenCvSharp (DirectShow).</summary>
         private async Task StartCameraByIndex(int index)
         {
             if (_videoDevices == null || index < 0 || index >= _videoDevices.Count) return;
 
             // ── Cleanup existing session safely ─────────────────────────────────
-            if (_frameReader != null)
-            {
-                _frameReader.FrameArrived -= FrameReader_FrameArrived;
-                await _frameReader.StopAsync();
-                _frameReader.Dispose();
-                _frameReader = null;
-            }
+            _cvCaptureCts?.Cancel();
+            _isUpdatingFrame = false;
 
-            if (_mediaCapture != null)
+            if (_cvCapture != null)
             {
-                try { _mediaCapture.Dispose(); } catch { }
-                _mediaCapture = null;
+                try
+                {
+                    _cvCapture.Release();
+                    _cvCapture.Dispose();
+                }
+                catch { }
+                _cvCapture = null;
             }
 
             LocalWebcamPreview.Source = null;
-            _softwareBitmapSource?.Dispose();
-
-            _softwareBitmapSource = new Microsoft.UI.Xaml.Media.Imaging.SoftwareBitmapSource();
-            LocalWebcamPreview.Source = _softwareBitmapSource;
-            _isUpdatingFrame = false;
 
             // ── Initialize new capture session ──────────────────────────────────
             try
             {
                 var selected = _videoDevices[index];
-                _mediaCapture = new MediaCapture();
 
-                await _mediaCapture.InitializeAsync(new MediaCaptureInitializationSettings
+                // DirectShow natively parses webcams (including MJPG Creative streams) without 
+                // WinUI 3 pipeline crashing. Index mapping matches DeviceInformation array.
+                _cvCapture = new OpenCvSharp.VideoCapture(index, OpenCvSharp.VideoCaptureAPIs.DSHOW);
+
+                if (!_cvCapture.IsOpened())
                 {
-                    VideoDeviceId = selected.Id,
-                    StreamingCaptureMode = StreamingCaptureMode.Video,
-                    MemoryPreference = MediaCaptureMemoryPreference.Cpu // Demanded by SoftwareBitmap
-                });
-
-                // Pick best stream
-                var frameSourceInfo = _mediaCapture.FrameSources.Values
-                    .FirstOrDefault(s => s.Info.MediaStreamType == Windows.Media.Capture.MediaStreamType.VideoPreview)
-                    ?? _mediaCapture.FrameSources.Values.FirstOrDefault();
-
-                if (frameSourceInfo != null)
-                {
-                    // Prioritize stable standard resolutions (720p/480p) to avoid MJPG software-decode pipeline crashes
-                    var format = frameSourceInfo.SupportedFormats
-                        .Where(f => f.VideoFormat.Width <= 1280 && 
-                                   (f.Subtype.Contains("NV12", StringComparison.OrdinalIgnoreCase) || 
-                                    f.Subtype.Contains("YUY2", StringComparison.OrdinalIgnoreCase)))
-                        .OrderByDescending(f => f.VideoFormat.Width * f.VideoFormat.Height)
-                        .FirstOrDefault() 
-                        ?? frameSourceInfo.SupportedFormats
-                        .Where(f => f.VideoFormat.Width <= 1280)
-                        .OrderByDescending(f => f.VideoFormat.Width * f.VideoFormat.Height)
-                        .FirstOrDefault()
-                        ?? frameSourceInfo.SupportedFormats.FirstOrDefault();
-
-                    if (format != null) await frameSourceInfo.SetFormatAsync(format);
-
-                    // Create FrameReader extracting raw frames mapped to what UI allows
-                    _frameReader = await _mediaCapture.CreateFrameReaderAsync(frameSourceInfo, Windows.Media.MediaProperties.MediaEncodingSubtypes.Bgra8);
-
-                    _frameReader.FrameArrived += FrameReader_FrameArrived;
-                    var status = await _frameReader.StartAsync();
-
-                    if (status == Windows.Media.Capture.Frames.MediaFrameReaderStartStatus.Success)
-                    {
-                        Log($"[Webcam] Streaming: {selected.Name}");
-                    }
-                    else
-                    {
-                        Log($"[Webcam] Failed to start frame reader: {status}");
-                    }
+                    Log($"[Webcam] Failed to open stream for '{selected.Name}' (DirectShow)");
+                    return;
                 }
-                else
+
+                // Force reliable standard resolution to prevent decoding lag on the CPU
+                _cvCapture.Set(OpenCvSharp.VideoCaptureProperties.FrameWidth, 640);
+                _cvCapture.Set(OpenCvSharp.VideoCaptureProperties.FrameHeight, 480);
+
+                Log($"[Webcam] Streaming: {selected.Name}");
+
+                _cvCaptureCts = new CancellationTokenSource();
+                var token = _cvCaptureCts.Token;
+
+                _ = Task.Run(async () =>
                 {
-                    Log($"[Webcam] No usable frame source for: {selected.Name}");
-                }
+                    using var mat = new OpenCvSharp.Mat();
+                    while (!token.IsCancellationRequested && _cvCapture != null && _cvCapture.IsOpened())
+                    {
+                        if (_cvCapture.Read(mat) && !mat.Empty())
+                        {
+                            byte[] frameBytes = mat.ToBytes(".jpg");
+
+                            DispatcherQueue?.TryEnqueue(async () =>
+                            {
+                                if (token.IsCancellationRequested) return;
+
+                                try
+                                {
+                                    var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                                    using (var ms = new System.IO.MemoryStream(frameBytes))
+                                    {
+                                        await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
+                                    }
+                                    LocalWebcamPreview.Source = bitmap;
+                                }
+                                catch { }
+                            });
+                        }
+
+                        try
+                        {
+                            await Task.Delay(33, token).ConfigureAwait(false); // ~30 fps cap
+                        }
+                        catch (TaskCanceledException) { break; }
+                    }
+                }, token);
             }
             catch (Exception ex)
             {
                 Log($"[Webcam] Failed to start '{(_videoDevices?[index].Name ?? "?")}': {ex.Message}");
-                if (_mediaCapture != null)
+                if (_cvCapture != null)
                 {
-                    try { _mediaCapture.Dispose(); } catch { }
-                    _mediaCapture = null;
-                }
-            }
-        }
-
-        private void FrameReader_FrameArrived(Windows.Media.Capture.Frames.MediaFrameReader sender, Windows.Media.Capture.Frames.MediaFrameArrivedEventArgs args)
-        {
-            if (_isUpdatingFrame || _softwareBitmapSource == null) return;
-
-            using var frame = sender.TryAcquireLatestFrame();
-            if (frame != null)
-            {
-                var softwareBitmap = frame.VideoMediaFrame?.SoftwareBitmap;
-                if (softwareBitmap != null)
-                {
-                    _isUpdatingFrame = true;
-
-                    if (softwareBitmap.BitmapPixelFormat != Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8 ||
-                        softwareBitmap.BitmapAlphaMode == Windows.Graphics.Imaging.BitmapAlphaMode.Straight)
-                    {
-                        softwareBitmap = Windows.Graphics.Imaging.SoftwareBitmap.Convert(
-                            softwareBitmap,
-                            Windows.Graphics.Imaging.BitmapPixelFormat.Bgra8,
-                            Windows.Graphics.Imaging.BitmapAlphaMode.Premultiplied);
-                    }
-                    else
-                    {
-                        // Duplicate to stop pipeline lock
-                        softwareBitmap = Windows.Graphics.Imaging.SoftwareBitmap.Copy(softwareBitmap);
-                    }
-
-                    DispatcherQueue?.TryEnqueue(async () =>
-                    {
-                        try
-                        {
-                            if (_softwareBitmapSource != null)
-                            {
-                                await _softwareBitmapSource.SetBitmapAsync(softwareBitmap);
-                            }
-                        }
-                        catch { /* Ignore swap race-conditions safely */ }
-                        finally
-                        {
-                            softwareBitmap.Dispose();
-                            _isUpdatingFrame = false;
-                        }
-                    });
+                    try { _cvCapture.Release(); _cvCapture.Dispose(); } catch { }
+                    _cvCapture = null;
                 }
             }
         }
