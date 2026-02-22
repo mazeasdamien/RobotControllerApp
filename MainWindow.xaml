@@ -751,10 +751,10 @@
                                                 <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="16" CornerRadius="12">
                                                     <StackPanel Spacing="6">
                                                         <TextBlock x:Name="QuestIpText" Text="Searching..." FontSize="13" FontWeight="SemiBold"/>
-                                                        <TextBlock x:Name="QuestLocText" Text="Tailscale Mesh" FontSize="11" Opacity="0.5"/>
+                                                        <TextBlock x:Name="QuestLocText" Text="Cloudflare Tunnel" FontSize="11" Opacity="0.5"/>
                                                         <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
                                                             <Ellipse x:Name="QuestRelayDot" Width="6" Height="6" Fill="#0078D7"/>
-                                                            <TextBlock x:Name="QuestRelayText" Text="DIRECT P2P" FontSize="10" FontWeight="SemiBold" Foreground="#0078D7"/>
+                                                            <TextBlock x:Name="QuestRelayText" Text="TUNNEL" FontSize="10" FontWeight="SemiBold" Foreground="#0078D7"/>
                                                         </StackPanel>
                                                     </StackPanel>
                                                 </Border>

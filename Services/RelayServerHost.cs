@@ -467,6 +467,8 @@ namespace RobotControllerApp.Services
                             }
                         }
                         catch { }
+
+                        OnUnityMessageReceived?.Invoke(message);
                         continue;
                     }
 

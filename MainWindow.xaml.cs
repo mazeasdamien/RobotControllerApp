@@ -526,39 +526,23 @@ namespace RobotControllerApp
         }
 
 
-        private async void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
+        private void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
         {
-            args.Cancel = true;
+            Log("Stopping services...");
 
-            var dialog = new ContentDialog
+            try
             {
-                Title = "Stop Services?",
-                Content = "Do you want to stop the Relay Server and Robot Bridge cleanly before exiting?",
-                PrimaryButtonText = "Yes, Stop & Exit",
-                CloseButtonText = "Cancel",
-                XamlRoot = this.Content.XamlRoot
-            };
-
-            var result = await dialog.ShowAsync();
-
-            if (result == ContentDialogResult.Primary)
-            {
-                Log("Stopping services...");
-                try
-                {
-                    await Task.WhenAny(
-                        Task.WhenAll(_robotBridge.StopAsync(), _relayServer.StopAsync()),
-                        Task.Delay(2000) // Force proceed after 2 seconds
-                    );
-                }
-                catch { }
-
-                // Remove handler to avoid loop
-                sender.Closing -= AppWindow_Closing;
-
-                // Force exit to ensure no phantom process locks the port
-                Environment.Exit(0);
+                _ = _robotBridge?.StopAsync();
+                _ = _relayServer?.StopAsync();
             }
+            catch { }
+
+            // Fire-and-forget exit to prevent WinUI 3 AppWindow shutdown crash
+            Task.Run(async () =>
+            {
+                await Task.Delay(500);
+                Environment.Exit(0);
+            });
         }
 
         private async void NavView_Loaded(object _, RoutedEventArgs __)
@@ -1218,7 +1202,7 @@ namespace RobotControllerApp
                 QuestRelayText.Text = "REACHABLE";
                 QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
                 QuestRelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-                QuestLocText.Text = "Tailscale Mesh";
+                QuestLocText.Text = "Cloudflare Tunnel";
             }
             else
             {
