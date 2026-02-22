@@ -14,6 +14,7 @@ namespace RobotControllerApp.Services
         private readonly ConcurrentDictionary<string, WebSocket> _robotClients = new();
         private readonly ConcurrentDictionary<string, WebSocket> _unityClients = new();
         private byte[]? _latestImage; // Cache
+        private byte[]? _latestOperatorImage; // Cache for Operator Webcam
         private float[] _currentJoints = new float[6]; // Cache for Nudge commands
 
         public void AddRobotClient(string robotId, WebSocket ws)
@@ -61,6 +62,16 @@ namespace RobotControllerApp.Services
         public byte[]? GetLatestImage()
         {
             return _latestImage;
+        }
+
+        public void UpdateLatestOperatorImage(byte[] image)
+        {
+            _latestOperatorImage = image;
+        }
+
+        public byte[]? GetLatestOperatorImage()
+        {
+            return _latestOperatorImage;
         }
 
         public void UpdateJoints(float[] newJoints)

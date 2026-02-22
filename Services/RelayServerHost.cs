@@ -34,6 +34,7 @@ namespace RobotControllerApp.Services
 
         private WebApplication? _app;
         private CancellationTokenSource? _cts;
+        public static ConnectionManager? CurrentManager { get; private set; }
 
         // Stats
         public static int _imagesTotal = 0;
@@ -80,6 +81,7 @@ namespace RobotControllerApp.Services
                 app.UseWebSockets();
 
                 var connectionManager = app.Services.GetRequiredService<ConnectionManager>();
+                CurrentManager = connectionManager;
 
                 // WebSocket endpoint for Robot clients
                 app.Map("/robot", async (HttpContext context) =>
@@ -157,6 +159,17 @@ namespace RobotControllerApp.Services
                         return Results.File(img, "image/jpeg");
                     }
                     return Results.NotFound("No image received yet");
+                });
+
+                // Operator Image Endpoint
+                app.MapGet("/image_operator", (ConnectionManager manager) =>
+                {
+                    var img = manager.GetLatestOperatorImage();
+                    if (img != null && img.Length > 0)
+                    {
+                        return Results.File(img, "image/jpeg");
+                    }
+                    return Results.NotFound("No operator image received yet");
                 });
 
                 // Removed WhatsApp Endpoint

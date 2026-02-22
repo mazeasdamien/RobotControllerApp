@@ -352,6 +352,9 @@ namespace RobotControllerApp
 
                             byte[] frameBytes = mat.ToBytes(".jpg");
 
+                            // Send directly to the Hub's HTTP operator image endpoint cache
+                            RelayServerHost.CurrentManager?.UpdateLatestOperatorImage(frameBytes);
+
                             DispatcherQueue?.TryEnqueue(async () =>
                             {
                                 if (token.IsCancellationRequested) return;
@@ -699,7 +702,7 @@ namespace RobotControllerApp
                         var sw = System.Diagnostics.Stopwatch.StartNew();
 
                         using var response = await client.GetAsync(
-                            $"https://speed.cloudflare.com/__down?bytes=15000000&nocache={Guid.NewGuid()}",
+                            $"http://speedtest.tele2.net/10MB.zip?nocache={Guid.NewGuid()}",
                             HttpCompletionOption.ResponseHeadersRead);
 
                         response.EnsureSuccessStatusCode();
@@ -1032,9 +1035,8 @@ namespace RobotControllerApp
                     {
                         try
                         {
-                            string host = expertTarget;
-                            if (host == "::1" || string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase)) host = "127.0.0.1";
-                            var reply = await _pinger.SendPingAsync(host, 1000);
+                            // Rather than pinging the dynamic Unity websocket IP, ping the Tunnel endpoint for accurate latency
+                            var reply = await _pinger.SendPingAsync("niryo.dmzs-lab.com", 1000);
                             if (reply.Status == IPStatus.Success) unityLat = reply.RoundtripTime;
                         }
                         catch { }
