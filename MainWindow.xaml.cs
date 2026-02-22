@@ -273,6 +273,9 @@ namespace RobotControllerApp
         private OpenCvSharp.VideoCapture? _cvCapture;
         private CancellationTokenSource? _cvCaptureCts;
         private bool _isUpdatingFrame = false;
+        private int _operatorFpsCount = 0;
+        private int _operatorFramesTotal = 0;
+        private DateTime _operatorLastFpsReset = DateTime.Now;
         private Windows.Devices.Enumeration.DeviceInformationCollection? _videoDevices;
 
         /// <summary>Start the selected camera safely using OpenCvSharp (DirectShow).</summary>
@@ -296,6 +299,12 @@ namespace RobotControllerApp
             }
 
             LocalWebcamPreview.Source = null;
+            OperatorFeedBadgeText.Text = "OFFLINE";
+            OperatorFeedBadgeText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
+            OperatorFeedBadge.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 51, 51, 51));
+            OperatorFeedDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
+            TelemOperatorFps.Text = "0.0";
+            _operatorFpsCount = 0;
 
             // ── Initialize new capture session ──────────────────────────────────
             try
@@ -312,14 +321,16 @@ namespace RobotControllerApp
                     return;
                 }
 
-                // Force reliable standard resolution to prevent decoding lag on the CPU
-                _cvCapture.Set(OpenCvSharp.VideoCaptureProperties.FrameWidth, 640);
-                _cvCapture.Set(OpenCvSharp.VideoCaptureProperties.FrameHeight, 480);
+                // Force reliable fast definition for Operator feed
+                _cvCapture.Set(OpenCvSharp.VideoCaptureProperties.FrameWidth, 1280);
+                _cvCapture.Set(OpenCvSharp.VideoCaptureProperties.FrameHeight, 720);
 
                 Log($"[Webcam] Streaming: {selected.Name}");
 
                 _cvCaptureCts = new CancellationTokenSource();
                 var token = _cvCaptureCts.Token;
+
+                _operatorLastFpsReset = DateTime.Now;
 
                 _ = Task.Run(async () =>
                 {
@@ -328,6 +339,20 @@ namespace RobotControllerApp
                     {
                         if (_cvCapture.Read(mat) && !mat.Empty())
                         {
+                            _operatorFramesTotal++;
+                            _operatorFpsCount++;
+                            int fps = 0;
+                            int total = _operatorFramesTotal;
+                            bool updateCounters = false;
+
+                            if ((DateTime.Now - _operatorLastFpsReset).TotalSeconds >= 1)
+                            {
+                                fps = _operatorFpsCount;
+                                _operatorFpsCount = 0;
+                                _operatorLastFpsReset = DateTime.Now;
+                                updateCounters = true;
+                            }
+
                             byte[] frameBytes = mat.ToBytes(".jpg");
 
                             DispatcherQueue?.TryEnqueue(async () =>
@@ -336,6 +361,20 @@ namespace RobotControllerApp
 
                                 try
                                 {
+                                    if (OperatorFeedBadgeText.Text != "LIVE")
+                                    {
+                                        OperatorFeedBadgeText.Text = "LIVE";
+                                        OperatorFeedBadgeText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
+                                        OperatorFeedBadge.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 180, 0, 0)); // Red background
+                                        OperatorFeedDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 0, 0)); // Bright Red Dot
+                                    }
+
+                                    if (updateCounters)
+                                    {
+                                        TelemOperatorFps.Text = fps.ToString("0.0");
+                                        TelemOperatorTotalImages.Text = total.ToString();
+                                    }
+
                                     var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
                                     using (var ms = new System.IO.MemoryStream(frameBytes))
                                     {
