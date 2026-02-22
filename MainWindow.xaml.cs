@@ -322,9 +322,18 @@ namespace RobotControllerApp
 
                 if (frameSourceInfo != null)
                 {
+                    // Prioritize stable standard resolutions (720p/480p) to avoid MJPG software-decode pipeline crashes
                     var format = frameSourceInfo.SupportedFormats
+                        .Where(f => f.VideoFormat.Width <= 1280 && 
+                                   (f.Subtype.Contains("NV12", StringComparison.OrdinalIgnoreCase) || 
+                                    f.Subtype.Contains("YUY2", StringComparison.OrdinalIgnoreCase)))
                         .OrderByDescending(f => f.VideoFormat.Width * f.VideoFormat.Height)
-                        .FirstOrDefault();
+                        .FirstOrDefault() 
+                        ?? frameSourceInfo.SupportedFormats
+                        .Where(f => f.VideoFormat.Width <= 1280)
+                        .OrderByDescending(f => f.VideoFormat.Width * f.VideoFormat.Height)
+                        .FirstOrDefault()
+                        ?? frameSourceInfo.SupportedFormats.FirstOrDefault();
 
                     if (format != null) await frameSourceInfo.SetFormatAsync(format);
 
