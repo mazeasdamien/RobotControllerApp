@@ -1,7 +1,11 @@
 # Visual Studio
 .vs/
-# [Bb]in/  (Unignored per user request to include executables)
+
+# Build outputs — NEVER commit these (causes file-lock "unable to unlink" errors on pull)
+[Bb]in/
 [Oo]bj/
+
+# Visual Studio artifacts
 *.user
 *.suo
 *.userosscache
@@ -19,3 +23,11 @@ Desktop.ini
 
 # User Settings
 settings.json
+
+# Build logs
+*.log
+build_*.txt
+errors*.txt
+msbuild.log
+full_build.log
+minimal_errors.log
