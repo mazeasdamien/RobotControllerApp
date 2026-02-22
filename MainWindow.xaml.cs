@@ -306,7 +306,7 @@ namespace RobotControllerApp
                 {
                     VideoDeviceId = selected.Id,
                     StreamingCaptureMode = StreamingCaptureMode.Video,
-                    // Auto or strictly required for hardware decoding. Not CPU!
+                    MemoryPreference = MediaCaptureMemoryPreference.Auto // Enable hardware rendering
                 });
 
                 // Pick best stream
@@ -316,19 +316,9 @@ namespace RobotControllerApp
 
                 if (frameSource != null)
                 {
-                    // Prioritize standard aspect ratios and uncompressed formats for WinUI3 compatibility
-                    var preferredFormats = frameSource.SupportedFormats
-                        .OrderByDescending(f => f.Subtype.Equals("YUY2", StringComparison.OrdinalIgnoreCase) || f.Subtype.Equals("NV12", StringComparison.OrdinalIgnoreCase) ? 1 : 0)
-                        .ThenByDescending(f => f.VideoFormat.Width == 1280 && f.VideoFormat.Height == 720 ? 1 : 0)
-                        .ThenByDescending(f => f.VideoFormat.Width == 640 && f.VideoFormat.Height == 480 ? 1 : 0)
-                        .ThenByDescending(f => f.VideoFormat.Width)
-                        .ToList();
-
-                    var format = preferredFormats.FirstOrDefault();
-                    if (format != null)
-                    {
-                        try { await frameSource.SetFormatAsync(format); } catch { }
-                    }
+                    // Do NOT force a manual format override here! 
+                    // Devices like the Creative GestureCam output MJPG by default and attempting 
+                    // to force uncompressed NV12/YUY2 causes a black screen pipeline crash in WinUI3.
 
                     var mediaSource = Windows.Media.Core.MediaSource.CreateFromMediaFrameSource(frameSource);
 
@@ -349,7 +339,11 @@ namespace RobotControllerApp
             catch (Exception ex)
             {
                 Log($"[Webcam] Failed to start '{(_videoDevices?[index].Name ?? "?")}': {ex.Message}");
-                _mediaCapture = null;
+                if (_mediaCapture != null)
+                {
+                    try { _mediaCapture.Dispose(); } catch { }
+                    _mediaCapture = null;
+                }
             }
         }
 
@@ -652,15 +646,15 @@ namespace RobotControllerApp
                 client.Timeout = TimeSpan.FromSeconds(30);
 
                 // ── 1. DOWNLOAD TEST ──────────────────────────────────────────────────
-                // 25 MB streamed in chunks — avoids TCP slow-start skew and RAM spike.
-                // At 100 Mbps this takes ~2s; at 400 Mbps ~0.5s — both reliable ranges.
+                // Stream chunks to avoid TCP slow-start skew and RAM spike.
+                // Requesting 10MB to maintain reliable measurement without 30s timeouts.
                 try
                 {
                     long totalBytes = 0;
                     var sw = System.Diagnostics.Stopwatch.StartNew();
 
                     using var response = await client.GetAsync(
-                        "https://speed.cloudflare.com/__down?bytes=25000000",
+                        "https://speed.cloudflare.com/__down?bytes=10000000",
                         HttpCompletionOption.ResponseHeadersRead);
 
                     using var stream = await response.Content.ReadAsStreamAsync();
@@ -673,7 +667,11 @@ namespace RobotControllerApp
                     if (sw.Elapsed.TotalSeconds > 0)
                         downMbps = (totalBytes * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
                 }
-                catch { downMbps = -1; }
+                catch (Exception ex)
+                {
+                    downMbps = -1;
+                    Log($"[Network] Warn: Download speed test failed: {ex.Message}");
+                }
 
                 // ── 2. UPLOAD TEST ────────────────────────────────────────────────────
                 // 4 MB of random data — gives a reasonable signal on any connection.
@@ -690,7 +688,11 @@ namespace RobotControllerApp
                     if (resp.IsSuccessStatusCode && sw.Elapsed.TotalSeconds > 0)
                         upMbps = (upData.Length * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
                 }
-                catch { upMbps = -1; }
+                catch (Exception ex)
+                {
+                    upMbps = -1;
+                    Log($"[Network] Warn: Upload speed test failed: {ex.Message}");
+                }
 
                 DispatcherQueue.TryEnqueue(() =>
                 {
