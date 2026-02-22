@@ -38,6 +38,11 @@ namespace RobotControllerApp.Services
 
         private readonly ConcurrentDictionary<string, WebRtcManager> _webRtcManagers = new();
 
+        // One send-lock per connection — WebSocket.SendAsync throws if called concurrently
+        private readonly ConcurrentDictionary<string, SemaphoreSlim> _sendLocks = new();
+        private SemaphoreSlim SendLock(string key) =>
+            _sendLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
+
         public void SetWebRtcManager(string robotId, WebRtcManager webRtc)
         {
             _webRtcManagers[robotId] = webRtc;
@@ -80,29 +85,54 @@ namespace RobotControllerApp.Services
 
         public async Task SendToRobotClient(string robotId, string message)
         {
-            if (_robotClients.TryGetValue(robotId, out var ws) && ws.State == WebSocketState.Open)
+            if (!_robotClients.TryGetValue(robotId, out var ws) || ws.State != WebSocketState.Open)
+                return;
+
+            var sem = SendLock($"robot_{robotId}");
+            await sem.WaitAsync();
+            try
             {
-                var bytes = Encoding.UTF8.GetBytes(message);
-                await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+                if (ws.State == WebSocketState.Open)
+                {
+                    var bytes = Encoding.UTF8.GetBytes(message);
+                    await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+                }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ConnectionManager] SendToRobotClient error: {ex.Message}");
+            }
+            finally { sem.Release(); }
         }
 
         public async Task SendToUnityClient(string robotId, string message)
         {
-            // Try WebRTC DataChannel first (lower latency) — only if it is actually open
+            // Prefer WebRTC DataChannel when open (lower latency, no lock needed — SIPSorcery handles it)
             if (_webRtcManagers.TryGetValue(robotId, out var webRtc) && webRtc.IsDataChannelOpen)
             {
                 webRtc.SendData(message);
                 return;
             }
 
-            // Always fall back to WebSocket — this is the reliable path and is ALWAYS available
-            // when the Unity client is connected (Quest sees Hub).
-            if (_unityClients.TryGetValue(robotId, out var ws) && ws.State == WebSocketState.Open)
+            // WebSocket fallback — MUST be serialized: concurrent SendAsync throws InvalidOperationException
+            if (!_unityClients.TryGetValue(robotId, out var ws) || ws.State != WebSocketState.Open)
+                return;
+
+            var sem = SendLock($"unity_{robotId}");
+            await sem.WaitAsync();
+            try
             {
-                var bytes = Encoding.UTF8.GetBytes(message);
-                await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+                if (ws.State == WebSocketState.Open)
+                {
+                    var bytes = Encoding.UTF8.GetBytes(message);
+                    await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+                }
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[ConnectionManager] SendToUnityClient error: {ex.Message}");
+            }
+            finally { sem.Release(); }
         }
 
         public object GetStatus()

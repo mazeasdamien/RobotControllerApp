@@ -1,8 +1,9 @@
 # Visual Studio
 .vs/
 
-# Build outputs — NEVER commit these (causes file-lock "unable to unlink" errors on pull)
-[Bb]in/
+# Build outputs
+# Note: bin/ is intentionally NOT ignored so the built .exe is shared via Git.
+# To avoid pull conflicts on other machines, close the app before pulling.
 [Oo]bj/
 
 # Visual Studio artifacts

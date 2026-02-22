@@ -306,6 +306,15 @@ namespace RobotControllerApp.Services
                     }
 
                     // Relay to Unity client
+                    // ─── IMPORTANT: Camera frames are NOT forwarded via WebSocket ───
+                    // Each JPEG frame is 50–200 KB of base64. At 10 FPS that is ~2 MB/s
+                    // which completely saturates the WebSocket and blocks all joint state
+                    // and command messages. Camera is served via the /image HTTP endpoint.
+                    if (message.Contains("compressed_video_stream", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue; // Skip — camera is polled by Quest via HTTP /image
+                    }
+
                     if (message.Contains("joint_states") || message.Contains("robot_state"))
                     {
                         Log($"[Hub] ⬅️ Robot state → Quest: {message.Substring(0, Math.Min(60, message.Length))}...");
