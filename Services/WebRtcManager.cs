@@ -16,6 +16,10 @@ namespace RobotControllerApp.Services
         public event Action<string>? OnMessageReceived;
         public event Action<bool>? OnConnectionStateChanged;
 
+        /// <summary>Returns true only when the WebRTC DataChannel is fully open and ready.</summary>
+        public bool IsDataChannelOpen =>
+            _dataChannel != null && _dataChannel.readyState == RTCDataChannelState.open;
+
         public async Task InitializeAndOffer()
         {
             RTCConfiguration config = new RTCConfiguration

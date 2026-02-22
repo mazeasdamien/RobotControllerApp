@@ -89,11 +89,16 @@ namespace RobotControllerApp.Services
 
         public async Task SendToUnityClient(string robotId, string message)
         {
-            if (_webRtcManagers.TryGetValue(robotId, out var webRtc))
+            // Try WebRTC DataChannel first (lower latency) — only if it is actually open
+            if (_webRtcManagers.TryGetValue(robotId, out var webRtc) && webRtc.IsDataChannelOpen)
             {
                 webRtc.SendData(message);
+                return;
             }
-            else if (_unityClients.TryGetValue(robotId, out var ws) && ws.State == WebSocketState.Open)
+
+            // Always fall back to WebSocket — this is the reliable path and is ALWAYS available
+            // when the Unity client is connected (Quest sees Hub).
+            if (_unityClients.TryGetValue(robotId, out var ws) && ws.State == WebSocketState.Open)
             {
                 var bytes = Encoding.UTF8.GetBytes(message);
                 await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
