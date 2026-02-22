@@ -75,8 +75,6 @@ namespace RobotControllerApp
 
             // Initialize Settings UI values
             RelayPortInput.Text = _settings.RelayPort.ToString();
-            PublicUrlInput.Text = _settings.PublicUrl;
-            ExpertIpInput.Text = _settings.ExpertIp;
             RobotIpInput.Text = _settings.RobotIp;
             Robot2IpInput.Text = _settings.Robot2Ip;
 
@@ -546,12 +544,20 @@ namespace RobotControllerApp
             if (result == ContentDialogResult.Primary)
             {
                 Log("Stopping services...");
-                await _robotBridge.StopAsync();
-                await _relayServer.StopAsync();
+                try
+                {
+                    await Task.WhenAny(
+                        Task.WhenAll(_robotBridge.StopAsync(), _relayServer.StopAsync()),
+                        Task.Delay(2000) // Force proceed after 2 seconds
+                    );
+                }
+                catch { }
 
                 // Remove handler to avoid loop
                 sender.Closing -= AppWindow_Closing;
-                this.Close();
+
+                // Force exit to ensure no phantom process locks the port
+                Environment.Exit(0);
             }
         }
 
@@ -622,10 +628,6 @@ namespace RobotControllerApp
                     _relayServer.Port = port;
                 }
 
-                _settings.PublicUrl = PublicUrlInput.Text.Trim();
-                _relayServer.PublicUrl = _settings.PublicUrl;
-
-                _settings.ExpertIp = ExpertIpInput.Text.Trim();
                 _settings.RobotIp = RobotIpInput.Text.Trim();
                 _settings.Robot2Ip = Robot2IpInput.Text.Trim();
                 _settings.Save();
