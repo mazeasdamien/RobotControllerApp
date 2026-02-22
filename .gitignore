@@ -2,7 +2,6 @@
 .vs/
 
 # Build outputs — NEVER commit these (causes file-lock "unable to unlink" errors on pull)
-[Bb]in/
 [Oo]bj/
 
 # Visual Studio artifacts

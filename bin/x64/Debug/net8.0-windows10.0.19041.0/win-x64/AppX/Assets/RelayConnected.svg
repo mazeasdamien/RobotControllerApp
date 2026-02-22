@@ -1,0 +1,260 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
+    <defs>
+        <!-- Glow effects for data, lights, and tunnel portal -->
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur1" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur2" />
+            <feMerge>
+                <feMergeNode in="blur1" />
+                <feMergeNode in="blur2" />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+
+        <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
+            <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+
+        <!-- Data perspective road gradient -->
+        <linearGradient id="roadFade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#00CC6A" stop-opacity="0" />
+            <stop offset="40%" stop-color="#00CC6A" stop-opacity="0.05" />
+            <stop offset="100%" stop-color="#00CC6A" stop-opacity="0.25" />
+        </linearGradient>
+
+        <!-- Base Data Packet Definition -->
+        <g id="data-packet">
+            <polygon points="0,-12 12,0 0,12 -12,0" fill="#00CC6A" filter="url(#glow)"/>
+            <polygon points="0,-6 6,0 0,6 -6,0" fill="#FFFFFF" />
+        </g>
+    </defs>
+
+    <!-- 1. PLAIN SOLID BACKGROUND -->
+    <rect width="100%" height="100%" fill="#1F1F1F" />
+
+    <!-- 2. CENTRAL TUNNEL (1-Point Perspective Portal) -->
+    <g id="central-tunnel">
+        <!-- Static depth rings (charcoal to black) -->
+        <circle cx="400" cy="220" r="180" fill="#2A2E35" opacity="0.3"/>
+        <circle cx="400" cy="220" r="140" fill="#1E2228" opacity="0.6"/>
+        <circle cx="400" cy="220" r="90" fill="#14171D" />
+        <circle cx="400" cy="220" r="45" fill="#0A0B0E" />
+
+        <!-- Center Portal Core -->
+        <circle cx="400" cy="220" r="15" fill="#000000" />
+        <circle cx="400" cy="220" r="5" fill="#FFFFFF" filter="url(#glow)">
+            <animate attributeName="opacity" values="0.7; 1; 0.7" dur="2s" repeatCount="indefinite" />
+        </circle>
+
+        <!-- Expanding glowing rings (Looping Tunnel Effect) -->
+        <circle cx="400" cy="220" r="15" fill="none" stroke="#00CC6A" stroke-width="2" filter="url(#softGlow)">
+            <animate attributeName="r" values="15; 180" dur="2.4s" repeatCount="indefinite" />
+            <animate attributeName="stroke-width" values="1; 5" dur="2.4s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="1; 0" dur="2.4s" repeatCount="indefinite" />
+        </circle>
+        <circle cx="400" cy="220" r="15" fill="none" stroke="#00CC6A" stroke-width="2" filter="url(#softGlow)">
+            <animate attributeName="r" values="15; 180" dur="2.4s" begin="0.8s" repeatCount="indefinite" />
+            <animate attributeName="stroke-width" values="1; 5" dur="2.4s" begin="0.8s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="1; 0" dur="2.4s" begin="0.8s" repeatCount="indefinite" />
+        </circle>
+        <circle cx="400" cy="220" r="15" fill="none" stroke="#00CC6A" stroke-width="2" filter="url(#softGlow)">
+            <animate attributeName="r" values="15; 180" dur="2.4s" begin="1.6s" repeatCount="indefinite" />
+            <animate attributeName="stroke-width" values="1; 5" dur="2.4s" begin="1.6s" repeatCount="indefinite" />
+            <animate attributeName="opacity" values="1; 0" dur="2.4s" begin="1.6s" repeatCount="indefinite" />
+        </circle>
+    </g>
+
+    <!-- 3. DATA STREAM ROAD (Radiating Perspective) -->
+    <g id="data-road">
+        <!-- Perspective Floor Base -->
+        <polygon points="390,220 410,220 700,650 100,650" fill="url(#roadFade)" />
+
+        <!-- Radiating Connection Lines -->
+        <g stroke="#66FFAA" stroke-width="2" opacity="0.6">
+            <line x1="400" y1="220" x2="140" y2="650" />
+            <line x1="400" y1="220" x2="220" y2="650" />
+            <line x1="400" y1="220" x2="310" y2="650" />
+            <line x1="400" y1="220" x2="400" y2="650" stroke="#00CC6A" stroke-width="4" filter="url(#glow)" />
+            <line x1="400" y1="220" x2="490" y2="650" />
+            <line x1="400" y1="220" x2="580" y2="650" />
+            <line x1="400" y1="220" x2="660" y2="650" />
+        </g>
+
+        <!-- Flowing Data Packets (Scaling towards viewer) -->
+        <!-- Packet 1 (Left lane) -->
+        <g>
+            <animateMotion dur="2s" repeatCount="indefinite" path="M 400 220 L 220 650" />
+            <g>
+                <animateTransform attributeName="transform" type="scale" values="0; 1.5" dur="2s" repeatCount="indefinite" />
+                <use href="#data-packet" />
+            </g>
+            <animate attributeName="opacity" values="0; 1; 1; 0" keyTimes="0; 0.1; 0.8; 1" dur="2s" repeatCount="indefinite" />
+        </g>
+
+        <!-- Packet 2 (Right lane) -->
+        <g>
+            <animateMotion dur="2.5s" begin="0.5s" repeatCount="indefinite" path="M 400 220 L 580 650" />
+            <g>
+                <animateTransform attributeName="transform" type="scale" values="0; 1.8" dur="2.5s" begin="0.5s" repeatCount="indefinite" />
+                <use href="#data-packet" />
+            </g>
+            <animate attributeName="opacity" values="0; 1; 1; 0" keyTimes="0; 0.1; 0.8; 1" dur="2.5s" begin="0.5s" repeatCount="indefinite" />
+        </g>
+
+        <!-- Packet 3 (Center Main Stream) -->
+        <g>
+            <animateMotion dur="1.8s" begin="1.2s" repeatCount="indefinite" path="M 400 220 L 400 650" />
+            <g>
+                <animateTransform attributeName="transform" type="scale" values="0; 2.5" dur="1.8s" begin="1.2s" repeatCount="indefinite" />
+                <use href="#data-packet" />
+            </g>
+            <animate attributeName="opacity" values="0; 1; 1; 0" keyTimes="0; 0.1; 0.8; 1" dur="1.8s" begin="1.2s" repeatCount="indefinite" />
+        </g>
+
+        <!-- Packet 4 (Mid-Left lane) -->
+        <g>
+            <animateMotion dur="2.2s" begin="1.7s" repeatCount="indefinite" path="M 400 220 L 310 650" />
+            <g>
+                <animateTransform attributeName="transform" type="scale" values="0; 1.6" dur="2.2s" begin="1.7s" repeatCount="indefinite" />
+                <use href="#data-packet" />
+            </g>
+            <animate attributeName="opacity" values="0; 1; 1; 0" keyTimes="0; 0.1; 0.8; 1" dur="2.2s" begin="1.7s" repeatCount="indefinite" />
+        </g>
+    </g>
+
+    <!-- 4. PERSPECTIVE SHADOWS -->
+    <g id="shadows" fill="#131313">
+        <!-- Server shadow -->
+        <polygon points="60,480 180,480 246,402 162,402" />
+        <!-- Robot base shadow -->
+        <polygon points="620,480 740,480 638,402 554,402" />
+    </g>
+
+    <!-- 5. LEFT: SERVER TOWER (1-Point Perspective) -->
+    <g id="server-tower">
+        <!-- Side Face (Receding to Vanishing Point 400,220) -->
+        <!-- Front: 180,100 to 180,480 | Back: 246,136 to 246,402 -->
+        <polygon points="180,100 246,136 246,402 180,480" fill="#1A1D24" />
+
+        <!-- Side Panel Details -->
+        <polygon points="190,130 236,155 236,180 190,160" fill="#2A2E35" />
+        <polygon points="190,180 236,200 236,380 190,440" fill="#14171D" />
+
+        <!-- Glowing Data Cable routing into tunnel -->
+        <path d="M 230 380 C 270 410, 310 420, 390 230" fill="none" stroke="#00CC6A" stroke-width="2" stroke-dasharray="6 6" opacity="0.6">
+            <animate attributeName="stroke-dashoffset" from="12" to="0" dur="0.5s" repeatCount="indefinite" />
+        </path>
+
+        <!-- Front Face -->
+        <rect x="60" y="100" width="120" height="380" rx="4" fill="#2A2E35" />
+
+        <!-- Server Panel Cutouts -->
+        <rect x="70" y="115" width="100" height="40" rx="2" fill="#1E2228" />
+        <!-- Blinking Node Lights -->
+        <circle cx="85" cy="135" r="5" fill="#00CC6A" filter="url(#glow)">
+            <animate attributeName="opacity" values="0.3; 1; 0.3" dur="1s" repeatCount="indefinite" />
+        </circle>
+        <circle cx="105" cy="135" r="5" fill="#66FFAA" filter="url(#glow)">
+            <animate attributeName="opacity" values="1; 0.2; 1" dur="1.5s" repeatCount="indefinite" />
+        </circle>
+
+        <!-- Server Blades -->
+        <rect x="70" y="165" width="100" height="25" fill="#1A1D24" />
+        <rect x="70" y="195" width="100" height="25" fill="#1A1D24" />
+        <rect x="70" y="225" width="100" height="25" fill="#1A1D24" />
+        <!-- Blade Activity LEDs -->
+        <rect x="155" y="172" width="6" height="10" fill="#00CC6A" rx="1">
+            <animate attributeName="opacity" values="0.1; 1; 0.1" dur="0.4s" repeatCount="indefinite" />
+        </rect>
+        <rect x="155" y="202" width="6" height="10" fill="#00CC6A" rx="1">
+            <animate attributeName="opacity" values="0.1; 1; 0.1" dur="0.7s" begin="0.2s" repeatCount="indefinite" />
+        </rect>
+        <rect x="155" y="232" width="6" height="10" fill="#00CC6A" rx="1">
+            <animate attributeName="opacity" values="0.1; 1; 0.1" dur="0.5s" begin="0.4s" repeatCount="indefinite" />
+        </rect>
+
+        <!-- Main Databank Box -->
+        <rect x="70" y="270" width="100" height="110" rx="2" fill="#14171D" />
+        <path d="M 80 280 L 80 370 M 90 280 L 90 370 M 100 280 L 100 370 M 110 280 L 110 370 M 120 280 L 120 370 M 130 280 L 130 370 M 140 280 L 140 370 M 150 280 L 150 370 M 160 280 L 160 370" stroke="#1A1D24" stroke-width="4" stroke-linecap="round"/>
+
+        <!-- Bottom Status Unit -->
+        <rect x="70" y="395" width="100" height="70" rx="3" fill="#1E2228" />
+        <circle cx="120" cy="430" r="18" fill="none" stroke="#353A43" stroke-width="4" />
+        <!-- Spinning Loader Ring -->
+        <path d="M 120 412 A 18 18 0 0 1 138 430" fill="none" stroke="#00CC6A" stroke-width="4" filter="url(#glow)">
+            <animateTransform attributeName="transform" type="rotate" from="0 120 430" to="360 120 430" dur="2s" repeatCount="indefinite" />
+        </path>
+        <circle cx="120" cy="430" r="6" fill="#FFFFFF" filter="url(#glow)" />
+    </g>
+
+    <!-- 6. RIGHT: ROBOTIC ARM (1-Point Perspective Base) -->
+    <g id="robot-station">
+        <!-- Base Side Face (Receding to Vanishing Point) -->
+        <!-- Front: 620,280 to 620,480 | Back: 554,262 to 554,402 -->
+        <polygon points="620,280 554,262 554,402 620,480" fill="#1A1D24" />
+
+        <!-- Base Side Details -->
+        <polygon points="610,310 564,295 564,390 610,450" fill="#14171D" />
+
+        <!-- Base Front Face -->
+        <rect x="620" y="280" width="120" height="200" rx="4" fill="#2A2E35" />
+        <rect x="635" y="300" width="90" height="20" rx="2" fill="#1E2228" />
+        <rect x="635" y="330" width="90" height="130" rx="2" fill="#1E2228" />
+        <!-- Warning Stripes -->
+        <path d="M 640 450 L 660 430 M 660 450 L 680 430 M 680 450 L 700 430 M 700 450 L 720 430" stroke="#00CC6A" stroke-width="4" opacity="0.8" />
+
+        <!-- Arm Mount Point on Side Face -->
+        <ellipse cx="587" cy="332" rx="14" ry="24" fill="#353A43" />
+        <ellipse cx="587" cy="332" rx="8" ry="14" fill="#1E2228" />
+
+        <!-- THE ROBOTIC ARM -->
+        <g id="articulated-arm">
+            <!-- Upper Arm (Fixed to mount, reaching forward/left) -->
+            <path d="M 587 332 L 490 250" stroke="#2A2E35" stroke-width="22" stroke-linecap="round" />
+            <path d="M 587 332 L 490 250" stroke="#424854" stroke-width="16" stroke-linecap="round" />
+
+            <!-- Elbow Joint -->
+            <circle cx="490" cy="250" r="18" fill="#1E2228" />
+            <circle cx="490" cy="250" r="10" fill="#2A2E35" stroke="#00CC6A" stroke-width="2" filter="url(#softGlow)" />
+
+            <!-- Lower Arm & Claw (Animated rotation scanning the road) -->
+            <g>
+                <animateTransform attributeName="transform" type="rotate" values="-15 490 250; 12 490 250; -15 490 250" dur="4s" repeatCount="indefinite" ease="ease-in-out" />
+
+                <!-- Lower Arm Bone -->
+                <path d="M 490 250 L 440 370" stroke="#2A2E35" stroke-width="18" stroke-linecap="round" />
+                <path d="M 490 250 L 440 370" stroke="#353A43" stroke-width="12" stroke-linecap="round" />
+
+                <!-- Power Cable on Lower Arm -->
+                <path d="M 480 260 Q 450 310 445 360" fill="none" stroke="#00CC6A" stroke-width="3" filter="url(#softGlow)" />
+
+                <!-- Wrist Joint -->
+                <circle cx="440" cy="370" r="14" fill="#1E2228" />
+                <circle cx="440" cy="370" r="6" fill="#00CC6A" />
+
+                <!-- Claw Housing -->
+                <rect x="415" y="370" width="50" height="15" rx="3" fill="#2A2E35" />
+                <rect x="420" y="380" width="40" height="8" fill="#14171D" />
+
+                <!-- Vibrant Safety Orange Pincers -> GREEN -->
+                <!-- Left Pincer -->
+                <path d="M 425 385 L 420 420 L 432 415 Z" fill="#00CC6A" filter="url(#softGlow)" />
+                <!-- Right Pincer -->
+                <path d="M 455 385 L 460 420 L 448 415 Z" fill="#66FFAA" filter="url(#softGlow)" />
+
+                <!-- Center Scanner Laser interacting with Data Stream -->
+                <circle cx="440" cy="385" r="4" fill="#FFFFFF" filter="url(#glow)" />
+                <path d="M 440 385 L 420 450 L 460 450 Z" fill="url(#roadFade)" opacity="0.8">
+                    <animate attributeName="opacity" values="0.3; 0.8; 0.3" dur="2s" repeatCount="indefinite" />
+                </path>
+            </g>
+        </g>
+    </g>
+
+    <!-- Overlay Vignette to focus the eye on the center -->
+    <rect width="100%" height="100%" fill="none" stroke="#1F1F1F" stroke-width="40" opacity="0.6" />
+</svg>
