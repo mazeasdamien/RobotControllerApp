@@ -317,7 +317,7 @@ namespace RobotControllerApp.Services
 
                     if (message.Contains("joint_states") || message.Contains("robot_state"))
                     {
-                        Log($"[Hub] ⬅️ Robot state → Quest: {message.Substring(0, Math.Min(60, message.Length))}...");
+                        // Log($"[Hub] ⬅️ Robot state → Quest: {message.Substring(0, Math.Min(60, message.Length))}...");
                     }
                     await manager.SendToUnityClient(robotId, message);
                 }
@@ -474,9 +474,9 @@ namespace RobotControllerApp.Services
 
                     // Relay to Robot client
                     // Log IK / trajectory commands specifically for diagnostics
-                    if (message.Contains("\"op\":\"publish\"") || message.Contains("\"op\":\"call_service\""))
+                    if (message.Contains("publish") && !message.Contains("/joint_states") && !message.Contains("camera"))
                     {
-                        Log($"[Hub] ➡️ Command from Quest → Robot: {message.Substring(0, Math.Min(80, message.Length))}...");
+                        // Log($"[Hub] ➡️ Command from Quest → Robot: {message.Substring(0, Math.Min(80, message.Length))}...");
                     }
                     await manager.SendToRobotClient(robotId, message);
                 }

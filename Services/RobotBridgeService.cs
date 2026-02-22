@@ -165,7 +165,7 @@ namespace RobotControllerApp.Services
 
                         if (message.Contains("publish") || message.Contains("call_service"))
                         {
-                            Log("[Bridge] 📥 Received command from Unity, forwarding to ROS...");
+                            // Log("[Bridge] 📥 Received command from Unity, forwarding to ROS...");
                         }
                         await SendToRobot(message); // Forward to Robot
                     }
