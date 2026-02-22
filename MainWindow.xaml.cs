@@ -899,6 +899,12 @@ namespace RobotControllerApp
             }
         }
 
+        // ─── Log state ─────────────────────────────────────────────────────────
+        private string _lastLogMessage = string.Empty;
+        private int _lastLogCount = 1;
+        private Run? _lastLogRun = null;   // The Run we update in-place for stacking
+        private bool _isUserScrolledUp = false; // True when user has scrolled away from bottom
+
         private void Log(string message)
         {
             this.DispatcherQueue.TryEnqueue(() =>
@@ -918,40 +924,61 @@ namespace RobotControllerApp
                 else if (message.Contains("[Bridge]"))
                     color = Microsoft.UI.Colors.Yellow;
 
-                var p = new Paragraph();
-                var run = new Run() { Text = $"[{DateTime.Now:HH:mm:ss}] {message}" };
-                run.Foreground = new SolidColorBrush(color);
-                p.Inlines.Add(run);
-
-                ConsoleLog.Blocks.Add(p);
-
-                // Keep buffer size manageable
-                if (ConsoleLog.Blocks.Count > 200) ConsoleLog.Blocks.RemoveAt(0);
-
-                // Auto-scroll to bottom
-                var scrollViewer = FindVisualChild<ScrollViewer>(ConsoleLog);
-                if (scrollViewer != null)
+                // ── Stacking: identical consecutive messages update in-place ────
+                if (message == _lastLogMessage && _lastLogRun != null)
                 {
-                    scrollViewer.UpdateLayout();
-                    scrollViewer.ChangeView(null, scrollViewer.ScrollableHeight, null);
+                    _lastLogCount++;
+                    // Strip old counter suffix and re-apply
+                    string baseText = $"[{DateTime.Now:HH:mm:ss}] {message}";
+                    _lastLogRun.Text = $"{baseText}  ×{_lastLogCount}";
+                }
+                else
+                {
+                    // New unique message — create a fresh paragraph
+                    _lastLogMessage = message;
+                    _lastLogCount = 1;
+
+                    var run = new Run()
+                    {
+                        Text = $"[{DateTime.Now:HH:mm:ss}] {message}",
+                        Foreground = new SolidColorBrush(color)
+                    };
+                    _lastLogRun = run;
+
+                    var p = new Paragraph();
+                    p.Inlines.Add(run);
+                    ConsoleLog.Blocks.Add(p);
+
+                    // Keep buffer size manageable
+                    if (ConsoleLog.Blocks.Count > 300) ConsoleLog.Blocks.RemoveAt(0);
+                }
+
+                // ── Auto-scroll: only scroll if user is already at the bottom ──
+                if (!_isUserScrolledUp)
+                {
+                    LogScroll.UpdateLayout();
+                    LogScroll.ChangeView(null, LogScroll.ScrollableHeight, null, true);
                 }
             });
         }
 
-        private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        /// <summary>Detected when user scrolls the log manually.</summary>
+        private void LogScroll_ViewChanged(object sender, ScrollViewerViewChangedEventArgs e)
         {
-            if (parent == null) return null;
-            DependencyObject? current = parent;
+            if (LogScroll == null) return;
+            // Consider "at bottom" if within 40px of the scrollable end
+            double distanceFromBottom = LogScroll.ScrollableHeight - LogScroll.VerticalOffset;
+            _isUserScrolledUp = distanceFromBottom > 40;
+            ScrollToBottomBtn.Visibility = _isUserScrolledUp ? Visibility.Visible : Visibility.Collapsed;
+        }
 
-            while (current != null)
-            {
-                current = VisualTreeHelper.GetParent(current);
-                if (current is T match)
-                {
-                    return match;
-                }
-            }
-            return null;
+        /// <summary>Jump-to-bottom button click — snaps log to latest entry.</summary>
+        private void ScrollToBottomBtn_Click(object sender, RoutedEventArgs e)
+        {
+            _isUserScrolledUp = false;
+            ScrollToBottomBtn.Visibility = Visibility.Collapsed;
+            LogScroll.UpdateLayout();
+            LogScroll.ChangeView(null, LogScroll.ScrollableHeight, null, false);
         }
 
 
