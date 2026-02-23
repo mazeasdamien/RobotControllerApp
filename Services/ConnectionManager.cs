@@ -37,22 +37,11 @@ namespace RobotControllerApp.Services
             _unityClients.TryRemove(robotId, out _);
         }
 
-        private readonly ConcurrentDictionary<string, WebRtcManager> _webRtcManagers = new();
 
         // One send-lock per connection — WebSocket.SendAsync throws if called concurrently
         private readonly ConcurrentDictionary<string, SemaphoreSlim> _sendLocks = new();
         private SemaphoreSlim SendLock(string key) =>
             _sendLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
-
-        public void SetWebRtcManager(string robotId, WebRtcManager webRtc)
-        {
-            _webRtcManagers[robotId] = webRtc;
-        }
-
-        public void RemoveWebRtcManager(string robotId)
-        {
-            _webRtcManagers.TryRemove(robotId, out _);
-        }
 
         public void UpdateLatestImage(byte[] image)
         {
@@ -118,14 +107,7 @@ namespace RobotControllerApp.Services
 
         public async Task SendToUnityClient(string robotId, string message)
         {
-            // Prefer WebRTC DataChannel when open (lower latency, no lock needed — SIPSorcery handles it)
-            if (_webRtcManagers.TryGetValue(robotId, out var webRtc) && webRtc.IsDataChannelOpen)
-            {
-                webRtc.SendData(message);
-                return;
-            }
-
-            // WebSocket fallback — MUST be serialized: concurrent SendAsync throws InvalidOperationException
+            // WebSocket send — MUST be serialized: concurrent SendAsync throws InvalidOperationException
             if (!_unityClients.TryGetValue(robotId, out var ws) || ws.State != WebSocketState.Open)
                 return;
 

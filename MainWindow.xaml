@@ -26,7 +26,7 @@
 
                 <NavigationViewItem Content="Telemetry" Tag="telemetry">
                     <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="FourBars"/>
+                        <FontIcon Glyph="&#xE9D9;"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
@@ -102,15 +102,10 @@
 
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
-                                                <FontIcon x:Name="RelayIcon" Glyph="&#xE774;" FontSize="24" Foreground="{StaticResource Brush.Text.Muted}"/>
+                                                <FontIcon x:Name="RelayIcon" Glyph="&#xE77B;" FontSize="24" Foreground="{StaticResource Brush.Text.Muted}"/>
                                                 <TextBlock Text="REMOTE EXPERT" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
-                                            <TextBlock x:Name="RelayStatusText" Text="Listening..." Style="{StaticResource Text.Caption}" Margin="0,8,0,0"/>
-                                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-                                                <TextBlock x:Name="RelayActiveText" Text="STANDBY" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}"/>
-                                                <TextBlock Text="|" Opacity="0.3" Visibility="Collapsed"/>
-                                                <TextBlock x:Name="RelayLatencyText" Text="--" Opacity="0.7" FontSize="12" VerticalAlignment="Center" Visibility="Collapsed"/>
-                                            </StackPanel>
+                                            <TextBlock x:Name="RelayActiveText" Text="WAITING" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" Margin="0,10,0,0"/>
                                         </StackPanel>
 
                                         <!-- Modern Status Indicator -->
@@ -121,7 +116,7 @@
                                                 </Ellipse.RenderTransform>
                                             </Ellipse>
                                             <Ellipse x:Name="RelayHaloInner" Width="36" Height="36" Stroke="{Binding ElementName=RelayActiveText, Path=Foreground}" StrokeThickness="2" Opacity="0.4"/>
-                                            <FontIcon x:Name="RelayHaloIcon" Glyph="&#xE813;" FontSize="20" Foreground="{Binding ElementName=RelayActiveText, Path=Foreground}"/>
+                                            <FontIcon x:Name="RelayHaloIcon" Glyph="&#xE701;" FontSize="18" Foreground="{Binding ElementName=RelayActiveText, Path=Foreground}"/>
                                         </Grid>
                                     </Grid>
                                 </Border>
@@ -136,17 +131,10 @@
 
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
-                                                <FontIcon x:Name="Robot1Icon" Glyph="&#xE99A;" FontSize="28" Foreground="{StaticResource Brush.Status.Warning}"/>
+                                                <FontIcon x:Name="Robot1Icon" Glyph="&#xEBC5;" FontSize="26" Foreground="{StaticResource Brush.Status.Warning}"/>
                                                 <TextBlock Text="ROBOT 1" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
-                                            <TextBlock x:Name="RobotStatusText" Text="Connecting..." Style="{StaticResource Text.Caption}" Margin="0,8,0,0"/>
-                                            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
-                                                <TextBlock x:Name="Robot1LatencyText" Text="--" Opacity="0.7" FontSize="12" VerticalAlignment="Center" Visibility="Collapsed"/>
-                                                <StackPanel x:Name="RobotConnectingState" Orientation="Horizontal" Spacing="8">
-                                                    <ProgressRing IsActive="True" Width="14" Height="14" Foreground="{StaticResource Brush.Primary}"/>
-                                                    <TextBlock Text="Searching..." FontSize="11" VerticalAlignment="Center" Opacity="0.6"/>
-                                                </StackPanel>
-                                            </StackPanel>
+                                            <TextBlock x:Name="Robot1ActiveText" Text="WAITING" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" Margin="0,10,0,0"/>
                                         </StackPanel>
 
                                         <!-- Modern Status Indicator -->
@@ -157,7 +145,7 @@
                                                 </Ellipse.RenderTransform>
                                             </Ellipse>
                                             <Ellipse x:Name="Robot1HaloInner" Width="36" Height="36" Stroke="{Binding ElementName=Robot1Icon, Path=Foreground}" StrokeThickness="2" Opacity="0.4"/>
-                                            <FontIcon Glyph="&#xEBC5;" FontSize="20" Foreground="{Binding ElementName=Robot1Icon, Path=Foreground}"/>
+                                            <FontIcon Glyph="&#xE9D9;" FontSize="18" Foreground="{Binding ElementName=Robot1Icon, Path=Foreground}"/>
                                         </Grid>
                                     </Grid>
                                 </Border>
@@ -172,17 +160,10 @@
 
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
-                                                <FontIcon x:Name="Robot2Icon" Glyph="&#xE99A;" FontSize="28" Foreground="{StaticResource Brush.Text.Primary}"/>
+                                                <FontIcon x:Name="Robot2Icon" Glyph="&#xEBC5;" FontSize="26" Foreground="{StaticResource Brush.Text.Primary}"/>
                                                 <TextBlock Text="ROBOT 2" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
-                                            <TextBlock x:Name="Robot2StatusText" Text="Offline" Style="{StaticResource Text.Caption}" Margin="0,8,0,0"/>
-                                            <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,8,0,0">
-                                                <TextBlock x:Name="Robot2LatencyText" Text="--" Opacity="0.7" FontSize="12" VerticalAlignment="Center" Visibility="Collapsed"/>
-                                                <StackPanel x:Name="Robot2ConnectingState" Orientation="Horizontal" Spacing="8">
-                                                    <ProgressRing IsActive="True" Width="14" Height="14" Foreground="{StaticResource Brush.Primary}"/>
-                                                    <TextBlock Text="Searching..." FontSize="11" VerticalAlignment="Center" Opacity="0.6"/>
-                                                </StackPanel>
-                                            </StackPanel>
+                                            <TextBlock x:Name="Robot2ActiveText" Text="WAITING" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" Margin="0,10,0,0"/>
                                         </StackPanel>
 
                                         <!-- Modern Status Indicator -->
@@ -193,7 +174,7 @@
                                                 </Ellipse.RenderTransform>
                                             </Ellipse>
                                             <Ellipse x:Name="Robot2HaloInner" Width="36" Height="36" Stroke="{Binding ElementName=Robot2Icon, Path=Foreground}" StrokeThickness="2" Opacity="0.4"/>
-                                            <FontIcon Glyph="&#xEBC5;" FontSize="20" Foreground="{Binding ElementName=Robot2Icon, Path=Foreground}"/>
+                                            <FontIcon Glyph="&#xE9D9;" FontSize="18" Foreground="{Binding ElementName=Robot2Icon, Path=Foreground}"/>
                                         </Grid>
                                     </Grid>
                                 </Border>
@@ -606,19 +587,74 @@
                                             </Grid>
                                         </StackPanel>
 
-                                        <!-- Speed Graph -->
-                                        <Grid Grid.Column="1">
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="Auto"/>
-                                                <RowDefinition Height="*"/>
-                                            </Grid.RowDefinitions>
-                                            <TextBlock Text="Speed History (Mbps)" FontSize="12" Opacity="0.6" Margin="0,0,0,8"/>
-                                            <Border Grid.Row="1" Height="100" Background="#08FFFFFF" CornerRadius="12" BorderBrush="#15FFFFFF" BorderThickness="1">
-                                                <Canvas x:Name="SpeedCanvas">
-                                                    <Polyline x:Name="SpeedPath" Stroke="{StaticResource Brush.Primary}" StrokeThickness="2" StrokeLineJoin="Round"/>
-                                                    <Polyline x:Name="UploadPath" Stroke="#D279FF" StrokeThickness="2" StrokeLineJoin="Round" StrokeDashArray="2,1"/>
-                                                </Canvas>
-                                            </Border>
+                                        <!-- Topology Nodes (replaces Speed History graph) -->
+                                        <Grid Grid.Column="1" ColumnSpacing="16">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+
+                                            <!-- Hub Node -->
+                                            <StackPanel Grid.Column="0" Spacing="8">
+                                                <TextBlock Text="LOCAL HUB" FontSize="10" FontWeight="Bold" Opacity="0.5"/>
+                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="12" CornerRadius="10">
+                                                    <StackPanel Spacing="5">
+                                                        <TextBlock x:Name="HubIpText" Text="Checking..." FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                        <TextBlock x:Name="HubLocText" Text="Locating Hub..." FontSize="10" Opacity="0.5" TextWrapping="Wrap"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,3,0,0">
+                                                            <Ellipse Width="6" Height="6" Fill="#00CC6A"/>
+                                                            <TextBlock x:Name="HubRelayText" Text="CONNECTED" FontSize="10" FontWeight="SemiBold" Foreground="#00CC6A"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- Expert Node -->
+                                            <StackPanel Grid.Column="1" Spacing="8">
+                                                <TextBlock Text="REMOTE EXPERT" FontSize="10" FontWeight="Bold" Opacity="0.5"/>
+                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="12" CornerRadius="10">
+                                                    <StackPanel Spacing="5">
+                                                        <TextBlock x:Name="QuestIpText" Text="Searching..." FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                        <TextBlock x:Name="QuestLocText" Text="--" FontSize="10" Opacity="0.5" TextWrapping="Wrap"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,3,0,0">
+                                                            <Ellipse x:Name="QuestRelayDot" Width="6" Height="6" Fill="#808080"/>
+                                                            <TextBlock x:Name="QuestRelayText" Text="OFFLINE" FontSize="10" FontWeight="SemiBold" Foreground="#808080"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- Robot 1 Node -->
+                                            <StackPanel Grid.Column="2" Spacing="8">
+                                                <TextBlock Text="ROBOT 1" FontSize="10" FontWeight="Bold" Opacity="0.5"/>
+                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="12" CornerRadius="10">
+                                                    <StackPanel Spacing="5">
+                                                        <TextBlock x:Name="R1IpText" Text="Disconnected" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                        <TextBlock x:Name="R1LocText" Text="LAN / Ethernet" FontSize="10" Opacity="0.5"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,3,0,0">
+                                                            <Ellipse x:Name="R1RelayDot" Width="6" Height="6" Fill="#808080"/>
+                                                            <TextBlock x:Name="R1RelayText" Text="OFFLINE" FontSize="10" FontWeight="SemiBold" Foreground="#808080"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- Robot 2 Node -->
+                                            <StackPanel Grid.Column="3" Spacing="8">
+                                                <TextBlock Text="ROBOT 2" FontSize="10" FontWeight="Bold" Opacity="0.5"/>
+                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="12" CornerRadius="10">
+                                                    <StackPanel Spacing="5">
+                                                        <TextBlock x:Name="R2IpText" Text="Offline" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                        <TextBlock x:Name="R2LocText" Text="N/A" FontSize="10" Opacity="0.5"/>
+                                                        <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,3,0,0">
+                                                            <Ellipse x:Name="R2RelayDot" Width="6" Height="6" Fill="#808080"/>
+                                                            <TextBlock x:Name="R2RelayText" Text="OFFLINE" FontSize="10" FontWeight="SemiBold" Foreground="#808080"/>
+                                                        </StackPanel>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
                                         </Grid>
                                     </Grid>
                                 </Border>
@@ -652,9 +688,9 @@
                                         <Grid Grid.Row="2" Margin="0,0,0,10">
                                             <!-- Y-Axis Labels -->
                                             <Grid VerticalAlignment="Stretch" HorizontalAlignment="Left" Width="40" Margin="0,0,10,0">
-                                                <TextBlock Text="300ms" FontSize="10" Opacity="0.4" VerticalAlignment="Top"/>
-                                                <TextBlock Text="200ms" FontSize="10" Opacity="0.4" Margin="0,100,0,0" VerticalAlignment="Top"/>
-                                                <TextBlock Text="100ms" FontSize="10" Opacity="0.4" Margin="0,200,0,0" VerticalAlignment="Top"/>
+                                                <TextBlock Text="150ms" FontSize="10" Opacity="0.4" VerticalAlignment="Top"/>
+                                                <TextBlock Text="100ms" FontSize="10" Opacity="0.4" Margin="0,100,0,0" VerticalAlignment="Top"/>
+                                                <TextBlock Text="50ms" FontSize="10" Opacity="0.4" Margin="0,200,0,0" VerticalAlignment="Top"/>
                                                 <TextBlock Text="0ms" FontSize="10" Opacity="0.4" VerticalAlignment="Bottom"/>
                                             </Grid>
 
@@ -669,6 +705,13 @@
                                             <!-- Plot Layers -->
                                             <Canvas x:Name="LatencyCanvas" Margin="40,0,0,0" Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                                                 <Polyline x:Name="UnityPath" Stroke="#0078D7" StrokeThickness="2" StrokeLineJoin="Round"/>
+                                                <!-- Peak indicator: dot + label drawn by code-behind -->
+                                                <Ellipse x:Name="PeakDot" Width="8" Height="8" Fill="#FF4B6EFF" Stroke="White" StrokeThickness="1.5"
+                                                         Visibility="Collapsed"
+                                                         Canvas.Left="0" Canvas.Top="0"/>
+                                                <TextBlock x:Name="PeakLabel" Text="" FontSize="10" FontWeight="Bold" Foreground="#AACCFF"
+                                                           Visibility="Collapsed"
+                                                           Canvas.Left="0" Canvas.Top="0"/>
                                             </Canvas>
                                         </Grid>
 
@@ -699,94 +742,13 @@
                                                 </StackPanel>
                                             </StackPanel>
 
-
                                         </Grid>
+                                        <!-- /Stats Panel -->
+
                                     </Grid>
+                                    <!-- /Latency card inner Grid -->
                                 </Border>
 
-                                <!-- Node Discovery Section -->
-                                <Border Grid.Row="3" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="32">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        
-                                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,24">
-                                            <FontIcon Glyph="&#xE774;" FontSize="20" Foreground="#00CC6A"/>
-                                            <TextBlock Text="Network Topology &amp; Node Discovery" Style="{StaticResource Text.Headline3}"/>
-                                        </StackPanel>
-                                        
-                                        <Grid Grid.Row="1" ColumnSpacing="24">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            
-                                            <!-- Hub Node -->
-                                            <StackPanel Grid.Column="0" Spacing="12">
-                                                <TextBlock Text="LOCAL HUB (THIS PC)" FontSize="11" FontWeight="Bold" Opacity="0.6"/>
-                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="16" CornerRadius="12">
-                                                    <StackPanel Spacing="6">
-                                                        <TextBlock x:Name="HubIpText" Text="Checking..." FontSize="13" FontWeight="SemiBold"/>
-                                                        <TextBlock x:Name="HubLocText" Text="Locating Hub..." FontSize="11" Opacity="0.5"/>
-                                                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
-                                                            <Ellipse Width="6" Height="6" Fill="#00CC6A"/>
-                                                            <TextBlock x:Name="HubRelayText" Text="CONNECTED" FontSize="10" FontWeight="SemiBold" Foreground="#00CC6A"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-
-                                            <!-- Expert Node -->
-                                            <StackPanel Grid.Column="1" Spacing="12">
-                                                <TextBlock Text="REMOTE EXPERT" FontSize="11" FontWeight="Bold" Opacity="0.6"/>
-                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="16" CornerRadius="12">
-                                                    <StackPanel Spacing="6">
-                                                        <TextBlock x:Name="QuestIpText" Text="Searching..." FontSize="13" FontWeight="SemiBold"/>
-                                                        <TextBlock x:Name="QuestLocText" Text="Cloudflare Tunnel" FontSize="11" Opacity="0.5"/>
-                                                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
-                                                            <Ellipse x:Name="QuestRelayDot" Width="6" Height="6" Fill="#0078D7"/>
-                                                            <TextBlock x:Name="QuestRelayText" Text="TUNNEL" FontSize="10" FontWeight="SemiBold" Foreground="#0078D7"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-
-                                            <!-- Robot 1 Node -->
-                                            <StackPanel Grid.Column="2" Spacing="12">
-                                                <TextBlock Text="ROBOT 1" FontSize="11" FontWeight="Bold" Opacity="0.6"/>
-                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="16" CornerRadius="12">
-                                                    <StackPanel Spacing="6">
-                                                        <TextBlock x:Name="R1IpText" Text="Disconnected" FontSize="13" FontWeight="SemiBold"/>
-                                                        <TextBlock x:Name="R1LocText" Text="LAN / Ethernet" FontSize="11" Opacity="0.5"/>
-                                                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
-                                                            <Ellipse x:Name="R1RelayDot" Width="6" Height="6" Fill="{StaticResource Brush.Primary}"/>
-                                                            <TextBlock x:Name="R1RelayText" Text="ROS BRIDGE" FontSize="10" FontWeight="SemiBold" Foreground="{StaticResource Brush.Primary}"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-
-                                            <!-- Robot 2 Node -->
-                                            <StackPanel Grid.Column="3" Spacing="12">
-                                                <TextBlock Text="ROBOT 2" FontSize="11" FontWeight="Bold" Opacity="0.6"/>
-                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="16" CornerRadius="12">
-                                                    <StackPanel Spacing="6">
-                                                        <TextBlock x:Name="R2IpText" Text="Offline" FontSize="13" FontWeight="SemiBold"/>
-                                                        <TextBlock x:Name="R2LocText" Text="N/A" FontSize="11" Opacity="0.5"/>
-                                                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
-                                                            <Ellipse x:Name="R2RelayDot" Width="6" Height="6" Fill="#808080"/>
-                                                            <TextBlock x:Name="R2RelayText" Text="PENDING" FontSize="10" FontWeight="SemiBold" Opacity="0.8"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Grid>
-                                </Border>
                             </Grid>
                         </ScrollViewer>
                     </Border>

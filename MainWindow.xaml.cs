@@ -79,7 +79,6 @@ namespace RobotControllerApp
             Robot2IpInput.Text = _settings.Robot2Ip;
 
             // Update Hub Card Status (Initialize as Waiting for Hub to start or Unity to connect)
-            RelayStatusText.Text = "Hub Service Primary";
             RelayActiveText.Text = "WAITING";
             RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
             RelayIcon.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
@@ -446,38 +445,21 @@ namespace RobotControllerApp
 
         private void UpdateRobotStatus(bool isConnected)
         {
-            if (isConnected)
-            {
-                RobotStatusText.Text = "Connected to ROS Bridge";
-                RobotStatusText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-                Robot1Icon.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-                RobotConnectingState.Visibility = Visibility.Collapsed;
-            }
-            else
-            {
-                RobotStatusText.Text = "Searching for Robot...";
-                RobotStatusText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
-                Robot1Icon.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
-                RobotConnectingState.Visibility = Visibility.Visible;
-            }
+            var successBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+            var warnBrush    = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
+            var mutedBrush   = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+            Robot1ActiveText.Text       = isConnected ? "ACTIVE" : "WAITING";
+            Robot1ActiveText.Foreground = isConnected ? successBrush : mutedBrush;
+            Robot1Icon.Foreground       = isConnected ? successBrush : warnBrush;
         }
 
         private void UpdateRobot2Status(bool isConnected)
         {
-            if (isConnected)
-            {
-                Robot2StatusText.Text = "Robot 2: Connected";
-                Robot2StatusText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-                Robot2Icon.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-                Robot2ConnectingState.Visibility = Visibility.Collapsed;
-            }
-            else
-            {
-                Robot2StatusText.Text = "Robot 2: Offline";
-                Robot2StatusText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Primary"];
-                Robot2Icon.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Primary"];
-                Robot2ConnectingState.Visibility = Visibility.Collapsed; // Hide search for placeholder 2
-            }
+            var successBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+            var mutedBrush   = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+            Robot2ActiveText.Text       = isConnected ? "ACTIVE" : "WAITING";
+            Robot2ActiveText.Foreground = isConnected ? successBrush : mutedBrush;
+            Robot2Icon.Foreground       = isConnected ? successBrush : mutedBrush;
         }
 
         private async Task TraceHubLocation()
@@ -586,7 +568,7 @@ namespace RobotControllerApp
 
             _ = Task.Run(async () => await _relayServer.StartAsync());
 
-            RelayStatusText.Text = $"Listening (Port {_settings.RelayPort})";
+            // (Relay server listening — no status caption element)
 
             // Step 2: Start Robot Bridge (Client)
             await Task.Delay(1000);
@@ -662,7 +644,7 @@ namespace RobotControllerApp
                     _ = Task.Run(async () => await _relayServer.StartAsync());
                     _robotBridge.Start();
 
-                    RelayStatusText.Text = $"Listening (Port {_settings.RelayPort})";
+                    // (Relay server restarted)
 
                     UpdateRobotStatus(false);
                     UpdateRobot2Status(false);
@@ -768,7 +750,7 @@ namespace RobotControllerApp
                     {
                         InternetSpeedText.Text = $"{downMbps:F1} Mbps";
                         UpdateHistory(_speedHistory, downMbps, MaxSpeedHistory);
-                        DrawSpeedGraph();
+
                         UpdateSpeedStats();
                     }
                     else InternetSpeedText.Text = "Err";
@@ -863,44 +845,7 @@ namespace RobotControllerApp
             }
         }
 
-        private void DrawSpeedGraph()
-        {
-            if (NetworkView.Visibility != Visibility.Visible) return;
-
-            SpeedPath.Points.Clear();
-            UploadPath.Points.Clear();
-            if (_speedHistory.Count < 2) return;
-
-            double width = SpeedCanvas.ActualWidth > 0 ? SpeedCanvas.ActualWidth : 400;
-            double height = SpeedCanvas.ActualHeight > 0 ? SpeedCanvas.ActualHeight : 100;
-
-            // If we have few points, space them out so the graph doesn't look "stuck" on the left
-            int divisor = Math.Max(_speedHistory.Count, MaxSpeedHistory);
-            double stepX = width / (divisor - 1);
-
-            double maxSpeed = Math.Max(100.0, _speedHistory.Max() * 1.2);
-            if (_uploadHistory.Count > 0)
-            {
-                maxSpeed = Math.Max(maxSpeed, _uploadHistory.Max() * 1.2);
-            }
-            double scaleY = height / maxSpeed;
-
-            for (int i = 0; i < _speedHistory.Count; i++)
-            {
-                double x = i * stepX;
-                double val = Math.Min(_speedHistory[i], maxSpeed);
-                double y = height - (val * scaleY);
-                SpeedPath.Points.Add(new Windows.Foundation.Point(x, y));
-            }
-
-            for (int i = 0; i < _uploadHistory.Count; i++)
-            {
-                double x = i * stepX;
-                double val = Math.Min(_uploadHistory[i], maxSpeed);
-                double y = height - (val * scaleY);
-                UploadPath.Points.Add(new Windows.Foundation.Point(x, y));
-            }
-        }
+        // DrawSpeedGraph removed — speed history graph was replaced by topology node cards.
 
         // ─── Log state ─────────────────────────────────────────────────────────
         private string _lastLogMessage = string.Empty;
@@ -1105,7 +1050,7 @@ namespace RobotControllerApp
 
                     // Redraw graphs
                     DrawNetworkGraph();
-                    DrawSpeedGraph();
+
                     UpdateLatencyStats();
                     UpdateSpeedCountdown();
                 }
@@ -1123,18 +1068,11 @@ namespace RobotControllerApp
 
         private void UpdateExpertStatus(bool connected)
         {
-            if (connected)
-            {
-                RelayActiveText.Text = "ACTIVE";
-                RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-                RelayStatusText.Text = "Connected";
-            }
-            else
-            {
-                RelayActiveText.Text = "WAITING";
-                RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
-                RelayStatusText.Text = "Awaiting Connection...";
-            }
+            var green  = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+            var muted  = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+            RelayActiveText.Text       = connected ? "ACTIVE" : "WAITING";
+            RelayActiveText.Foreground = connected ? green : muted;
+            RelayIcon.Foreground       = connected ? green : muted;
         }
 
         private void UpdateDashboardAndDiscovery(double uLat, double r1Lat, double r2Lat)
@@ -1150,46 +1088,26 @@ namespace RobotControllerApp
             // Robot 2 is logically connected if we can reach its IP (as it has no specific bridge software yet)
             bool isR2Connected = r2Lat > 0 && !string.IsNullOrEmpty(_settings.Robot2Ip);
 
-            // Expert: use WebSocket latency if ICMP failing
-            double displayULat = uLat;
-            if (isExpertWsConnected && displayULat <= 0 && RelayServerHost.LastQuestLatencyMs > 0)
-                displayULat = RelayServerHost.LastQuestLatencyMs;
+            // ---------- Dashboard Status Cards ----------
+            var successBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+            var mutedBrush   = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+            var warnBrush    = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
 
-            // Robot 1: If ping failed but bridge reports heartbeat latency, use that
-            double displayR1Lat = r1Lat;
-            if (isR1Connected && displayR1Lat <= 0)
-                displayR1Lat = _robotBridge.LastLatencyMs;
+            // Remote Expert
+            bool expertActive = isExpertWsConnected || isExpertReachable;
+            RelayActiveText.Text       = expertActive ? "ACTIVE" : "WAITING";
+            RelayActiveText.Foreground = expertActive ? successBrush : mutedBrush;
+            RelayIcon.Foreground       = expertActive ? successBrush : mutedBrush;
 
-            // DISPLAY LOGIC: Show ms if reachable or connected
-            RelayLatencyText.Text = (displayULat > 0) ? $"{displayULat:F0}" : "--";
-            Robot1LatencyText.Text = (isR1Connected && displayR1Lat > 0) ? $"{displayR1Lat:F0}" : "--";
-            Robot2LatencyText.Text = (isR2Connected) ? $"{r2Lat:F0}" : "--";
+            // Robot 1
+            Robot1ActiveText.Text       = isR1Connected ? "ACTIVE" : "WAITING";
+            Robot1ActiveText.Foreground = isR1Connected ? successBrush : mutedBrush;
+            Robot1Icon.Foreground       = isR1Connected ? successBrush : warnBrush;
 
-            // Dashboard Status Update based on Ping (if WS is offline)
-            if (!isExpertWsConnected)
-            {
-                if (isExpertReachable)
-                {
-                    RelayActiveText.Text = "EXPERT REACHABLE";
-                    var green = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-                    RelayActiveText.Foreground = green;
-                    RelayIcon.Foreground = green;   // ← icon also green
-                }
-                else
-                {
-                    RelayActiveText.Text = "WAITING FOR EXPERT";
-                    var muted = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
-                    RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Error"];
-                    RelayIcon.Foreground = muted;   // ← icon stays muted when not reachable
-                }
-            }
-            else
-            {
-                RelayActiveText.Text = "ACTIVE";
-                var activeGreen = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-                RelayActiveText.Foreground = activeGreen;
-                RelayIcon.Foreground = activeGreen; // ← icon green when fully active
-            }
+            // Robot 2
+            Robot2ActiveText.Text       = isR2Connected ? "ACTIVE" : "WAITING";
+            Robot2ActiveText.Foreground = isR2Connected ? successBrush : mutedBrush;
+            Robot2Icon.Foreground       = isR2Connected ? successBrush : mutedBrush;
 
             // 2. Discovery updates
             string? expertDisplayIp = RelayServerHost.UnityClientIp;
@@ -1204,8 +1122,8 @@ namespace RobotControllerApp
             {
                 QuestIpText.Text = expertDisplayIp;
             }
-            R1IpText.Text = (isR1Connected || displayR1Lat > 0) ? ExtractIp(_settings.RobotIp) : "Disconnected";
-            R2IpText.Text = r2Lat > 0 ? ExtractIp(_settings.Robot2Ip) : "Offline";
+            R1IpText.Text = (isR1Connected) ? ExtractIp(_settings.RobotIp) : "Disconnected";
+            R2IpText.Text = (r2Lat > 0) ? ExtractIp(_settings.Robot2Ip) : "Offline";
 
             if (isExpertWsConnected)
             {
@@ -1219,25 +1137,25 @@ namespace RobotControllerApp
                 QuestRelayText.Text = "REACHABLE";
                 QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
                 QuestRelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-                QuestLocText.Text = "Cloudflare Tunnel";
+                QuestLocText.Text = "--";
             }
             else
             {
-                QuestRelayText.Text = "SEARCHING";
+                QuestRelayText.Text = "OFFLINE";
                 QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
                 QuestRelayDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 128, 128, 128));
-                QuestLocText.Text = "N/A";
+                QuestLocText.Text = "--";
             }
 
-            if (isR1Connected || displayR1Lat > 0)
+            if (isR1Connected)
             {
-                R1RelayText.Text = "ROS BRIDGE";
+                R1RelayText.Text = "CONNECTED";
                 R1RelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
                 R1RelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
             }
             else
             {
-                R1RelayText.Text = "SEARCHING";
+                R1RelayText.Text = "OFFLINE";
                 R1RelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
                 R1RelayDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 128, 128, 128));
             }
@@ -1250,7 +1168,7 @@ namespace RobotControllerApp
             }
             else
             {
-                R2RelayText.Text = "PENDING";
+                R2RelayText.Text = "OFFLINE";
                 R2RelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
                 R2RelayDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 128, 128, 128));
             }
