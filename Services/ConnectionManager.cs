@@ -9,86 +9,74 @@ using System.Threading.Tasks;
 
 namespace RobotControllerApp.Services
 {
+    /// <summary>
+    /// Thread-safe active connection registry managing telemetry caching and concurrent WebSocket transmission paths.
+    /// </summary>
     public class ConnectionManager
     {
         private readonly ConcurrentDictionary<string, WebSocket> _robotClients = new();
         private readonly ConcurrentDictionary<string, WebSocket> _unityClients = new();
-        private byte[]? _latestImage; // Cache
-        private byte[]? _latestOperatorImage; // Cache for Operator Webcam
-        private float[] _currentJoints = new float[6]; // Cache for Nudge commands
-
-        public void AddRobotClient(string robotId, WebSocket ws)
-        {
-            _robotClients[robotId] = ws;
-        }
-
-        public void RemoveRobotClient(string robotId)
-        {
-            _robotClients.TryRemove(robotId, out _);
-        }
-
-        public void AddUnityClient(string robotId, WebSocket ws)
-        {
-            _unityClients[robotId] = ws;
-        }
-
-        public void RemoveUnityClient(string robotId)
-        {
-            _unityClients.TryRemove(robotId, out _);
-        }
-
-
-        // One send-lock per connection — WebSocket.SendAsync throws if called concurrently
         private readonly ConcurrentDictionary<string, SemaphoreSlim> _sendLocks = new();
+        private byte[]? _latestImage;
+        private byte[]? _latestOperatorImage;
+        private float[] _currentJoints = new float[6];
+
         private SemaphoreSlim SendLock(string key) =>
             _sendLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
 
-        public void UpdateLatestImage(byte[] image)
-        {
-            _latestImage = image;
-        }
+        /// <summary>Registers an active hardware robot bridge connection.</summary>
+        public void AddRobotClient(string robotId, WebSocket ws) => _robotClients[robotId] = ws;
 
-        public byte[]? GetLatestImage()
-        {
-            return _latestImage;
-        }
+        /// <summary>Removes a disconnected hardware robot bridge.</summary>
+        public void RemoveRobotClient(string robotId) => _robotClients.TryRemove(robotId, out _);
 
-        public void UpdateLatestOperatorImage(byte[] image)
-        {
-            _latestOperatorImage = image;
-        }
+        /// <summary>Registers an active remote expert (Quest) interface stream.</summary>
+        public void AddUnityClient(string robotId, WebSocket ws) => _unityClients[robotId] = ws;
 
-        public byte[]? GetLatestOperatorImage()
-        {
-            return _latestOperatorImage;
-        }
+        /// <summary>Removes a disconnected remote expert stream.</summary>
+        public void RemoveUnityClient(string robotId) => _unityClients.TryRemove(robotId, out _);
 
+        /// <summary>Updates the latest cached image frame from the primary robot camera.</summary>
+        public void UpdateLatestImage(byte[] image) => _latestImage = image;
+
+        /// <summary>Retrieves the latest cached image frame from the primary robot camera.</summary>
+        public byte[]? GetLatestImage() => _latestImage;
+
+        /// <summary>Updates the latest cached image frame from the expert's local webcam.</summary>
+        public void UpdateLatestOperatorImage(byte[] image) => _latestOperatorImage = image;
+
+        /// <summary>Retrieves the latest cached image frame from the expert's local webcam.</summary>
+        public byte[]? GetLatestOperatorImage() => _latestOperatorImage;
+
+        /// <summary>Caches the latest joint configurations for internal nudge tracking.</summary>
         public void UpdateJoints(float[] newJoints)
         {
             if (newJoints != null && newJoints.Length >= 6)
             {
-                // Niryo sends 6 joints usually. Copy safely.
                 Array.Copy(newJoints, _currentJoints, 6);
             }
         }
 
-        public float[] GetCurrentJoints()
-        {
-            // Return clone to avoid race conditions
-            return (float[])_currentJoints.Clone();
-        }
+        /// <summary>Returns a clone of the most recently received joint state payload.</summary>
+        public float[] GetCurrentJoints() => (float[])_currentJoints.Clone();
 
-        public bool IsRobotConnected(string robotId)
-        {
-            return _robotClients.TryGetValue(robotId, out var ws) && ws.State == WebSocketState.Open;
-        }
+        /// <summary>Checks if a specific robot client maintains an open WebSocket state.</summary>
+        public bool IsRobotConnected(string robotId) =>
+            _robotClients.TryGetValue(robotId, out var ws) && ws.State == WebSocketState.Open;
 
-        public async Task SendToRobotClient(string robotId, string message)
-        {
-            if (!_robotClients.TryGetValue(robotId, out var ws) || ws.State != WebSocketState.Open)
-                return;
+        /// <summary>Asynchronously dispatches a UTF-8 encoded text message to a designated robot client.</summary>
+        public Task SendToRobotClient(string robotId, string message) =>
+            SendThrottledMessageAsync(_robotClients, $"robot_{robotId}", robotId, message);
 
-            var sem = SendLock($"robot_{robotId}");
+        /// <summary>Asynchronously dispatches a UTF-8 encoded text message to the remote expert interface.</summary>
+        public Task SendToUnityClient(string robotId, string message) =>
+            SendThrottledMessageAsync(_unityClients, $"unity_{robotId}", robotId, message);
+
+        private async Task SendThrottledMessageAsync(ConcurrentDictionary<string, WebSocket> collection, string lockKey, string id, string message)
+        {
+            if (!collection.TryGetValue(id, out var ws) || ws.State != WebSocketState.Open) return;
+
+            var sem = SendLock(lockKey);
             await sem.WaitAsync();
             try
             {
@@ -100,47 +88,23 @@ namespace RobotControllerApp.Services
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[ConnectionManager] SendToRobotClient error: {ex.Message}");
+                Console.WriteLine($"[ConnectionManager] Send error on {lockKey}: {ex.Message}");
             }
-            finally { sem.Release(); }
-        }
-
-        public async Task SendToUnityClient(string robotId, string message)
-        {
-            // WebSocket send — MUST be serialized: concurrent SendAsync throws InvalidOperationException
-            if (!_unityClients.TryGetValue(robotId, out var ws) || ws.State != WebSocketState.Open)
-                return;
-
-            var sem = SendLock($"unity_{robotId}");
-            await sem.WaitAsync();
-            try
+            finally
             {
-                if (ws.State == WebSocketState.Open)
-                {
-                    var bytes = Encoding.UTF8.GetBytes(message);
-                    await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
-                }
+                sem.Release();
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[ConnectionManager] SendToUnityClient error: {ex.Message}");
-            }
-            finally { sem.Release(); }
         }
 
-        public object GetStatus()
+        /// <summary>Generates an anonymous status payload mapping current active paired connections.</summary>
+        public object GetStatus() => new
         {
-            return new
-            {
-                Timestamp = DateTime.UtcNow,
-                RobotClients = _robotClients.Keys.ToList(),
-                ActivePairs = _robotClients.Keys.Intersect(_unityClients.Keys).ToList()
-            };
-        }
+            Timestamp = DateTime.UtcNow,
+            RobotClients = _robotClients.Keys.ToList(),
+            ActivePairs = _robotClients.Keys.Intersect(_unityClients.Keys).ToList()
+        };
 
-        public string? GetFirstConnectedRobotId()
-        {
-            return _robotClients.Keys.FirstOrDefault();
-        }
+        /// <summary>Returns the string identifier of the first valid robot connection dict key.</summary>
+        public string? GetFirstConnectedRobotId() => _robotClients.Keys.FirstOrDefault();
     }
 }

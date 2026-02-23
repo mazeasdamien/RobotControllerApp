@@ -450,11 +450,11 @@ namespace RobotControllerApp
         private void UpdateRobotStatus(bool isConnected)
         {
             var successBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-            var warnBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
             var mutedBrush = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
             Robot1ActiveText.Text = isConnected ? "ACTIVE" : "WAITING";
             Robot1ActiveText.Foreground = isConnected ? successBrush : mutedBrush;
-            Robot1Icon.Foreground = isConnected ? successBrush : warnBrush;
+            Robot1Icon.Foreground = isConnected ? successBrush : mutedBrush;
+            if (Robot1StatusIndicator != null) Robot1StatusIndicator.Visibility = isConnected ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void UpdateRobot2Status(bool isConnected)
@@ -464,6 +464,36 @@ namespace RobotControllerApp
             Robot2ActiveText.Text = isConnected ? "ACTIVE" : "WAITING";
             Robot2ActiveText.Foreground = isConnected ? successBrush : mutedBrush;
             Robot2Icon.Foreground = isConnected ? successBrush : mutedBrush;
+            if (Robot2StatusIndicator != null) Robot2StatusIndicator.Visibility = isConnected ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        /// <summary>
+        /// Polls the relay ConnectionManager every 2 s and updates robot status cards.
+        /// This is the authoritative source of truth for whether a robot is reachable,
+        /// even when the ROS bridge event path has fired a disconnect (e.g. ROS restarting).
+        /// </summary>
+        private void StartRelayStatusPoll()
+        {
+            var pollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
+            pollTimer.Tick += (_, _) =>
+            {
+                // Use the ROS-level IsConnected flag on each bridge:
+                // ConnectionManager.IsRobotConnected() only tells us if the bridge
+                // WebSocket to the relay is open (always true while the app runs).
+                // _robotBridge.IsConnected is set false the moment the ROS socket drops.
+                bool r1 = _robotBridge.IsConnected;
+                bool r2 = _robotBridge2.IsConnected;
+
+                string r1Text = Robot1ActiveText.Text;
+                string r2Text = Robot2ActiveText.Text;
+
+                if (r1 && r1Text != "ACTIVE") UpdateRobotStatus(true);
+                else if (!r1 && r1Text == "ACTIVE") UpdateRobotStatus(false);
+
+                if (r2 && r2Text != "ACTIVE") UpdateRobot2Status(true);
+                else if (!r2 && r2Text == "ACTIVE") UpdateRobot2Status(false);
+            };
+            pollTimer.Start();
         }
 
         private async Task TraceHubLocation()
@@ -592,7 +622,10 @@ namespace RobotControllerApp
             _robotBridge2.Start();
             UpdateRobot2Status(false);
 
-            // Step 3: Ready
+            // Step 3: Start relay status poll (keeps dashboard in sync with actual relay state)
+            StartRelayStatusPoll();
+
+            // Step 4: Ready
             Log("System Ready. Waiting for connections...");
         }
 
@@ -1118,6 +1151,7 @@ namespace RobotControllerApp
             RelayActiveText.Text = connected ? "ACTIVE" : "WAITING";
             RelayActiveText.Foreground = connected ? green : muted;
             RelayIcon.Foreground = connected ? green : muted;
+            if (RelayStatusIndicator != null) RelayStatusIndicator.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void UpdateDashboardAndDiscovery(double uLat, double r1Lat, double r2Lat)
@@ -1127,8 +1161,8 @@ namespace RobotControllerApp
             // Add a 3-second buffer to prevent flickering due to dropped ICMP pings over Wi-Fi
             int uCount = _unityLatencyHistory.Count;
             bool isExpertReachable = uLat > 0 || (uCount > 0 && _unityLatencyHistory.Skip(System.Math.Max(0, uCount - 3)).Any(v => v > 0));
-            // Robot 1 is logically connected ONLY if the bridge is sending heartbeats
-            bool isR1Connected = _robotBridge.IsConnected || _robotBridge.LastLatencyMs > 0;
+            // Robot 1 is logically connected ONLY if the bridge is currently alive with ROS
+            bool isR1Connected = _robotBridge.IsConnected;
 
             // Robot 2 is logically connected if we can reach its IP (as it has no specific bridge software yet)
             bool isR2Connected = r2Lat > 0 && !string.IsNullOrEmpty(_settings.Robot2Ip);
@@ -1143,16 +1177,19 @@ namespace RobotControllerApp
             RelayActiveText.Text = expertActive ? "ACTIVE" : "WAITING";
             RelayActiveText.Foreground = expertActive ? successBrush : mutedBrush;
             RelayIcon.Foreground = expertActive ? successBrush : mutedBrush;
+            if (RelayStatusIndicator != null) RelayStatusIndicator.Visibility = expertActive ? Visibility.Visible : Visibility.Collapsed;
 
             // Robot 1
             Robot1ActiveText.Text = isR1Connected ? "ACTIVE" : "WAITING";
             Robot1ActiveText.Foreground = isR1Connected ? successBrush : mutedBrush;
-            Robot1Icon.Foreground = isR1Connected ? successBrush : warnBrush;
+            Robot1Icon.Foreground = isR1Connected ? successBrush : mutedBrush;
+            if (Robot1StatusIndicator != null) Robot1StatusIndicator.Visibility = isR1Connected ? Visibility.Visible : Visibility.Collapsed;
 
             // Robot 2
             Robot2ActiveText.Text = isR2Connected ? "ACTIVE" : "WAITING";
             Robot2ActiveText.Foreground = isR2Connected ? successBrush : mutedBrush;
             Robot2Icon.Foreground = isR2Connected ? successBrush : mutedBrush;
+            if (Robot2StatusIndicator != null) Robot2StatusIndicator.Visibility = isR2Connected ? Visibility.Visible : Visibility.Collapsed;
 
             // 2. Discovery updates
             // Prefer the public IP reported by the Quest itself (from telemetry)
@@ -1168,13 +1205,13 @@ namespace RobotControllerApp
 
             if (!isExpertWsConnected && !isExpertReachable)
             {
-                QuestIpText.Text = "Disconnected";
+                QuestIpText.Text = "Offline";
             }
             else
             {
                 QuestIpText.Text = expertDisplayIp;
             }
-            R1IpText.Text = (isR1Connected) ? ExtractIp(_settings.RobotIp) : "Disconnected";
+            R1IpText.Text = (isR1Connected) ? ExtractIp(_settings.RobotIp) : "Offline";
             R2IpText.Text = (r2Lat > 0) ? ExtractIp(_settings.Robot2Ip) : "Offline";
 
             if (isExpertWsConnected)

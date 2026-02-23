@@ -109,7 +109,7 @@
                                         </StackPanel>
 
                                         <!-- Modern Status Indicator -->
-                                        <Grid Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                                        <Grid x:Name="RelayStatusIndicator" Visibility="Collapsed" Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
                                             <Ellipse x:Name="RelayHaloOuter" Width="48" Height="48" Stroke="{Binding ElementName=RelayActiveText, Path=Foreground}" StrokeThickness="1" Opacity="0.2" RenderTransformOrigin="0.5,0.5">
                                                 <Ellipse.RenderTransform>
                                                     <ScaleTransform/>
@@ -131,14 +131,14 @@
 
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
-                                                <FontIcon x:Name="Robot1Icon" Glyph="&#xEBC5;" FontSize="26" Foreground="{StaticResource Brush.Status.Warning}"/>
+                                                <FontIcon x:Name="Robot1Icon" Glyph="&#xEBC5;" FontSize="26" Foreground="{StaticResource Brush.Text.Muted}"/>
                                                 <TextBlock Text="ROBOT 1" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
                                             <TextBlock x:Name="Robot1ActiveText" Text="WAITING" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" Margin="0,10,0,0"/>
                                         </StackPanel>
 
                                         <!-- Modern Status Indicator -->
-                                        <Grid Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                                        <Grid x:Name="Robot1StatusIndicator" Visibility="Collapsed" Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
                                             <Ellipse x:Name="Robot1HaloOuter" Width="48" Height="48" Stroke="{Binding ElementName=Robot1Icon, Path=Foreground}" StrokeThickness="1" Opacity="0.2" RenderTransformOrigin="0.5,0.5">
                                                 <Ellipse.RenderTransform>
                                                     <ScaleTransform/>
@@ -160,14 +160,14 @@
 
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
-                                                <FontIcon x:Name="Robot2Icon" Glyph="&#xEBC5;" FontSize="26" Foreground="{StaticResource Brush.Text.Primary}"/>
+                                                <FontIcon x:Name="Robot2Icon" Glyph="&#xEBC5;" FontSize="26" Foreground="{StaticResource Brush.Text.Muted}"/>
                                                 <TextBlock Text="ROBOT 2" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
                                             <TextBlock x:Name="Robot2ActiveText" Text="WAITING" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" Margin="0,10,0,0"/>
                                         </StackPanel>
 
                                         <!-- Modern Status Indicator -->
-                                        <Grid Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
+                                        <Grid x:Name="Robot2StatusIndicator" Visibility="Collapsed" Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
                                             <Ellipse x:Name="Robot2HaloOuter" Width="48" Height="48" Stroke="{Binding ElementName=Robot2Icon, Path=Foreground}" StrokeThickness="1" Opacity="0.2" RenderTransformOrigin="0.5,0.5">
                                                 <Ellipse.RenderTransform>
                                                     <ScaleTransform/>
@@ -640,7 +640,7 @@
                                                 <TextBlock Text="ROBOT 1" FontSize="10" FontWeight="Bold" Opacity="0.5"/>
                                                 <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="12" CornerRadius="10">
                                                     <StackPanel Spacing="5">
-                                                        <TextBlock x:Name="R1IpText" Text="Disconnected" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                                        <TextBlock x:Name="R1IpText" Text="Offline" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
                                                         <TextBlock x:Name="R1LocText" Text="LAN / Ethernet" FontSize="10" Opacity="0.5"/>
                                                         <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,3,0,0">
                                                             <Ellipse x:Name="R1RelayDot" Width="6" Height="6" Fill="#808080"/>
@@ -675,6 +675,7 @@
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="300"/>
+                                            <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
@@ -745,7 +746,7 @@
 
 
                                         <!-- Stats Panel -->
-                                        <Grid Grid.Row="3" Margin="40,16,0,0">
+                                        <Grid Grid.Row="4" Margin="40,16,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>
@@ -775,7 +776,7 @@
                                         <!-- /Stats Panel -->
 
                                         <!-- X-Axis Time Labels -->
-                                        <Grid Grid.Row="3" Margin="40,48,52,0" HorizontalAlignment="Stretch">
+                                        <Grid Grid.Row="3" Margin="40,8,52,0" HorizontalAlignment="Stretch">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>

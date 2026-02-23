@@ -14,6 +14,10 @@ using System.Threading.Tasks;
 
 namespace RobotControllerApp.Services
 {
+    /// <summary>
+    /// Background ASP.NET Core service bridging WebSocket and HTTP connections between
+    /// the physical ROS robots and the remote expert's Unity client.
+    /// </summary>
     public class RelayServerHost
     {
         public static event Action<string>? OnLog;
@@ -241,22 +245,20 @@ namespace RobotControllerApp.Services
                     {
                         try
                         {
-                            using (JsonDocument doc = JsonDocument.Parse(message))
+                            using var doc = JsonDocument.Parse(message);
+                            var root = doc.RootElement;
+                            if (root.TryGetProperty("msg", out var msgElement) &&
+                                msgElement.TryGetProperty("position", out var posElement) &&
+                                posElement.ValueKind == JsonValueKind.Array)
                             {
-                                var root = doc.RootElement;
-                                if (root.TryGetProperty("msg", out var msgElement) &&
-                                    msgElement.TryGetProperty("position", out var posElement) &&
-                                    posElement.ValueKind == JsonValueKind.Array)
+                                var positions = new float[6];
+                                int count = 0;
+                                foreach (var p in posElement.EnumerateArray())
                                 {
-                                    var positions = new float[6];
-                                    int count = 0;
-                                    foreach (var p in posElement.EnumerateArray())
-                                    {
-                                        if (count < 6) positions[count++] = (float)p.GetDouble();
-                                    }
-                                    manager.UpdateJoints(positions);
-                                    OnJointsReceived?.Invoke(positions);
+                                    if (count < 6) positions[count++] = (float)p.GetDouble();
                                 }
+                                manager.UpdateJoints(positions);
+                                OnJointsReceived?.Invoke(positions);
                             }
                         }
                         catch { /* Parsing error safe ignore */ }
@@ -280,7 +282,7 @@ namespace RobotControllerApp.Services
                                         int end = message.IndexOf("\"", start);
                                         if (end != -1)
                                         {
-                                            string base64 = message.Substring(start, end - start);
+                                            string base64 = message[start..end];
                                             if (base64.Length > 100)
                                             {
                                                 byte[] imageBytes = Convert.FromBase64String(base64);
@@ -328,10 +330,6 @@ namespace RobotControllerApp.Services
                         continue; // Skip — camera is polled by Quest via HTTP /image
                     }
 
-                    if (message.Contains("joint_states") || message.Contains("robot_state"))
-                    {
-                        // Log($"[Hub] ⬅️ Robot state → Quest: {message.Substring(0, Math.Min(60, message.Length))}...");
-                    }
                     await manager.SendToUnityClient(robotId, message);
                 }
             }
@@ -398,15 +396,13 @@ namespace RobotControllerApp.Services
                     {
                         try
                         {
-                            using (JsonDocument doc = JsonDocument.Parse(message))
-                            {
-                                var root = doc.RootElement;
-                                string loc   = root.TryGetProperty("location",  out var l) ? l.GetString() ?? "Unknown" : "Unknown";
-                                float  rx    = root.TryGetProperty("rx_kbps",   out var r) ? (float)r.GetDouble() : 0f;
-                                float  tx    = root.TryGetProperty("tx_kbps",   out var t) ? (float)t.GetDouble() : 0f;
-                                string pubIp = root.TryGetProperty("public_ip", out var p) ? p.GetString() ?? "" : "";
-                                OnUnityTelemetryReceived?.Invoke(loc, rx, tx, pubIp);
-                            }
+                            using var doc = JsonDocument.Parse(message);
+                            var root = doc.RootElement;
+                            string loc = root.TryGetProperty("location", out var l) ? l.GetString() ?? "Unknown" : "Unknown";
+                            float rx = root.TryGetProperty("rx_kbps", out var r) ? (float)r.GetDouble() : 0f;
+                            float tx = root.TryGetProperty("tx_kbps", out var t) ? (float)t.GetDouble() : 0f;
+                            string pubIp = root.TryGetProperty("public_ip", out var p) ? p.GetString() ?? "" : "";
+                            OnUnityTelemetryReceived?.Invoke(loc, rx, tx, pubIp);
                         }
                         catch { }
 
@@ -424,70 +420,6 @@ namespace RobotControllerApp.Services
             {
                 pingTimer.Dispose();
             }
-        }
-
-        // --- HELPERS ---
-
-        string GetTrajectoryJson(float[] joints)
-        {
-            var msg = new
-            {
-                op = "publish",
-                topic = "/niryo_robot_follow_joint_trajectory_controller/command",
-                type = "trajectory_msgs/JointTrajectory",
-                msg = new
-                {
-                    header = new { seq = 0, stamp = new { secs = 0, nsecs = 0 }, frame_id = "" },
-                    joint_names = new[] { "joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6" },
-                    points = new[]
-                    {
-                        new
-                        {
-                            positions = joints,
-                            velocities = new float[0],
-                            accelerations = new float[0],
-                            effort = new float[0],
-                            time_from_start = new { secs = 2, nsecs = 0 }
-                        }
-                    }
-                }
-            };
-            return JsonSerializer.Serialize(msg);
-        }
-
-        string GetGripperJson(bool open)
-        {
-            var args = new
-            {
-                id = 11,
-                position = open ? 100 : 0,
-                speed = 100,
-                hold_torque = 1000, // Updated to 1000 for full holding strength
-                max_torque = 1000   // Updated to 1000 for full holding strength
-            };
-
-            var msg = new
-            {
-                op = "call_service",
-                service = open ? "/niryo_robot/tools/open_gripper" : "/niryo_robot/tools/close_gripper",
-                type = "tools_interface/ToolCommand",
-                args = args
-            };
-            string json = JsonSerializer.Serialize(msg);
-            Log($"[Gripper] Generated Command: {json}");
-            return json;
-        }
-
-        string GetServiceJson(string serviceName, string serviceType, object args)
-        {
-            var msg = new
-            {
-                op = "call_service",
-                service = serviceName,
-                type = serviceType,
-                args = args
-            };
-            return JsonSerializer.Serialize(msg);
         }
     }
 }

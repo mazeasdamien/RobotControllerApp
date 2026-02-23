@@ -1,29 +1,43 @@
 using System;
+using System.IO;
 using System.Text.Json;
-using Windows.Storage;
 
 namespace RobotControllerApp.Services
 {
+    /// <summary>
+    /// Manages persistent application configuration parameters for network connectivity.
+    /// </summary>
     public class AppSettings
     {
+        /// <summary>The port on which the local WebSocket relay server listens.</summary>
         public int RelayPort { get; set; } = 5000;
+
+        /// <summary>The designated public tunnel URL for remote expert connection.</summary>
         public string PublicUrl { get; set; } = "https://niryo.dmzs-lab.com";
+
+        /// <summary>The IP address of the primary Niryo robot.</summary>
         public string RobotIp { get; set; } = "169.254.200.200";
+
+        /// <summary>The IP address of the secondary Niryo robot.</summary>
         public string Robot2Ip { get; set; } = "169.254.200.201";
+
+        /// <summary>The IP address of the remote expert client.</summary>
         public string ExpertIp { get; set; } = "";
 
-
-        private static string SettingsPath => System.IO.Path.Combine(
+        private static string SettingsPath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "RobotOrange", "settings.json");
 
+        /// <summary>
+        /// Loads settings from local application data. Returns defaults if file does not exist.
+        /// </summary>
         public static AppSettings Load()
         {
             try
             {
-                if (System.IO.File.Exists(SettingsPath))
+                if (File.Exists(SettingsPath))
                 {
-                    var json = System.IO.File.ReadAllText(SettingsPath);
+                    var json = File.ReadAllText(SettingsPath);
                     return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
                 }
             }
@@ -31,14 +45,17 @@ namespace RobotControllerApp.Services
             return new AppSettings();
         }
 
+        /// <summary>
+        /// Serializes and saves current configuration state to persistent storage.
+        /// </summary>
         public void Save()
         {
             try
             {
                 var json = JsonSerializer.Serialize(this);
-                var dir = System.IO.Path.GetDirectoryName(SettingsPath);
-                if (dir != null) System.IO.Directory.CreateDirectory(dir);
-                System.IO.File.WriteAllText(SettingsPath, json);
+                var dir = Path.GetDirectoryName(SettingsPath);
+                if (dir != null) Directory.CreateDirectory(dir);
+                File.WriteAllText(SettingsPath, json);
             }
             catch { }
         }

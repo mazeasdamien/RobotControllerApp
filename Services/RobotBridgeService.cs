@@ -8,42 +8,56 @@ using System.Threading.Tasks;
 
 namespace RobotControllerApp.Services
 {
+    /// <summary>
+    /// Service bridging continuous WebSocket telemetry and commands between a remote ROS master
+    /// and the local Relay Hub server. Instantiated per-robot.
+    /// </summary>
     public class RobotBridgeService
     {
+        /// <summary>Global logging event stream.</summary>
         public static event Action<string>? OnLog;
+
+        /// <summary>Static global connection event stream. Deprecated in favor of instance-specific streams.</summary>
         public static event Action<bool>? OnRosConnectionChanged;
-        /// <summary>Per-instance connection event — use this instead of the static one when managing multiple bridges.</summary>
+
+        /// <summary>Instance-level stream emitting true when the physical robot WebSocket establishes connection.</summary>
         public event Action<bool>? OnInstanceConnectionChanged;
+        /// <summary>Indicates if the WebSocket to the physical robot is currently open.</summary>
         public bool IsConnected { get; private set; }
 
         private ClientWebSocket? _robotWebSocket;
         private ClientWebSocket? _relayWebSocket;
         private CancellationTokenSource? _cts;
 
-        // Configuration
         public string RobotId { get; set; } = "Robot_Niryo_01";
-        public string RosIp { get; set; } = "169.254.200.200"; // Default from previous context
+        public string RosIp { get; set; } = "169.254.200.200";
         public int RosPort { get; set; } = 9090;
         public string RelayServerUrl { get; set; } = "ws://localhost:5000/robot";
         public int TelemetryIntervalMs { get; set; } = 100;
+
+        /// <summary>Most recent measurement of round-trip latency to the local relay.</summary>
         public long LastLatencyMs { get; private set; } = 0;
-        private System.Diagnostics.Stopwatch _pingWatch = new();
 
-        private void Log(string message)
-        {
-            OnLog?.Invoke(message);
-        }
+        private readonly System.Diagnostics.Stopwatch _pingWatch = new();
 
+        private static void Log(string message) => OnLog?.Invoke(message);
+
+        /// <summary>
+        /// Initiates the dual asynchronous WebSocket connection loops to the robot and relay.
+        /// </summary>
         public void Start()
         {
-            if (_cts != null) return;
+            // Allow restart: if already running, stop first
+            _cts?.Dispose();
             _cts = new CancellationTokenSource();
 
-            // Run connection loops in background
-            Task.Run(() => ConnectToRobot(_cts.Token));
-            Task.Run(() => ConnectToRelay(_cts.Token));
+            Task.Run(() => ConnectToRobotAsync(_cts.Token));
+            Task.Run(() => ConnectToRelayAsync(_cts.Token));
         }
 
+        /// <summary>
+        /// Gracefully terminates active WebSockets and cancels reconnection routines.
+        /// </summary>
         public async Task StopAsync()
         {
             _cts?.Cancel();
@@ -59,10 +73,11 @@ namespace RobotControllerApp.Services
                 _relayWebSocket.Dispose();
                 _relayWebSocket = null;
             }
-            if (_cts != null) { _cts.Dispose(); _cts = null; }
+            _cts?.Dispose();
+            _cts = null;
         }
 
-        async Task ConnectToRobot(CancellationToken token)
+        private async Task ConnectToRobotAsync(CancellationToken token)
         {
             var rosUrl = $"ws://{RosIp}:{RosPort}";
             var buffer = new byte[1024 * 1024];
@@ -72,10 +87,7 @@ namespace RobotControllerApp.Services
                 try
                 {
                     _robotWebSocket = new ClientWebSocket();
-                    Log($"[ROS] Connecting to {rosUrl}...");
-
                     await _robotWebSocket.ConnectAsync(new Uri(rosUrl), token);
-                    Log("[ROS] ✓ Connected to robot");
                     IsConnected = true;
                     OnRosConnectionChanged?.Invoke(true);
                     OnInstanceConnectionChanged?.Invoke(true);
@@ -98,43 +110,46 @@ namespace RobotControllerApp.Services
                         await SendToRelay(message); // Forward to Relay
                     }
                 }
-                catch (Exception)
+                catch (OperationCanceledException)
+                {
+                    break; // Clean shutdown
+                }
+                catch (Exception ex)
                 {
                     if (!token.IsCancellationRequested)
-                        Log($"[ROS] Failed to connect to local robot ({RosIp}).");
+                        Log($"[ROS:{RobotId}] Failed to connect to robot ({RosIp}): {ex.Message}");
                 }
                 finally
                 {
-                    IsConnected = false;
-                    OnRosConnectionChanged?.Invoke(false);
-                    OnInstanceConnectionChanged?.Invoke(false);
-                    // Force disconnect from Relay so the Server knows we are offline
-                    try { _relayWebSocket?.Abort(); } catch { }
+                    if (IsConnected)
+                    {
+                        IsConnected = false;
+                        OnRosConnectionChanged?.Invoke(false);
+                        OnInstanceConnectionChanged?.Invoke(false);
+                    }
+                    // Do NOT abort relay here — relay has its own reconnect loop
                 }
 
-                if (!token.IsCancellationRequested) await Task.Delay(3000, token);
+                if (!token.IsCancellationRequested)
+                {
+                    try { await Task.Delay(3000, token); } catch (OperationCanceledException) { break; }
+                }
             }
         }
 
-        async Task ConnectToRelay(CancellationToken token)
+        private async Task ConnectToRelayAsync(CancellationToken token)
         {
             var relayUrl = $"{RelayServerUrl}?robotId={RobotId}";
             var buffer = new byte[1024 * 1024];
 
             while (!token.IsCancellationRequested)
             {
-                // Bridge now connects to Relay immediately to validate the communication link,
-                // even if the hardware ROS robot is still booting or offline.
-
                 if (token.IsCancellationRequested) break;
 
                 try
                 {
                     _relayWebSocket = new ClientWebSocket();
-                    Log($"[Bridge] Connecting to Local Relay at {relayUrl}...");
-
                     await _relayWebSocket.ConnectAsync(new Uri(relayUrl), token);
-                    Log("[Bridge] ✓ Connected to Local Relay");
                     StartRelayHeartbeat();
 
                     // Register
@@ -159,7 +174,6 @@ namespace RobotControllerApp.Services
 
                         var message = Encoding.UTF8.GetString(ms.ToArray());
 
-                        // --- HEARTBEAT PONG (ROS conventions) ---
                         if (message.Contains("\"op\":\"pong\""))
                         {
                             _pingWatch.Stop();
@@ -167,24 +181,28 @@ namespace RobotControllerApp.Services
                             continue;
                         }
 
-                        if (message.Contains("publish") || message.Contains("call_service"))
-                        {
-                            // Log("[Bridge] 📥 Received command from Unity, forwarding to ROS...");
-                        }
-                        await SendToRobot(message); // Forward to Robot
+                        await SendToRobotAsync(message);
                     }
                 }
-                catch (Exception)
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+                catch (Exception ex)
                 {
                     if (!token.IsCancellationRequested)
-                        Log($"[Bridge] Failed to connect to Local Relay.");
+                        Log($"[Bridge:{RobotId}] Failed to connect to Local Relay: {ex.Message}");
                 }
                 finally
                 {
                     _pingTimer?.Dispose();
+                    _pingTimer = null;
                 }
 
-                if (!token.IsCancellationRequested) await Task.Delay(3000, token);
+                if (!token.IsCancellationRequested)
+                {
+                    try { await Task.Delay(3000, token); } catch (OperationCanceledException) { break; }
+                }
             }
         }
 
@@ -206,7 +224,7 @@ namespace RobotControllerApp.Services
             }, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
         }
 
-        async Task SubscribeToJointStates()
+        private async Task SubscribeToJointStates()
         {
             var subscribeJoints = new
             {
@@ -215,8 +233,7 @@ namespace RobotControllerApp.Services
                 type = "sensor_msgs/JointState",
                 throttle_rate = TelemetryIntervalMs
             };
-            await SendToRobot(JsonSerializer.Serialize(subscribeJoints));
-            Log("[ROS] Subscribed to /joint_states");
+            await SendToRobotAsync(JsonSerializer.Serialize(subscribeJoints));
 
             var subscribeCamera = new
             {
@@ -225,10 +242,8 @@ namespace RobotControllerApp.Services
                 type = "sensor_msgs/CompressedImage",
                 throttle_rate = 0
             };
-            await SendToRobot(JsonSerializer.Serialize(subscribeCamera));
-            Log("[ROS] Subscribed to Camera Stream");
+            await SendToRobotAsync(JsonSerializer.Serialize(subscribeCamera));
 
-            // Additional Telemetry for Research
             var subscribeGripper = new
             {
                 op = "subscribe",
@@ -236,7 +251,7 @@ namespace RobotControllerApp.Services
                 type = "niryo_robot_msgs/GripperState",
                 throttle_rate = 500
             };
-            await SendToRobot(JsonSerializer.Serialize(subscribeGripper));
+            await SendToRobotAsync(JsonSerializer.Serialize(subscribeGripper));
 
             var subscribeState = new
             {
@@ -245,20 +260,15 @@ namespace RobotControllerApp.Services
                 type = "niryo_robot_msgs/RobotState",
                 throttle_rate = 1000
             };
-            await SendToRobot(JsonSerializer.Serialize(subscribeState));
-            Log("[ROS] Subscribed to Gripper and System State");
+            await SendToRobotAsync(JsonSerializer.Serialize(subscribeState));
         }
 
-        async Task SendToRobot(string json)
+        private async Task SendToRobotAsync(string json)
         {
             if (_robotWebSocket?.State == WebSocketState.Open)
             {
                 var bytes = Encoding.UTF8.GetBytes(json);
                 await _robotWebSocket.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
-            }
-            else
-            {
-                Log("[Bridge] ⚠️ Cannot forward command: Not connected to Robot (ROS).");
             }
         }
 
