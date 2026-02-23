@@ -85,7 +85,7 @@
                             <!-- HEADER REMOVED -->
 
                             <!-- STATUS CARDS -->
-                            <Grid Grid.Row="1" ColumnSpacing="8" Margin="{StaticResource Margin.Card}">
+                            <Grid Grid.Row="1" ColumnSpacing="8" Margin="{StaticResource Margin.Card}" Height="90">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
@@ -744,6 +744,22 @@
 
                                         </Grid>
                                         <!-- /Stats Panel -->
+
+                                        <!-- X-Axis Time Labels -->
+                                        <Grid Grid.Row="3" Margin="40,48,0,0" HorizontalAlignment="Stretch">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="−2 min" FontSize="9" Opacity="0.30" HorizontalAlignment="Left"/>
+                                            <TextBlock Grid.Column="1" Text="−90 s"  FontSize="9" Opacity="0.30" HorizontalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="−60 s"  FontSize="9" Opacity="0.30" HorizontalAlignment="Center"/>
+                                            <TextBlock Grid.Column="3" Text="−30 s"  FontSize="9" Opacity="0.30" HorizontalAlignment="Center"/>
+                                            <TextBlock Grid.Column="4" Text="now"    FontSize="9" Opacity="0.30" HorizontalAlignment="Right"/>
+                                        </Grid>
 
                                     </Grid>
                                     <!-- /Latency card inner Grid -->

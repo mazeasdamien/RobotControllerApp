@@ -699,7 +699,7 @@ namespace RobotControllerApp
                         var sw = System.Diagnostics.Stopwatch.StartNew();
 
                         using var response = await client.GetAsync(
-                            $"http://speedtest.tele2.net/10MB.zip?nocache={Guid.NewGuid()}",
+                            $"https://speed.cloudflare.com/__down?bytes=10000000&nocache={Guid.NewGuid()}",
                             HttpCompletionOption.ResponseHeadersRead);
 
                         response.EnsureSuccessStatusCode();
@@ -1111,8 +1111,11 @@ namespace RobotControllerApp
 
             // 2. Discovery updates
             string? expertDisplayIp = RelayServerHost.UnityClientIp;
+            // Strip IPv6-mapped IPv4 prefix (e.g. "::ffff:127.0.0.1" → "127.0.0.1")
+            if (!string.IsNullOrEmpty(expertDisplayIp) && expertDisplayIp.StartsWith("::ffff:"))
+                expertDisplayIp = expertDisplayIp[7..];
             if (string.IsNullOrEmpty(expertDisplayIp)) expertDisplayIp = _settings.ExpertIp;
-            if (string.IsNullOrEmpty(expertDisplayIp)) expertDisplayIp = "quest-3"; // Default fallback
+            if (string.IsNullOrEmpty(expertDisplayIp)) expertDisplayIp = "quest-3";
 
             if (!isExpertWsConnected && !isExpertReachable)
             {
@@ -1130,7 +1133,8 @@ namespace RobotControllerApp
                 QuestRelayText.Text = "CONNECTED";
                 QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
                 QuestRelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-                QuestLocText.Text = $"{_questLocation}  ↓ {_questRxKbps:0.0} KB/s  ↑ {_questTxKbps:0.0} KB/s";
+                QuestLocText.Text = (string.IsNullOrEmpty(_questLocation) || _questLocation == "Unknown" || _questLocation == "Unknown Location")
+                    ? "--" : _questLocation;
             }
             else if (isExpertReachable)
             {
@@ -1218,7 +1222,43 @@ namespace RobotControllerApp
             if (NetworkView.Visibility != Visibility.Visible) return;
 
             UpdatePath(UnityPath, _unityLatencyHistory);
+            DrawPeakIndicator(_unityLatencyHistory);
         }
+
+        private void DrawPeakIndicator(List<double> history)
+        {
+            var valid = history.Where(v => v > 0).ToList();
+            if (valid.Count < 2)
+            {
+                PeakDot.Visibility   = Visibility.Collapsed;
+                PeakLabel.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            double maxVal = valid.Max();
+            int peakIdx   = history.LastIndexOf(maxVal); // rightmost occurrence
+
+            double width   = LatencyCanvas.ActualWidth  > 0 ? LatencyCanvas.ActualWidth  : 800;
+            double height  = LatencyCanvas.ActualHeight > 0 ? LatencyCanvas.ActualHeight : 120;
+            double stepX   = width / (MaxHistory - 1);
+            double maxMs   = 300.0;
+            double scaleY  = height / maxMs;
+
+            double x = peakIdx * stepX;
+            double y = height - (Math.Min(maxVal, maxMs) * scaleY);
+
+            // Centre the 8×8 dot on the data point
+            Canvas.SetLeft(PeakDot,   x - 4);
+            Canvas.SetTop (PeakDot,   y - 4);
+            PeakDot.Visibility = Visibility.Visible;
+
+            // Place label just above the dot, clamp to canvas left edge
+            PeakLabel.Text = $"{maxVal:F0} ms";
+            Canvas.SetLeft(PeakLabel, Math.Max(0, x - 16));
+            Canvas.SetTop (PeakLabel, Math.Max(0, y - 18));
+            PeakLabel.Visibility = Visibility.Visible;
+        }
+
 
         private void UpdatePath(Microsoft.UI.Xaml.Shapes.Polyline polyline, List<double> history)
         {
