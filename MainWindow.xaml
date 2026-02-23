@@ -103,9 +103,9 @@
                                         <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                             <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
                                                 <FontIcon x:Name="RelayIcon" Glyph="&#xE774;" FontSize="24" Foreground="{StaticResource Brush.Text.Muted}"/>
-                                                <TextBlock Text="EXPERT INTERFACE (QUEST 3)" Style="{StaticResource Text.Headline3}"/>
+                                                <TextBlock Text="REMOTE EXPERT" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
-                                            <TextBlock x:Name="RelayStatusText" Text="Listening for Quest 3..." Style="{StaticResource Text.Caption}" Margin="0,8,0,0"/>
+                                            <TextBlock x:Name="RelayStatusText" Text="Listening..." Style="{StaticResource Text.Caption}" Margin="0,8,0,0"/>
                                             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
                                                 <TextBlock x:Name="RelayActiveText" Text="STANDBY" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}"/>
                                                 <TextBlock Text="|" Opacity="0.3" Visibility="Collapsed"/>
@@ -424,16 +424,11 @@
                                                     <TextBlock Text="End Effector (Gripper)" Opacity="0.6"/>
                                                     <TextBlock x:Name="TelemGripper" Text="Unknown" HorizontalAlignment="Right" FontWeight="Bold" Foreground="{StaticResource Brush.Primary}"/>
                                                 </Grid>
-                                                <Border Height="1" Background="White" Opacity="0.1"/>
-                                                <Grid>
-                                                    <TextBlock Text="Operational Mode" Opacity="0.6"/>
-                                                    <TextBlock x:Name="TelemMode" Text="Standard / Teleop" HorizontalAlignment="Right"/>
-                                                </Grid>
                                             </StackPanel>
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- 2. IK Solver Feed (From Quest 3) -->
+                                    <!-- 2. IK Solver Feed (From Expert) -->
                                     <Border Grid.Row="0" Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="24">
                                         <StackPanel Spacing="16">
                                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -648,7 +643,7 @@
                                             <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
                                                 <StackPanel Orientation="Horizontal" Spacing="4">
                                                     <Rectangle Width="12" Height="12" Fill="#0078D7"/>
-                                                    <TextBlock Text="Expert (Quest)" FontSize="12" Opacity="0.8"/>
+                                                    <TextBlock Text="Remote Expert" FontSize="12" Opacity="0.8"/>
                                                 </StackPanel>
                                             </StackPanel>
                                         </StackPanel>
@@ -747,7 +742,7 @@
 
                                             <!-- Expert Node -->
                                             <StackPanel Grid.Column="1" Spacing="12">
-                                                <TextBlock Text="EXPERT (QUEST)" FontSize="11" FontWeight="Bold" Opacity="0.6"/>
+                                                <TextBlock Text="REMOTE EXPERT" FontSize="11" FontWeight="Bold" Opacity="0.6"/>
                                                 <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="16" CornerRadius="12">
                                                     <StackPanel Spacing="6">
                                                         <TextBlock x:Name="QuestIpText" Text="Searching..." FontSize="13" FontWeight="SemiBold"/>
@@ -803,10 +798,7 @@
                 <Grid x:Name="SettingsView" Visibility="Collapsed">
                     <Border Padding="{StaticResource Padding.Page}">
                         <StackPanel Spacing="{StaticResource Space.24}" MaxWidth="600" HorizontalAlignment="Left">
-                            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,12">
-                                <Image Source="ms-appx:///Assets/AppLogo.png" Width="36" Height="36"/>
-                                <TextBlock Text="Settings" Style="{StaticResource Text.Headline1}" VerticalAlignment="Center"/>
-                            </StackPanel>
+
                             
                             <!-- Relay Settings -->
                             <StackPanel Spacing="8">

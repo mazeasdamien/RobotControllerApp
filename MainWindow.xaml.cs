@@ -141,18 +141,6 @@ namespace RobotControllerApp
 
             RelayServerHost.OnRobotStateReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
             {
-                try
-                {
-                    using var doc = System.Text.Json.JsonDocument.Parse(msg);
-                    if (doc.RootElement.TryGetProperty("msg", out var m))
-                    {
-                        if (m.TryGetProperty("robot_status", out var s))
-                            TelemMode.Text = s.ToString();
-                        else if (m.TryGetProperty("state", out var st))
-                            TelemMode.Text = st.ToString();
-                    }
-                }
-                catch { }
             });
 
             DateTime lastUnityMsg = DateTime.MinValue;
@@ -564,7 +552,7 @@ namespace RobotControllerApp
 
             // Step 1: Start Relay Server (Background)
             await Task.Delay(500);
-            Log($"Starting Hub Relay Server for Quest 3 (Port {_settings.RelayPort})...");
+            Log($"Starting Hub Relay Server (Port {_settings.RelayPort})...");
 
             _relayServer.Port = _settings.RelayPort;
             _relayServer.PublicUrl = _settings.PublicUrl;
@@ -1112,13 +1100,13 @@ namespace RobotControllerApp
             {
                 RelayActiveText.Text = "ACTIVE";
                 RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-                RelayStatusText.Text = "Expert (Quest) Connected";
+                RelayStatusText.Text = "Connected";
             }
             else
             {
                 RelayActiveText.Text = "WAITING";
                 RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
-                RelayStatusText.Text = "Awaiting Quest Connection...";
+                RelayStatusText.Text = "Awaiting Connection...";
             }
         }
 
@@ -1155,14 +1143,14 @@ namespace RobotControllerApp
             {
                 if (isExpertReachable)
                 {
-                    RelayActiveText.Text = "QUEST REACHABLE";
+                    RelayActiveText.Text = "EXPERT REACHABLE";
                     var green = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
                     RelayActiveText.Foreground = green;
                     RelayIcon.Foreground = green;   // ← icon also green
                 }
                 else
                 {
-                    RelayActiveText.Text = "WAITING FOR QUEST";
+                    RelayActiveText.Text = "WAITING FOR EXPERT";
                     var muted = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
                     RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Error"];
                     RelayIcon.Foreground = muted;   // ← icon stays muted when not reachable
