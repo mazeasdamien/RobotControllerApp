@@ -517,23 +517,50 @@ namespace RobotControllerApp
         }
 
 
-        private void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
+        private bool _isClosing = false;
+
+        private async void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
         {
-            Log("Stopping services...");
+            if (_isClosing) return;
 
-            try
-            {
-                _ = _robotBridge?.StopAsync();
-                _ = _relayServer?.StopAsync();
-            }
-            catch { }
+            // Cancel the immediate close so we can show a prompt and clean up properly
+            args.Cancel = true;
 
-            // Fire-and-forget exit to prevent WinUI 3 AppWindow shutdown crash
-            Task.Run(async () =>
+            var dialog = new ContentDialog
             {
-                await Task.Delay(500);
+                Title = "Close Application",
+                Content = "Are you sure you want to close the Hub? This will cleanly stop all services and disconnect robots.",
+                PrimaryButtonText = "Close Hub",
+                CloseButtonText = "Cancel",
+                XamlRoot = this.Content.XamlRoot
+            };
+
+            var result = await dialog.ShowAsync();
+
+            if (result == ContentDialogResult.Primary)
+            {
+                _isClosing = true;
+                Log("Stopping services...");
+
+                try
+                {
+                    _speedTestTimer?.Stop();
+                    _cvCaptureCts?.Cancel();
+                    if (_cvCapture != null)
+                    {
+                        try { _cvCapture.Release(); _cvCapture.Dispose(); } catch { }
+                        _cvCapture = null;
+                    }
+
+                    if (_robotBridge != null) await _robotBridge.StopAsync();
+                    if (_relayServer != null) await _relayServer.StopAsync();
+                }
+                catch { }
+
+                // Full application exit
+                Application.Current.Exit();
                 Environment.Exit(0);
-            });
+            }
         }
 
         private async void NavView_Loaded(object _, RoutedEventArgs __)
