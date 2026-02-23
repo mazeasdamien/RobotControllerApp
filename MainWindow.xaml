@@ -735,8 +735,8 @@
                                                 <TextBlock x:Name="ScaleLabel" Text="300ms" FontSize="9" Opacity="0.5" HorizontalAlignment="Center"/>
                                                 <Slider x:Name="LatencyScaleSlider"
                                                         Orientation="Vertical"
-                                                        Minimum="50" Maximum="1000" Value="300"
-                                                        TickFrequency="50" StepFrequency="25"
+                                                        Minimum="10" Maximum="300" Value="150"
+                                                        TickFrequency="10" StepFrequency="5"
                                                         Height="270"
                                                         HorizontalAlignment="Center"
                                                         ValueChanged="LatencyScaleSlider_ValueChanged"/>
@@ -775,7 +775,7 @@
                                         <!-- /Stats Panel -->
 
                                         <!-- X-Axis Time Labels -->
-                                        <Grid Grid.Row="3" Margin="40,48,0,0" HorizontalAlignment="Stretch">
+                                        <Grid Grid.Row="3" Margin="40,48,52,0" HorizontalAlignment="Stretch">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>

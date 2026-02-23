@@ -38,7 +38,7 @@ namespace RobotControllerApp
         private bool _isNetworkPinging = false;
         private const int MaxHistory = 300; // 5 minutes (at 1 ping / second)
         private const int MaxSpeedHistory = 20;
-        private double _latencyMaxMs = 300.0; // Y-axis scale, driven by LatencyScaleSlider
+        private double _latencyMaxMs = 150.0; // Y-axis scale, driven by LatencyScaleSlider
 
         // Custom Telemetry from Unity Client
         private string _questLocation = "Unknown Location";
@@ -702,6 +702,10 @@ namespace RobotControllerApp
                         long totalBytes = 0;
                         var sw = System.Diagnostics.Stopwatch.StartNew();
 
+                        // Some endpoints reject requests without a User-Agent
+                        client.DefaultRequestHeaders.TryAddWithoutValidation(
+                            "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
+
                         using var response = await client.GetAsync(
                             $"https://speed.cloudflare.com/__down?bytes=10000000&nocache={Guid.NewGuid()}",
                             HttpCompletionOption.ResponseHeadersRead);
@@ -709,7 +713,7 @@ namespace RobotControllerApp
                         response.EnsureSuccessStatusCode();
 
                         using var stream = await response.Content.ReadAsStreamAsync();
-                        byte[] buf = new byte[65536]; // 64 KB chunks
+                        byte[] buf = new byte[65536];
                         int read;
                         while ((read = await stream.ReadAsync(buf.AsMemory())) > 0)
                             totalBytes += read;
@@ -718,11 +722,31 @@ namespace RobotControllerApp
                         if (sw.Elapsed.TotalSeconds > 0 && totalBytes > 1000)
                             downMbps = (totalBytes * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
                         else
-                            downMbps = -1; // Indicate error if almost no bytes were received
+                            downMbps = -1;
                     }
-                    catch (Exception)
+                    catch
                     {
-                        downMbps = -1;
+                        // Fallback: smaller file from a different CDN
+                        try
+                        {
+                            long totalBytes = 0;
+                            var sw = System.Diagnostics.Stopwatch.StartNew();
+                            using var response = await client.GetAsync(
+                                "https://proof.ovh.net/files/10Mb.dat",
+                                HttpCompletionOption.ResponseHeadersRead);
+                            response.EnsureSuccessStatusCode();
+                            using var stream = await response.Content.ReadAsStreamAsync();
+                            byte[] buf = new byte[65536];
+                            int read;
+                            while ((read = await stream.ReadAsync(buf.AsMemory())) > 0)
+                                totalBytes += read;
+                            sw.Stop();
+                            if (sw.Elapsed.TotalSeconds > 0 && totalBytes > 1000)
+                                downMbps = (totalBytes * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
+                            else
+                                downMbps = -1;
+                        }
+                        catch { downMbps = -1; }
                     }
 
                     // ── 2. UPLOAD TEST ────────────────────────────────────────────────────
