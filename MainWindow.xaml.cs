@@ -38,6 +38,7 @@ namespace RobotControllerApp
         private bool _isNetworkPinging = false;
         private const int MaxHistory = 300; // 5 minutes (at 1 ping / second)
         private const int MaxSpeedHistory = 20;
+        private double _latencyMaxMs = 300.0; // Y-axis scale, driven by LatencyScaleSlider
 
         // Custom Telemetry from Unity Client
         private string _questLocation = "Unknown Location";
@@ -991,12 +992,15 @@ namespace RobotControllerApp
                     // Fallback to static IP from settings if not connected
                     if (string.IsNullOrEmpty(expertTarget)) expertTarget = _settings.ExpertIp;
 
+                    // Ping the actual Quest device IP (set in Settings → Expert IP).
+                    // Only attempt if we have an IP — skip if nothing is configured.
                     if (!string.IsNullOrEmpty(expertTarget))
                     {
+                        // Strip IPv6-mapped prefix for the pinger
+                        if (expertTarget.StartsWith("::ffff:")) expertTarget = expertTarget[7..];
                         try
                         {
-                            // Rather than pinging the dynamic Unity websocket IP, ping the Tunnel endpoint for accurate latency
-                            var reply = await _pinger.SendPingAsync("niryo.dmzs-lab.com", 1000);
+                            var reply = await _pinger.SendPingAsync(expertTarget, 1000);
                             if (reply.Status == IPStatus.Success) unityLat = reply.RoundtripTime;
                         }
                         catch { }
@@ -1139,8 +1143,8 @@ namespace RobotControllerApp
             else if (isExpertReachable)
             {
                 QuestRelayText.Text = "REACHABLE";
-                QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-                QuestRelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+                QuestRelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
+                QuestRelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
                 QuestLocText.Text = "--";
             }
             else
@@ -1241,7 +1245,7 @@ namespace RobotControllerApp
             double width   = LatencyCanvas.ActualWidth  > 0 ? LatencyCanvas.ActualWidth  : 800;
             double height  = LatencyCanvas.ActualHeight > 0 ? LatencyCanvas.ActualHeight : 120;
             double stepX   = width / (MaxHistory - 1);
-            double maxMs   = 300.0;
+            double maxMs   = _latencyMaxMs;
             double scaleY  = height / maxMs;
 
             double x = peakIdx * stepX;
@@ -1270,7 +1274,7 @@ namespace RobotControllerApp
             double height = LatencyCanvas.ActualHeight > 0 ? LatencyCanvas.ActualHeight : 120;
 
             double stepX = width / (MaxHistory - 1);
-            double maxHeight = 300.0; // 300ms max scale
+            double maxHeight = _latencyMaxMs;
             double scaleY = height / maxHeight;
 
             for (int i = 0; i < history.Count; i++)
@@ -1285,6 +1289,24 @@ namespace RobotControllerApp
                 double y = height - (val * scaleY);
                 polyline.Points.Add(new Windows.Foundation.Point(x, y));
             }
+        }
+
+        private void LatencyScaleSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            _latencyMaxMs = e.NewValue;
+
+            // Update readout label
+            if (ScaleLabel != null)
+                ScaleLabel.Text = $"{_latencyMaxMs:F0}ms";
+
+            // Update Y-axis tick labels at 75%, 50%, 25% of scale
+            if (YLabel75 != null) YLabel75.Text = $"{_latencyMaxMs * 0.75:F0}ms";
+            if (YLabel50 != null) YLabel50.Text = $"{_latencyMaxMs * 0.50:F0}ms";
+            if (YLabel25 != null) YLabel25.Text = $"{_latencyMaxMs * 0.25:F0}ms";
+            if (YLabel0  != null) YLabel0.Text  = "0ms";
+
+            // Immediately redraw with new scale
+            DrawNetworkGraph();
         }
     }
 }
