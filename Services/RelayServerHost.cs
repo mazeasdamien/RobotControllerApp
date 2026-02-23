@@ -24,7 +24,7 @@ namespace RobotControllerApp.Services
         public static event Action<string>? OnUnityMessageReceived;
         public static event Action<string>? OnGripperReceived;
         public static event Action<string>? OnRobotStateReceived;
-        public static event Action<string, float, float>? OnUnityTelemetryReceived; // location, rx_kbps, tx_kbps
+        public static event Action<string, float, float, string>? OnUnityTelemetryReceived; // location, rx_kbps, tx_kbps, public_ip
 
         public static string? UnityClientIp { get; private set; }
         public static string? RobotBridgeIp { get; private set; }
@@ -401,10 +401,11 @@ namespace RobotControllerApp.Services
                             using (JsonDocument doc = JsonDocument.Parse(message))
                             {
                                 var root = doc.RootElement;
-                                string loc = root.TryGetProperty("location", out var l) ? l.GetString() ?? "Unknown" : "Unknown";
-                                float rx = root.TryGetProperty("rx_kbps", out var r) ? (float)r.GetDouble() : 0f;
-                                float tx = root.TryGetProperty("tx_kbps", out var t) ? (float)t.GetDouble() : 0f;
-                                OnUnityTelemetryReceived?.Invoke(loc, rx, tx);
+                                string loc   = root.TryGetProperty("location",  out var l) ? l.GetString() ?? "Unknown" : "Unknown";
+                                float  rx    = root.TryGetProperty("rx_kbps",   out var r) ? (float)r.GetDouble() : 0f;
+                                float  tx    = root.TryGetProperty("tx_kbps",   out var t) ? (float)t.GetDouble() : 0f;
+                                string pubIp = root.TryGetProperty("public_ip", out var p) ? p.GetString() ?? "" : "";
+                                OnUnityTelemetryReceived?.Invoke(loc, rx, tx, pubIp);
                             }
                         }
                         catch { }

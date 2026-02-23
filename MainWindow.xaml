@@ -327,13 +327,13 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- System Logs -->
+                                <!-- Hub Logs -->
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="*"/>
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="System Logs" Style="{StaticResource Text.Headline3}" Margin="{StaticResource Margin.Component}"/>
+                                    <TextBlock Text="Hub Logs" Style="{StaticResource Text.Headline3}" Margin="{StaticResource Margin.Component}"/>
                                     <Border Grid.Row="1" Background="Black" CornerRadius="{StaticResource Radius.Small}" Padding="{StaticResource Padding.Small}">
                                         <Grid>
                                             <ScrollViewer x:Name="LogScroll"
@@ -341,27 +341,36 @@
                                                 <RichTextBlock x:Name="ConsoleLog" IsTextSelectionEnabled="True" Foreground="#00FF00" FontFamily="Consolas" FontSize="12"/>
                                             </ScrollViewer>
 
-                                            <!-- Jump-to-bottom button (visible only when scrolled up) -->
+                                            <!-- Jump-to-bottom button — premium pill style -->
                                             <Button x:Name="ScrollToBottomBtn"
-                                                    Content="↓ Latest"
                                                     Click="ScrollToBottomBtn_Click"
                                                     Visibility="Collapsed"
-                                                    HorizontalAlignment="Right"
+                                                    HorizontalAlignment="Center"
                                                     VerticalAlignment="Bottom"
-                                                    Margin="0,0,12,12"
-                                                    Padding="10,5"
-                                                    FontSize="11"
-                                                    FontWeight="SemiBold"
-                                                    CornerRadius="20"
-                                                    Background="#CC1A1A2E"
-                                                    BorderBrush="#5500E5FF"
-                                                    BorderThickness="1"
-                                                    Foreground="#00E5FF"
-                                                    Opacity="0.92"/>
+                                                    Margin="0,0,0,14"
+                                                    Padding="0"
+                                                    CornerRadius="999"
+                                                    Background="Transparent"
+                                                    BorderThickness="0">
+                                                <Border Background="#D0101022"
+                                                        CornerRadius="999"
+                                                        Padding="14,7"
+                                                        BorderBrush="#6600E5FF"
+                                                        BorderThickness="1">
+                                                    <Border.Shadow>
+                                                        <ThemeShadow/>
+                                                    </Border.Shadow>
+                                                    <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                                                        <FontIcon Glyph="&#xE74B;" FontSize="11" Foreground="#00E5FF"/>
+                                                        <TextBlock Text="LATEST" FontSize="11" FontWeight="Bold" Foreground="#00E5FF" VerticalAlignment="Center" CharacterSpacing="80"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </Button>
                                         </Grid>
                                     </Border>
 
                                 </Grid>
+
                             </Grid>
                         </Grid>
                     </Border>
@@ -703,7 +712,7 @@
                                                 </Grid>
 
                                                 <!-- Grid Lines -->
-                                                <Canvas Margin="40,0,0,0" Opacity="0.08" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                                                <Canvas Margin="40,0,12,0" Opacity="0.08" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                                                     <Line X1="0" Y1="0"   X2="2000" Y2="0"   Stroke="White" StrokeThickness="1"/>
                                                     <Line X1="0" Y1="75"  X2="2000" Y2="75"  Stroke="White" StrokeThickness="1"/>
                                                     <Line X1="0" Y1="150" X2="2000" Y2="150" Stroke="White" StrokeThickness="1"/>
@@ -712,7 +721,7 @@
                                                 </Canvas>
 
                                                 <!-- Plot Layers -->
-                                                <Canvas x:Name="LatencyCanvas" Margin="40,0,0,0" Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+                                                <Canvas x:Name="LatencyCanvas" Margin="40,0,12,0" Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
                                                     <Polyline x:Name="UnityPath" Stroke="#0078D7" StrokeThickness="2" StrokeLineJoin="Round"/>
                                                     <Ellipse x:Name="PeakDot" Width="8" Height="8" Fill="#FF4B6EFF" Stroke="White" StrokeThickness="1.5"
                                                              Visibility="Collapsed" Canvas.Left="0" Canvas.Top="0"/>
@@ -728,7 +737,6 @@
                                                         Orientation="Vertical"
                                                         Minimum="50" Maximum="1000" Value="300"
                                                         TickFrequency="50" StepFrequency="25"
-                                                        IsDirectionReversed="True"
                                                         Height="270"
                                                         HorizontalAlignment="Center"
                                                         ValueChanged="LatencyScaleSlider_ValueChanged"/>

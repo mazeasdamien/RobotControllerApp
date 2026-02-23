@@ -42,8 +42,9 @@ namespace RobotControllerApp
 
         // Custom Telemetry from Unity Client
         private string _questLocation = "Unknown Location";
-        private float _questRxKbps = 0f;
-        private float _questTxKbps = 0f;
+        private string _questPublicIp  = "";
+        private float  _questRxKbps = 0f;
+        private float  _questTxKbps = 0f;
 
         public MainWindow()
         {
@@ -100,11 +101,12 @@ namespace RobotControllerApp
                 this.DispatcherQueue.TryEnqueue(() => UpdateExpertStatus(connected));
             };
 
-            RelayServerHost.OnUnityTelemetryReceived += (loc, rx, tx) => this.DispatcherQueue.TryEnqueue(() =>
+            RelayServerHost.OnUnityTelemetryReceived += (loc, rx, tx, pubIp) => this.DispatcherQueue.TryEnqueue(() =>
             {
                 _questLocation = loc;
-                _questRxKbps = rx;
-                _questTxKbps = tx;
+                _questRxKbps   = rx;
+                _questTxKbps   = tx;
+                if (!string.IsNullOrEmpty(pubIp)) _questPublicIp = pubIp;
             });
 
             // Telemetry Subscriptions
@@ -151,6 +153,9 @@ namespace RobotControllerApp
                 lastUnityMsg = now;
 
 
+                // Only parse IK pos/rot from telemetry messages — skip all other Unity/ROS traffic
+                if (!msg.Contains("\"op\":\"unity_telemetry\"")) return;
+
                 try
                 {
                     using var doc = System.Text.Json.JsonDocument.Parse(msg);
@@ -191,10 +196,8 @@ namespace RobotControllerApp
                         }
                     }
                 }
-                catch (Exception ex)
-                {
-                    if (msg.Contains("pos")) Log($"[Parse Error] {ex.Message}");
-                }
+                catch { /* silently ignore malformed telemetry */ }
+
             });
 
             RelayServerHost.OnImageReceived += (imageBytes) => this.DispatcherQueue.TryEnqueue(async () =>
@@ -992,19 +995,27 @@ namespace RobotControllerApp
                     // Fallback to static IP from settings if not connected
                     if (string.IsNullOrEmpty(expertTarget)) expertTarget = _settings.ExpertIp;
 
-                    // Ping the actual Quest device IP (set in Settings → Expert IP).
-                    // Only attempt if we have an IP — skip if nothing is configured.
+                    // Ping the actual Quest device IP.
+                    // If it's loopback (Unity Editor on same PC) or empty, fall back to
+                    // the Cloudflare tunnel so the graph always shows real WAN latency.
                     if (!string.IsNullOrEmpty(expertTarget))
                     {
-                        // Strip IPv6-mapped prefix for the pinger
                         if (expertTarget.StartsWith("::ffff:")) expertTarget = expertTarget[7..];
-                        try
-                        {
-                            var reply = await _pinger.SendPingAsync(expertTarget, 1000);
-                            if (reply.Status == IPStatus.Success) unityLat = reply.RoundtripTime;
-                        }
-                        catch { }
                     }
+
+                    bool expertIsLoopback = string.IsNullOrEmpty(expertTarget)
+                        || expertTarget == "127.0.0.1"
+                        || expertTarget == "localhost"
+                        || expertTarget == "::1";
+
+                    string pingTarget = expertIsLoopback ? "niryo.dmzs-lab.com" : expertTarget;
+                    try
+                    {
+                        var reply = await _pinger.SendPingAsync(pingTarget, 1000);
+                        if (reply.Status == IPStatus.Success) unityLat = reply.RoundtripTime;
+                    }
+                    catch { }
+
 
                     // 2. Measure Robot 1 latency (Ethernet)
                     double r1Lat = 0;
@@ -1114,12 +1125,16 @@ namespace RobotControllerApp
             Robot2Icon.Foreground       = isR2Connected ? successBrush : mutedBrush;
 
             // 2. Discovery updates
-            string? expertDisplayIp = RelayServerHost.UnityClientIp;
+            // Prefer the public IP reported by the Quest itself (from telemetry)
+            string? expertDisplayIp = !string.IsNullOrEmpty(_questPublicIp)
+                ? _questPublicIp
+                : RelayServerHost.UnityClientIp;
             // Strip IPv6-mapped IPv4 prefix (e.g. "::ffff:127.0.0.1" → "127.0.0.1")
             if (!string.IsNullOrEmpty(expertDisplayIp) && expertDisplayIp.StartsWith("::ffff:"))
                 expertDisplayIp = expertDisplayIp[7..];
             if (string.IsNullOrEmpty(expertDisplayIp)) expertDisplayIp = _settings.ExpertIp;
-            if (string.IsNullOrEmpty(expertDisplayIp)) expertDisplayIp = "quest-3";
+            if (string.IsNullOrEmpty(expertDisplayIp)) expertDisplayIp = "--";
+
 
             if (!isExpertWsConnected && !isExpertReachable)
             {
