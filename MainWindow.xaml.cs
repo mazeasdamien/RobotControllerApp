@@ -24,7 +24,8 @@ namespace RobotControllerApp
     public sealed partial class MainWindow : Window
     {
         private readonly RelayServerHost _relayServer;
-        private readonly RobotBridgeService _robotBridge;
+        private readonly RobotBridgeService _robotBridge;   // Robot 1
+        private readonly RobotBridgeService _robotBridge2;  // Robot 2
         private readonly AppSettings _settings;
 
         // Network Performance History
@@ -42,9 +43,9 @@ namespace RobotControllerApp
 
         // Custom Telemetry from Unity Client
         private string _questLocation = "Unknown Location";
-        private string _questPublicIp  = "";
-        private float  _questRxKbps = 0f;
-        private float  _questTxKbps = 0f;
+        private string _questPublicIp = "";
+        private float _questRxKbps = 0f;
+        private float _questTxKbps = 0f;
 
         public MainWindow()
         {
@@ -73,7 +74,8 @@ namespace RobotControllerApp
             // Initialize Services
             _settings = AppSettings.Load();
             _relayServer = new RelayServerHost();
-            _robotBridge = new RobotBridgeService();
+            _robotBridge = new RobotBridgeService() { RobotId = "Robot_Niryo_01" };
+            _robotBridge2 = new RobotBridgeService() { RobotId = "Robot_Niryo_02" };
 
             // Initialize Settings UI values
             RelayPortInput.Text = _settings.RelayPort.ToString();
@@ -91,10 +93,8 @@ namespace RobotControllerApp
             // Wire up Logs
             RelayServerHost.OnLog += Log;
             RobotBridgeService.OnLog += Log;
-            RobotBridgeService.OnRosConnectionChanged += (connected) =>
-            {
-                this.DispatcherQueue.TryEnqueue(() => UpdateRobotStatus(connected));
-            };
+            _robotBridge.OnInstanceConnectionChanged += (connected) => this.DispatcherQueue.TryEnqueue(() => UpdateRobotStatus(connected));
+            _robotBridge2.OnInstanceConnectionChanged += (connected) => this.DispatcherQueue.TryEnqueue(() => UpdateRobot2Status(connected));
 
             RelayServerHost.OnUnityConnectionChanged += (connected) =>
             {
@@ -104,8 +104,8 @@ namespace RobotControllerApp
             RelayServerHost.OnUnityTelemetryReceived += (loc, rx, tx, pubIp) => this.DispatcherQueue.TryEnqueue(() =>
             {
                 _questLocation = loc;
-                _questRxKbps   = rx;
-                _questTxKbps   = tx;
+                _questRxKbps = rx;
+                _questTxKbps = tx;
                 if (!string.IsNullOrEmpty(pubIp)) _questPublicIp = pubIp;
             });
 
@@ -450,20 +450,20 @@ namespace RobotControllerApp
         private void UpdateRobotStatus(bool isConnected)
         {
             var successBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-            var warnBrush    = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
-            var mutedBrush   = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
-            Robot1ActiveText.Text       = isConnected ? "ACTIVE" : "WAITING";
+            var warnBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
+            var mutedBrush = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+            Robot1ActiveText.Text = isConnected ? "ACTIVE" : "WAITING";
             Robot1ActiveText.Foreground = isConnected ? successBrush : mutedBrush;
-            Robot1Icon.Foreground       = isConnected ? successBrush : warnBrush;
+            Robot1Icon.Foreground = isConnected ? successBrush : warnBrush;
         }
 
         private void UpdateRobot2Status(bool isConnected)
         {
             var successBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-            var mutedBrush   = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
-            Robot2ActiveText.Text       = isConnected ? "ACTIVE" : "WAITING";
+            var mutedBrush = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+            Robot2ActiveText.Text = isConnected ? "ACTIVE" : "WAITING";
             Robot2ActiveText.Foreground = isConnected ? successBrush : mutedBrush;
-            Robot2Icon.Foreground       = isConnected ? successBrush : mutedBrush;
+            Robot2Icon.Foreground = isConnected ? successBrush : mutedBrush;
         }
 
         private async Task TraceHubLocation()
@@ -539,6 +539,7 @@ namespace RobotControllerApp
                     }
 
                     if (_robotBridge != null) await _robotBridge.StopAsync();
+                    if (_robotBridge2 != null) await _robotBridge2.StopAsync();
                     if (_relayServer != null) await _relayServer.StopAsync();
                 }
                 catch { }
@@ -574,34 +575,37 @@ namespace RobotControllerApp
 
             // (Relay server listening — no status caption element)
 
-            // Step 2: Start Robot Bridge (Client)
+            // Step 2: Start Robot Bridges
             await Task.Delay(1000);
-            Log($"Starting Robot Bridge Service (Target: {_settings.RobotIp})...");
 
-            string sanitizedRosIp = _settings.RobotIp;
-            if (sanitizedRosIp.Contains("://"))
-            {
-                // Extract hostname/IP from URI
-                try { sanitizedRosIp = new Uri(sanitizedRosIp).Host; } catch { }
-            }
-            else if (sanitizedRosIp.Contains(':'))
-            {
-                sanitizedRosIp = sanitizedRosIp.Split(':')[0];
-            }
-
-            _robotBridge.RosIp = sanitizedRosIp;
+            // Robot 1
+            Log($"Starting Robot 1 Bridge (Target: {_settings.RobotIp})...");
+            _robotBridge.RosIp = SanitizeIp(_settings.RobotIp);
             _robotBridge.RelayServerUrl = $"ws://localhost:{_settings.RelayPort}/robot";
             _robotBridge.Start();
-
             UpdateRobotStatus(false);
 
-            // Initialize Robot 2 (Visual Only)
+            // Robot 2
+            Log($"Starting Robot 2 Bridge (Target: {_settings.Robot2Ip})...");
+            _robotBridge2.RosIp = SanitizeIp(_settings.Robot2Ip);
+            _robotBridge2.RelayServerUrl = $"ws://localhost:{_settings.RelayPort}/robot";
+            _robotBridge2.Start();
             UpdateRobot2Status(false);
 
             // Step 3: Ready
             Log("System Ready. Waiting for connections...");
         }
 
+        private static string SanitizeIp(string ip)
+        {
+            if (string.IsNullOrWhiteSpace(ip)) return ip;
+            if (ip.Contains("://"))
+            {
+                try { return new Uri(ip).Host; } catch { }
+            }
+            if (ip.Contains(':')) return ip.Split(':')[0];
+            return ip.Trim();
+        }
 
         private async void SaveSettingsButton_Click(object sender, RoutedEventArgs e)
         {
@@ -619,8 +623,10 @@ namespace RobotControllerApp
                 _settings.RobotIp = RobotIpInput.Text.Trim();
                 _settings.Robot2Ip = Robot2IpInput.Text.Trim();
                 _settings.Save();
-                _robotBridge.RelayServerUrl = $"ws://localhost:{_settings.RelayPort}/robot"; // Robot 1 Config
-                                                                                             // Note: Robot 2 connection logic is not yet implemented in service, only stored in settings.
+                _robotBridge.RosIp = SanitizeIp(_settings.RobotIp);
+                _robotBridge2.RosIp = SanitizeIp(_settings.Robot2Ip);
+                _robotBridge.RelayServerUrl = $"ws://localhost:{_settings.RelayPort}/robot";
+                _robotBridge2.RelayServerUrl = $"ws://localhost:{_settings.RelayPort}/robot";
 
                 // Persist to Disk
                 _settings.Save();
@@ -630,6 +636,7 @@ namespace RobotControllerApp
                 {
                     Log("Stopping services...");
                     await _robotBridge.StopAsync();
+                    await _robotBridge2.StopAsync();
                     await _relayServer.StopAsync();
                 }
                 catch (Exception stopEx)
@@ -647,8 +654,7 @@ namespace RobotControllerApp
                 {
                     _ = Task.Run(async () => await _relayServer.StartAsync());
                     _robotBridge.Start();
-
-                    // (Relay server restarted)
+                    _robotBridge2.Start();
 
                     UpdateRobotStatus(false);
                     UpdateRobot2Status(false);
@@ -1107,11 +1113,11 @@ namespace RobotControllerApp
 
         private void UpdateExpertStatus(bool connected)
         {
-            var green  = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-            var muted  = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
-            RelayActiveText.Text       = connected ? "ACTIVE" : "WAITING";
+            var green = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+            var muted = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+            RelayActiveText.Text = connected ? "ACTIVE" : "WAITING";
             RelayActiveText.Foreground = connected ? green : muted;
-            RelayIcon.Foreground       = connected ? green : muted;
+            RelayIcon.Foreground = connected ? green : muted;
         }
 
         private void UpdateDashboardAndDiscovery(double uLat, double r1Lat, double r2Lat)
@@ -1129,24 +1135,24 @@ namespace RobotControllerApp
 
             // ---------- Dashboard Status Cards ----------
             var successBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
-            var mutedBrush   = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
-            var warnBrush    = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
+            var mutedBrush = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+            var warnBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
 
             // Remote Expert
             bool expertActive = isExpertWsConnected || isExpertReachable;
-            RelayActiveText.Text       = expertActive ? "ACTIVE" : "WAITING";
+            RelayActiveText.Text = expertActive ? "ACTIVE" : "WAITING";
             RelayActiveText.Foreground = expertActive ? successBrush : mutedBrush;
-            RelayIcon.Foreground       = expertActive ? successBrush : mutedBrush;
+            RelayIcon.Foreground = expertActive ? successBrush : mutedBrush;
 
             // Robot 1
-            Robot1ActiveText.Text       = isR1Connected ? "ACTIVE" : "WAITING";
+            Robot1ActiveText.Text = isR1Connected ? "ACTIVE" : "WAITING";
             Robot1ActiveText.Foreground = isR1Connected ? successBrush : mutedBrush;
-            Robot1Icon.Foreground       = isR1Connected ? successBrush : warnBrush;
+            Robot1Icon.Foreground = isR1Connected ? successBrush : warnBrush;
 
             // Robot 2
-            Robot2ActiveText.Text       = isR2Connected ? "ACTIVE" : "WAITING";
+            Robot2ActiveText.Text = isR2Connected ? "ACTIVE" : "WAITING";
             Robot2ActiveText.Foreground = isR2Connected ? successBrush : mutedBrush;
-            Robot2Icon.Foreground       = isR2Connected ? successBrush : mutedBrush;
+            Robot2Icon.Foreground = isR2Connected ? successBrush : mutedBrush;
 
             // 2. Discovery updates
             // Prefer the public IP reported by the Quest itself (from telemetry)
@@ -1273,32 +1279,32 @@ namespace RobotControllerApp
             var valid = history.Where(v => v > 0).ToList();
             if (valid.Count < 2)
             {
-                PeakDot.Visibility   = Visibility.Collapsed;
+                PeakDot.Visibility = Visibility.Collapsed;
                 PeakLabel.Visibility = Visibility.Collapsed;
                 return;
             }
 
             double maxVal = valid.Max();
-            int peakIdx   = history.LastIndexOf(maxVal); // rightmost occurrence
+            int peakIdx = history.LastIndexOf(maxVal); // rightmost occurrence
 
-            double width   = LatencyCanvas.ActualWidth  > 0 ? LatencyCanvas.ActualWidth  : 800;
-            double height  = LatencyCanvas.ActualHeight > 0 ? LatencyCanvas.ActualHeight : 120;
-            double stepX   = width / (MaxHistory - 1);
-            double maxMs   = _latencyMaxMs;
-            double scaleY  = height / maxMs;
+            double width = LatencyCanvas.ActualWidth > 0 ? LatencyCanvas.ActualWidth : 800;
+            double height = LatencyCanvas.ActualHeight > 0 ? LatencyCanvas.ActualHeight : 120;
+            double stepX = width / (MaxHistory - 1);
+            double maxMs = _latencyMaxMs;
+            double scaleY = height / maxMs;
 
             double x = peakIdx * stepX;
             double y = height - (Math.Min(maxVal, maxMs) * scaleY);
 
             // Centre the 8×8 dot on the data point
-            Canvas.SetLeft(PeakDot,   x - 4);
-            Canvas.SetTop (PeakDot,   y - 4);
+            Canvas.SetLeft(PeakDot, x - 4);
+            Canvas.SetTop(PeakDot, y - 4);
             PeakDot.Visibility = Visibility.Visible;
 
             // Place label just above the dot, clamp to canvas left edge
             PeakLabel.Text = $"{maxVal:F0} ms";
             Canvas.SetLeft(PeakLabel, Math.Max(0, x - 16));
-            Canvas.SetTop (PeakLabel, Math.Max(0, y - 18));
+            Canvas.SetTop(PeakLabel, Math.Max(0, y - 18));
             PeakLabel.Visibility = Visibility.Visible;
         }
 
@@ -1342,7 +1348,7 @@ namespace RobotControllerApp
             if (YLabel75 != null) YLabel75.Text = $"{_latencyMaxMs * 0.75:F0}ms";
             if (YLabel50 != null) YLabel50.Text = $"{_latencyMaxMs * 0.50:F0}ms";
             if (YLabel25 != null) YLabel25.Text = $"{_latencyMaxMs * 0.25:F0}ms";
-            if (YLabel0  != null) YLabel0.Text  = "0ms";
+            if (YLabel0 != null) YLabel0.Text = "0ms";
 
             // Immediately redraw with new scale
             DrawNetworkGraph();

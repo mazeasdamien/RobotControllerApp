@@ -12,6 +12,8 @@ namespace RobotControllerApp.Services
     {
         public static event Action<string>? OnLog;
         public static event Action<bool>? OnRosConnectionChanged;
+        /// <summary>Per-instance connection event — use this instead of the static one when managing multiple bridges.</summary>
+        public event Action<bool>? OnInstanceConnectionChanged;
         public bool IsConnected { get; private set; }
 
         private ClientWebSocket? _robotWebSocket;
@@ -76,6 +78,7 @@ namespace RobotControllerApp.Services
                     Log("[ROS] ✓ Connected to robot");
                     IsConnected = true;
                     OnRosConnectionChanged?.Invoke(true);
+                    OnInstanceConnectionChanged?.Invoke(true);
 
                     await SubscribeToJointStates();
 
@@ -104,6 +107,7 @@ namespace RobotControllerApp.Services
                 {
                     IsConnected = false;
                     OnRosConnectionChanged?.Invoke(false);
+                    OnInstanceConnectionChanged?.Invoke(false);
                     // Force disconnect from Relay so the Server knows we are offline
                     try { _relayWebSocket?.Abort(); } catch { }
                 }
