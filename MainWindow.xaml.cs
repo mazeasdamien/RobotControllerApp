@@ -1127,7 +1127,8 @@ namespace RobotControllerApp
             bool on = R1LearningToggle.IsOn;
             string cmd = BuildLearningModeCommand(on);
             bool ok = await SendDebugCommand(_robotBridge, cmd);
-            Log($"[Debug][R1] Learning mode {(on ? "ON" : "OFF")} — sent={ok}");
+            Log(ok ? $"✅ R1 — Learning mode {(on ? "ON" : "OFF")}"
+                   : "❌ R1 — Learning mode: ROS not connected");
         }
 
         private async void R2LearningToggle_Toggled(object sender, RoutedEventArgs e)
@@ -1135,22 +1136,53 @@ namespace RobotControllerApp
             bool on = R2LearningToggle.IsOn;
             string cmd = BuildLearningModeCommand(on);
             bool ok = await SendDebugCommand(_robotBridge2, cmd);
-            Log($"[Debug][R2] Learning mode {(on ? "ON" : "OFF")} — sent={ok}");
+            Log(ok ? $"✅ R2 — Learning mode {(on ? "ON" : "OFF")}"
+                   : "❌ R2 — Learning mode: ROS not connected");
         }
 
         private async void R1HomeButton_Click(object sender, RoutedEventArgs e)
         {
             string cmd = BuildHomeCommand();
             bool ok = await SendDebugCommand(_robotBridge, cmd);
-            Log($"[Debug][R1] Home command — sent={ok}");
+            Log(ok ? "✅ R1 — Moving to home [0 0 0 0 0 0]"
+                   : "❌ R1 — Home: ROS not connected");
         }
 
         private async void R2HomeButton_Click(object sender, RoutedEventArgs e)
         {
             string cmd = BuildHomeCommand();
             bool ok = await SendDebugCommand(_robotBridge2, cmd);
-            Log($"[Debug][R2] Home command — sent={ok}");
+            Log(ok ? "✅ R2 — Moving to home [0 0 0 0 0 0]"
+                   : "❌ R2 — Home: ROS not connected");
         }
+
+        private async void R1CalibrateButton_Click(object sender, RoutedEventArgs e)
+        {
+            string cmd = BuildCalibrationCommand();
+            bool ok = await SendDebugCommand(_robotBridge, cmd);
+            Log(ok ? "✅ R1 — Auto-calibration triggered"
+                   : "❌ R1 — Calibration: ROS not connected");
+        }
+
+        private async void R2CalibrateButton_Click(object sender, RoutedEventArgs e)
+        {
+            string cmd = BuildCalibrationCommand();
+            bool ok = await SendDebugCommand(_robotBridge2, cmd);
+            Log(ok ? "✅ R2 — Auto-calibration triggered"
+                   : "❌ R2 — Calibration: ROS not connected");
+        }
+
+        private static string BuildCalibrationCommand() =>
+            // Service: /niryo_robot/joints_interface/calibrate_motors
+            // Type:    niryo_robot_msgs/SetInt  (confirmed: rosservice type on Pi)
+            // value:   1 = AUTO calibration, 2 = MANUAL
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                op = "call_service",
+                service = "/niryo_robot/joints_interface/calibrate_motors",
+                type = "niryo_robot_msgs/SetInt",
+                args = new { value = 1 }
+            });
 
         /// <summary>
         /// Sends a command to a robot bridge and returns true if the ROS socket was open.
@@ -1164,7 +1196,6 @@ namespace RobotControllerApp
                     $"Check that rosbridge_server is running on {bridge.RosIp}:{bridge.RosPort}.");
                 return false;
             }
-            Log($"[Debug][{bridge.RobotId}] Sending: {json[..Math.Min(120, json.Length)]}...");
             await bridge.SendDirectToRobotAsync(json);
             return true;
         }

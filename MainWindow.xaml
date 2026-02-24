@@ -197,18 +197,22 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                             <TextBlock Text="Robot 1" FontSize="12" FontWeight="SemiBold"
                                                        Foreground="{StaticResource Brush.Primary}" VerticalAlignment="Center"/>
-                                            <TextBlock Text="Learning Mode" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+                                            <TextBlock Text="Learning" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+                                            <ToggleSwitch x:Name="R1LearningToggle"
+                                                          OnContent="ON" OffContent="OFF" MinWidth="0"
+                                                          Margin="4,0,0,0"
+                                                          Toggled="R1LearningToggle_Toggled"/>
                                         </StackPanel>
-                                        <ToggleSwitch x:Name="R1LearningToggle" Grid.Column="1"
-                                                      OnContent="ON" OffContent="OFF" MinWidth="0"
-                                                      Margin="0,0,16,0"
-                                                      Toggled="R1LearningToggle_Toggled"/>
-                                        <Button x:Name="R1HomeButton" Grid.Column="2"
+                                        <Button x:Name="R1HomeButton" Grid.Column="1"
                                                 Content="HOME" Style="{StaticResource Button.Filled}"
+                                                Margin="0,0,8,0"
                                                 Click="R1HomeButton_Click"/>
+                                        <Button x:Name="R1CalibrateButton" Grid.Column="2"
+                                                Content="CALIBRATE"
+                                                Click="R1CalibrateButton_Click"/>
                                     </Grid>
                                 </Border>
 
@@ -221,18 +225,22 @@
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
-                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                             <TextBlock Text="Robot 2" FontSize="12" FontWeight="SemiBold"
                                                        Foreground="#FFD279" VerticalAlignment="Center"/>
-                                            <TextBlock Text="Learning Mode" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+                                            <TextBlock Text="Learning" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+                                            <ToggleSwitch x:Name="R2LearningToggle"
+                                                          OnContent="ON" OffContent="OFF" MinWidth="0"
+                                                          Margin="4,0,0,0"
+                                                          Toggled="R2LearningToggle_Toggled"/>
                                         </StackPanel>
-                                        <ToggleSwitch x:Name="R2LearningToggle" Grid.Column="1"
-                                                      OnContent="ON" OffContent="OFF" MinWidth="0"
-                                                      Margin="0,0,16,0"
-                                                      Toggled="R2LearningToggle_Toggled"/>
-                                        <Button x:Name="R2HomeButton" Grid.Column="2"
+                                        <Button x:Name="R2HomeButton" Grid.Column="1"
                                                 Content="HOME" Style="{StaticResource Button.Filled}"
+                                                Margin="0,0,8,0"
                                                 Click="R2HomeButton_Click"/>
+                                        <Button x:Name="R2CalibrateButton" Grid.Column="2"
+                                                Content="CALIBRATE"
+                                                Click="R2CalibrateButton_Click"/>
                                     </Grid>
                                 </Border>
                             </Grid>
