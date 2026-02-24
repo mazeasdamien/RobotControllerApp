@@ -204,12 +204,14 @@ namespace RobotControllerApp
             });
 
             DateTime lastUnityMsg = DateTime.MinValue;
+            // Rate-limit IK forwarding: max 10 Hz per robot to avoid flooding rosbridge
+            DateTime _lastIkSendR1 = DateTime.MinValue;
+            DateTime _lastIkSendR2 = DateTime.MinValue;
 
             RelayServerHost.OnUnityMessageReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
             {
                 var now = DateTime.Now;
                 lastUnityMsg = now;
-
 
                 // Only parse IK pos/rot from telemetry messages — skip all other Unity/ROS traffic
                 if (!msg.Contains("\"op\":\"unity_telemetry\"")) return;
@@ -223,50 +225,100 @@ namespace RobotControllerApp
                     bool isRobot2 = root.TryGetProperty("robotId", out var rid) &&
                                     rid.GetString() == "Robot_Niryo_02";
 
-                    // Flexible parsing for Position (pos, position / Array, Object)
+                    double px = 0, py = 0, pz = 0;
+                    double qx = 0, qy = 0, qz = 0, qw = 1;
+                    bool hasPos = false, hasRot = false;
+
+                    // Flexible parsing for Position
                     if (root.TryGetProperty("pos", out System.Text.Json.JsonElement pos) || root.TryGetProperty("position", out pos))
                     {
-                        string posText;
                         if (pos.ValueKind == System.Text.Json.JsonValueKind.Array && pos.GetArrayLength() >= 3)
-                            posText = $"Pos: [{pos[0].GetDouble():0.00}, {pos[1].GetDouble():0.00}, {pos[2].GetDouble():0.00}]";
+                        { px = pos[0].GetDouble(); py = pos[1].GetDouble(); pz = pos[2].GetDouble(); hasPos = true; }
                         else if (pos.ValueKind == System.Text.Json.JsonValueKind.Object)
                         {
-                            double x = 0, y = 0, z = 0;
-                            if (pos.TryGetProperty("x", out var vx)) x = vx.GetDouble();
-                            if (pos.TryGetProperty("y", out var vy)) y = vy.GetDouble();
-                            if (pos.TryGetProperty("z", out var vz)) z = vz.GetDouble();
-                            posText = $"Pos: [{x:0.00}, {y:0.00}, {z:0.00}]";
+                            if (pos.TryGetProperty("x", out var vx)) px = vx.GetDouble();
+                            if (pos.TryGetProperty("y", out var vy)) py = vy.GetDouble();
+                            if (pos.TryGetProperty("z", out var vz)) pz = vz.GetDouble();
+                            hasPos = true;
                         }
-                        else posText = "";
-
-                        if (!string.IsNullOrEmpty(posText))
+                        if (hasPos)
                         {
+                            string posText = $"Pos: [{px:0.00}, {py:0.00}, {pz:0.00}]";
                             if (isRobot2) TelemIKPos2.Text = posText;
                             else TelemIKPos.Text = posText;
                         }
                     }
 
-                    // Flexible parsing for Rotation (rot, rotation / Array, Object)
+                    // Flexible parsing for Rotation (quaternion)
                     if (root.TryGetProperty("rot", out System.Text.Json.JsonElement rot) || root.TryGetProperty("rotation", out rot))
                     {
-                        string rotText;
                         if (rot.ValueKind == System.Text.Json.JsonValueKind.Array && rot.GetArrayLength() >= 4)
-                            rotText = $"Rot: [{rot[0].GetDouble():0.00}, {rot[1].GetDouble():0.00}, {rot[2].GetDouble():0.00}, {rot[3].GetDouble():0.00}]";
+                        { qx = rot[0].GetDouble(); qy = rot[1].GetDouble(); qz = rot[2].GetDouble(); qw = rot[3].GetDouble(); hasRot = true; }
                         else if (rot.ValueKind == System.Text.Json.JsonValueKind.Object)
                         {
-                            double x = 0, y = 0, z = 0, w = 1;
-                            if (rot.TryGetProperty("x", out var vx)) x = vx.GetDouble();
-                            if (rot.TryGetProperty("y", out var vy)) y = vy.GetDouble();
-                            if (rot.TryGetProperty("z", out var vz)) z = vz.GetDouble();
-                            if (rot.TryGetProperty("w", out var vw)) w = vw.GetDouble();
-                            rotText = $"Rot: [{x:0.00}, {y:0.00}, {z:0.00}, {w:0.00}]";
+                            if (rot.TryGetProperty("x", out var vx)) qx = vx.GetDouble();
+                            if (rot.TryGetProperty("y", out var vy)) qy = vy.GetDouble();
+                            if (rot.TryGetProperty("z", out var vz)) qz = vz.GetDouble();
+                            if (rot.TryGetProperty("w", out var vw)) qw = vw.GetDouble();
+                            hasRot = true;
                         }
-                        else rotText = "";
-
-                        if (!string.IsNullOrEmpty(rotText))
+                        if (hasRot)
                         {
+                            string rotText = $"Rot: [{qx:0.00}, {qy:0.00}, {qz:0.00}, {qw:0.00}]";
                             if (isRobot2) TelemIKRot2.Text = rotText;
                             else TelemIKRot.Text = rotText;
+                        }
+                    }
+
+                    // ── Forward pose to physical robot via rosbridge ──────────────────
+                    if (hasPos && hasRot)
+                    {
+                        // Quaternion → RPY (Euler angles in radians)
+                        double sinr_cosp = 2 * (qw * qx + qy * qz);
+                        double cosr_cosp = 1 - 2 * (qx * qx + qy * qy);
+                        double roll = Math.Atan2(sinr_cosp, cosr_cosp);
+
+                        double sinp = 2 * (qw * qy - qz * qx);
+                        double pitch = Math.Abs(sinp) >= 1 ? Math.CopySign(Math.PI / 2, sinp) : Math.Asin(sinp);
+
+                        double siny_cosp = 2 * (qw * qz + qx * qy);
+                        double cosy_cosp = 1 - 2 * (qy * qy + qz * qz);
+                        double yaw = Math.Atan2(siny_cosp, cosy_cosp);
+
+                        // Rate-limit: skip if last send was < 100ms ago (10 Hz max)
+                        bool r1Ready = !isRobot2 && (now - _lastIkSendR1).TotalMilliseconds >= 100;
+                        bool r2Ready = isRobot2 && (now - _lastIkSendR2).TotalMilliseconds >= 100;
+
+                        if (r1Ready || r2Ready)
+                        {
+                            // Build Niryo rosbridge move command
+                            // cmd_type 2 = POSE (position + rpy)
+                            string cmd = System.Text.Json.JsonSerializer.Serialize(new
+                            {
+                                op = "call_service",
+                                service = "/niryo_robot_arm_commander/robot_move_command",
+                                type = "niryo_robot_msgs/RobotMoveCommand",
+                                args = new
+                                {
+                                    cmd_type = 2,       // POSE
+                                    position = new { x = px, y = py, z = pz },
+                                    rpy = new { roll, pitch, yaw },
+                                    dist_smoothing = 0.0
+                                }
+                            });
+
+                            if (!isRobot2)
+                            {
+                                _lastIkSendR1 = now;
+                                _ = _robotBridge.SendDirectToRobotAsync(cmd);
+                                Log($"[IK→R1] Pose ({px:0.00}, {py:0.00}, {pz:0.00}) RPY ({roll:0.00}, {pitch:0.00}, {yaw:0.00})");
+                            }
+                            else
+                            {
+                                _lastIkSendR2 = now;
+                                _ = _robotBridge2.SendDirectToRobotAsync(cmd);
+                                Log($"[IK→R2] Pose ({px:0.00}, {py:0.00}, {pz:0.00}) RPY ({roll:0.00}, {pitch:0.00}, {yaw:0.00})");
+                            }
                         }
                     }
                 }
