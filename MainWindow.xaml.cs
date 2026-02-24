@@ -1082,19 +1082,27 @@ namespace RobotControllerApp
         // ── DEBUG PANEL ─────────────────────────────────────────────────────────
 
         private static string BuildLearningModeCommand(bool activate) =>
+            // Service confirmed: /niryo_robot/learning_mode/activate
+            // Type:  niryo_robot_msgs/SetBool  (custom Niryo type, field is 'value')
+            // Note:  std_srvs/SetBool would use 'data', but Niryo uses their own SetBool
             System.Text.Json.JsonSerializer.Serialize(new
             {
                 op = "call_service",
-                service = "/niryo_robot/activate_learning_mode",
+                service = "/niryo_robot/learning_mode/activate",
                 type = "niryo_robot_msgs/SetBool",
                 args = new { value = activate }
             });
 
         private static string BuildHomeCommand() =>
+            // Publish directly to the follow_joint_trajectory controller action goal topic.
+            // Confirmed running: /niryo_robot_follow_joint_trajectory_controller/query_state
             System.Text.Json.JsonSerializer.Serialize(new
             {
                 op = "publish",
-                topic = "/niryo_robot_arm_commander/joint_trajectory",
+                // /command is the direct joint_trajectory_controller input topic
+                // simpler than action goal — no goal_id stamping required
+                // confirmed in: rostopic list | grep follow_joint
+                topic = "/niryo_robot_follow_joint_trajectory_controller/command",
                 type = "trajectory_msgs/JointTrajectory",
                 msg = new
                 {
@@ -1104,11 +1112,11 @@ namespace RobotControllerApp
                     {
                         new
                         {
-                            positions = new[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
-                            velocities = Array.Empty<double>(),
+                            positions     = new[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
+                            velocities    = new[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
                             accelerations = Array.Empty<double>(),
-                            effort = Array.Empty<double>(),
-                            time_from_start = new { secs = 3, nsecs = 0 }
+                            effort        = Array.Empty<double>(),
+                            time_from_start = new { secs = 4, nsecs = 0 }
                         }
                     }
                 }
@@ -1361,7 +1369,7 @@ namespace RobotControllerApp
 
             if (isR2Connected)
             {
-                R2RelayText.Text = "REACHABLE";
+                R2RelayText.Text = "CONNECTED";
                 R2RelayText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
                 R2RelayDot.Fill = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
             }
