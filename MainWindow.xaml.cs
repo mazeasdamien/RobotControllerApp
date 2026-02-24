@@ -47,6 +47,9 @@ namespace RobotControllerApp
         private float _questRxKbps = 0f;
         private float _questTxKbps = 0f;
 
+        // Guard flag: prevents Toggled event firing when toggle is updated programmatically
+        private bool _updatingToggle = false;
+
         public MainWindow()
         {
             this.InitializeComponent();
@@ -96,6 +99,21 @@ namespace RobotControllerApp
             // Robot status is driven exclusively by StartRelayStatusPoll (every 2s).
             // Do NOT subscribe to OnInstanceConnectionChanged here — the ROS reconnect loop
             // fires false every ~3s which would fight the poll and cause ACTIVE/WAITING flicker.
+
+            // Sync Learning Mode toggles with actual robot state
+            // _updatingToggle prevents Toggled event from re-firing when we set IsOn programmatically
+            _robotBridge.OnLearningModeChanged += (isOn) => this.DispatcherQueue.TryEnqueue(() =>
+            {
+                _updatingToggle = true;
+                R1LearningToggle.IsOn = isOn;
+                _updatingToggle = false;
+            });
+            _robotBridge2.OnLearningModeChanged += (isOn) => this.DispatcherQueue.TryEnqueue(() =>
+            {
+                _updatingToggle = true;
+                R2LearningToggle.IsOn = isOn;
+                _updatingToggle = false;
+            });
 
             RelayServerHost.OnUnityConnectionChanged += (connected) =>
             {
@@ -1124,6 +1142,7 @@ namespace RobotControllerApp
 
         private async void R1LearningToggle_Toggled(object sender, RoutedEventArgs e)
         {
+            if (_updatingToggle) return; // programmatic update — don't send ROS command
             bool on = R1LearningToggle.IsOn;
             string cmd = BuildLearningModeCommand(on);
             bool ok = await SendDebugCommand(_robotBridge, cmd);
@@ -1133,6 +1152,7 @@ namespace RobotControllerApp
 
         private async void R2LearningToggle_Toggled(object sender, RoutedEventArgs e)
         {
+            if (_updatingToggle) return; // programmatic update — don't send ROS command
             bool on = R2LearningToggle.IsOn;
             string cmd = BuildLearningModeCommand(on);
             bool ok = await SendDebugCommand(_robotBridge2, cmd);
@@ -1158,30 +1178,41 @@ namespace RobotControllerApp
 
         private async void R1CalibrateButton_Click(object sender, RoutedEventArgs e)
         {
-            string cmd = BuildCalibrationCommand();
-            bool ok = await SendDebugCommand(_robotBridge, cmd);
-            Log(ok ? "✅ R1 — Auto-calibration triggered"
+            // Step 1: request new calibration (forces re-calib even if already calibrated)
+            await SendDebugCommand(_robotBridge, BuildRequestCalibrationCommand());
+            // Step 2: start AUTO calibration (value:2 = AUTO, value:1 = MANUAL/release joints)
+            bool ok = await SendDebugCommand(_robotBridge, BuildCalibrationCommand());
+            Log(ok ? "✅ R1 — Auto-calibration started (robot will move)"
                    : "❌ R1 — Calibration: ROS not connected");
         }
 
         private async void R2CalibrateButton_Click(object sender, RoutedEventArgs e)
         {
-            string cmd = BuildCalibrationCommand();
-            bool ok = await SendDebugCommand(_robotBridge2, cmd);
-            Log(ok ? "✅ R2 — Auto-calibration triggered"
+            await SendDebugCommand(_robotBridge2, BuildRequestCalibrationCommand());
+            bool ok = await SendDebugCommand(_robotBridge2, BuildCalibrationCommand());
+            Log(ok ? "✅ R2 — Auto-calibration started (robot will move)"
                    : "❌ R2 — Calibration: ROS not connected");
         }
+
+        private static string BuildRequestCalibrationCommand() =>
+            // Flags the robot as needing recalibration (required before calibrate_motors)
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                op = "call_service",
+                service = "/niryo_robot/joints_interface/request_new_calibration",
+                args = new { }
+            });
 
         private static string BuildCalibrationCommand() =>
             // Service: /niryo_robot/joints_interface/calibrate_motors
             // Type:    niryo_robot_msgs/SetInt  (confirmed: rosservice type on Pi)
-            // value:   1 = AUTO calibration, 2 = MANUAL
+            // value:   1 = MANUAL (releases joints), 2 = AUTO (robot moves itself)
             System.Text.Json.JsonSerializer.Serialize(new
             {
                 op = "call_service",
                 service = "/niryo_robot/joints_interface/calibrate_motors",
                 type = "niryo_robot_msgs/SetInt",
-                args = new { value = 1 }
+                args = new { value = 2 }
             });
 
         /// <summary>

@@ -22,6 +22,9 @@ namespace RobotControllerApp.Services
 
         /// <summary>Instance-level stream emitting true when the physical robot WebSocket establishes connection.</summary>
         public event Action<bool>? OnInstanceConnectionChanged;
+
+        /// <summary>Fires whenever the robot reports a learning mode state change via /niryo_robot/robot_state.</summary>
+        public event Action<bool>? OnLearningModeChanged;
         /// <summary>Indicates if the WebSocket to the physical robot is currently open.</summary>
         public bool IsConnected { get; private set; }
 
@@ -109,6 +112,7 @@ namespace RobotControllerApp.Services
                         if (result.MessageType == WebSocketMessageType.Close) break;
 
                         var message = Encoding.UTF8.GetString(ms.ToArray());
+                        ParseLearningModeIfPresent(message);
                         await SendToRelay(message); // Forward to Relay
                     }
                 }
@@ -224,6 +228,29 @@ namespace RobotControllerApp.Services
                     catch { }
                 }
             }, null, TimeSpan.FromSeconds(2), TimeSpan.FromSeconds(2));
+        }
+
+        /// <summary>
+        /// Quickly scans a rosbridge publish message for /niryo_robot/robot_state
+        /// and extracts the learning_mode boolean field to fire OnLearningModeChanged.
+        /// </summary>
+        private void ParseLearningModeIfPresent(string json)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+
+                if (!root.TryGetProperty("topic", out var topicEl)) return;
+                if (topicEl.GetString() != "/niryo_robot/robot_state") return;
+
+                if (!root.TryGetProperty("msg", out var msg)) return;
+                if (!msg.TryGetProperty("learning_mode", out var lmEl)) return;
+
+                bool isLearning = lmEl.GetBoolean();
+                OnLearningModeChanged?.Invoke(isLearning);
+            }
+            catch { /* malformed message — ignore */ }
         }
 
         private async Task SubscribeToJointStates()
