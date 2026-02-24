@@ -34,6 +34,8 @@ namespace RobotControllerApp.Services
         /// <summary>Indicates if the WebSocket to the physical robot is currently open.</summary>
         public bool IsConnected { get; private set; }
 
+        private bool _isLearningMode = false; // tracked from /niryo_robot/robot_state
+
         private ClientWebSocket? _robotWebSocket;
         private ClientWebSocket? _relayWebSocket;
         private CancellationTokenSource? _cts;
@@ -256,7 +258,13 @@ namespace RobotControllerApp.Services
                 if (!msg.TryGetProperty("learning_mode", out var lmEl)) return;
 
                 bool isLearning = lmEl.GetBoolean();
-                OnLearningModeChanged?.Invoke(isLearning);
+                if (_isLearningMode != isLearning)
+                {
+                    _isLearningMode = isLearning;
+                    OnLearningModeChanged?.Invoke(isLearning);
+                    // Refresh STATUS string whenever learning mode changes
+                    OnRobotStatusUpdated?.Invoke(DeriveStatusString(false, false));
+                }
             }
             catch { /* malformed message — ignore */ }
         }
@@ -286,12 +294,18 @@ namespace RobotControllerApp.Services
                         if (el.GetInt32() != 0) errorCount++;
 
                 OnHardwareStatusUpdated?.Invoke(new HardwareInfo(rpiTemp, calibNeeded, calibInProgress, maxMotorTemp, errorCount));
+
+                // Derive STATUS string locally — /niryo_robot_status/robot_status may not exist on older firmware
+                OnRobotStatusUpdated?.Invoke(DeriveStatusString(calibInProgress, calibNeeded));
             }
             catch { }
         }
 
         private void ParseRobotStatusIfPresent(string json)
         {
+            // /niryo_robot_status/robot_status may not exist on all firmware versions.
+            // We keep the subscription but only use it if the field is present.
+            // Status is primarily derived in ParseHardwareStatusIfPresent above.
             try
             {
                 using var doc = JsonDocument.Parse(json);
@@ -300,9 +314,20 @@ namespace RobotControllerApp.Services
                 if (t.GetString() != "/niryo_robot_status/robot_status") return;
                 if (!root.TryGetProperty("msg", out var msg)) return;
                 if (!msg.TryGetProperty("robot_status_str", out var sEl)) return;
-                OnRobotStatusUpdated?.Invoke(sEl.GetString() ?? "");
+                string s = sEl.GetString() ?? "";
+                if (!string.IsNullOrEmpty(s))
+                    OnRobotStatusUpdated?.Invoke(s); // override derived value with authoritative one
             }
             catch { }
+        }
+
+        /// <summary>Builds a human-readable status string from known state flags.</summary>
+        private string DeriveStatusString(bool calibInProgress, bool calibNeeded)
+        {
+            if (calibInProgress) return "CALIBRATING";
+            if (calibNeeded) return "NEEDS CALIB";
+            if (_isLearningMode) return "LEARNING";
+            return "STANDBY";
         }
 
         private async Task SubscribeToJointStates()

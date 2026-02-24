@@ -219,30 +219,39 @@ namespace RobotControllerApp
                     using var doc = System.Text.Json.JsonDocument.Parse(msg);
                     var root = doc.RootElement;
 
+                    // Determine target robot — robotId field routes to the correct IK panel
+                    bool isRobot2 = root.TryGetProperty("robotId", out var rid) &&
+                                    rid.GetString() == "Robot_Niryo_02";
+
                     // Flexible parsing for Position (pos, position / Array, Object)
                     if (root.TryGetProperty("pos", out System.Text.Json.JsonElement pos) || root.TryGetProperty("position", out pos))
                     {
+                        string posText;
                         if (pos.ValueKind == System.Text.Json.JsonValueKind.Array && pos.GetArrayLength() >= 3)
-                        {
-                            TelemIKPos.Text = $"Pos: [{pos[0].GetDouble():0.00}, {pos[1].GetDouble():0.00}, {pos[2].GetDouble():0.00}]";
-                        }
+                            posText = $"Pos: [{pos[0].GetDouble():0.00}, {pos[1].GetDouble():0.00}, {pos[2].GetDouble():0.00}]";
                         else if (pos.ValueKind == System.Text.Json.JsonValueKind.Object)
                         {
                             double x = 0, y = 0, z = 0;
                             if (pos.TryGetProperty("x", out var vx)) x = vx.GetDouble();
                             if (pos.TryGetProperty("y", out var vy)) y = vy.GetDouble();
                             if (pos.TryGetProperty("z", out var vz)) z = vz.GetDouble();
-                            TelemIKPos.Text = $"Pos: [{x:0.00}, {y:0.00}, {z:0.00}]";
+                            posText = $"Pos: [{x:0.00}, {y:0.00}, {z:0.00}]";
+                        }
+                        else posText = "";
+
+                        if (!string.IsNullOrEmpty(posText))
+                        {
+                            if (isRobot2) TelemIKPos2.Text = posText;
+                            else TelemIKPos.Text = posText;
                         }
                     }
 
                     // Flexible parsing for Rotation (rot, rotation / Array, Object)
                     if (root.TryGetProperty("rot", out System.Text.Json.JsonElement rot) || root.TryGetProperty("rotation", out rot))
                     {
+                        string rotText;
                         if (rot.ValueKind == System.Text.Json.JsonValueKind.Array && rot.GetArrayLength() >= 4)
-                        {
-                            TelemIKRot.Text = $"Rot: [{rot[0].GetDouble():0.00}, {rot[1].GetDouble():0.00}, {rot[2].GetDouble():0.00}, {rot[3].GetDouble():0.00}]";
-                        }
+                            rotText = $"Rot: [{rot[0].GetDouble():0.00}, {rot[1].GetDouble():0.00}, {rot[2].GetDouble():0.00}, {rot[3].GetDouble():0.00}]";
                         else if (rot.ValueKind == System.Text.Json.JsonValueKind.Object)
                         {
                             double x = 0, y = 0, z = 0, w = 1;
@@ -250,7 +259,14 @@ namespace RobotControllerApp
                             if (rot.TryGetProperty("y", out var vy)) y = vy.GetDouble();
                             if (rot.TryGetProperty("z", out var vz)) z = vz.GetDouble();
                             if (rot.TryGetProperty("w", out var vw)) w = vw.GetDouble();
-                            TelemIKRot.Text = $"Rot: [{x:0.00}, {y:0.00}, {z:0.00}, {w:0.00}]";
+                            rotText = $"Rot: [{x:0.00}, {y:0.00}, {z:0.00}, {w:0.00}]";
+                        }
+                        else rotText = "";
+
+                        if (!string.IsNullOrEmpty(rotText))
+                        {
+                            if (isRobot2) TelemIKRot2.Text = rotText;
+                            else TelemIKRot.Text = rotText;
                         }
                     }
                 }
@@ -1047,25 +1063,42 @@ namespace RobotControllerApp
 
         private async void R1CalibrateButton_Click(object sender, RoutedEventArgs e)
         {
-            bool ok = await SendDebugCommand(_robotBridge, BuildCalibrationCommand());
-            Log(ok ? "✅ R1 — Auto-calibration started (robot will move)"
-                   : "❌ R1 — Calibration: ROS not connected");
+            // Step 1 — tell the robot calibration is needed (matches Niryo Studio "Request new calibration")
+            bool step1 = await SendDebugCommand(_robotBridge, BuildRequestNewCalibration());
+            if (!step1) { Log("❌ R1 — Calibration: ROS not connected"); return; }
+            Log("⏳ R1 — Calibration requested, waiting for robot to be ready...");
+
+            // Step 2 — wait for the flag to propagate, then launch physical auto-calibration
+            await Task.Delay(1500);
+            bool step2 = await SendDebugCommand(_robotBridge, BuildCalibrationCommand());
+            Log(step2 ? "✅ R1 — Auto-calibration started (robot will move ~2-4 min)"
+                       : "❌ R1 — calibrate_motors failed");
         }
 
         private async void R2CalibrateButton_Click(object sender, RoutedEventArgs e)
         {
-            bool ok = await SendDebugCommand(_robotBridge2, BuildCalibrationCommand());
-            Log(ok ? "✅ R2 — Auto-calibration started (robot will move)"
-                   : "❌ R2 — Calibration: ROS not connected");
+            bool step1 = await SendDebugCommand(_robotBridge2, BuildRequestNewCalibration());
+            if (!step1) { Log("❌ R2 — Calibration: ROS not connected"); return; }
+            Log("⏳ R2 — Calibration requested, waiting for robot to be ready...");
+
+            await Task.Delay(1500);
+            bool step2 = await SendDebugCommand(_robotBridge2, BuildCalibrationCommand());
+            Log(step2 ? "✅ R2 — Auto-calibration started (robot will move ~2-4 min)"
+                       : "❌ R2 — calibrate_motors failed");
         }
 
+        /// <summary>Step 1: sets calibration_needed=True on the robot (mirrors Niryo Studio "Request new calibration" button).</summary>
+        private static string BuildRequestNewCalibration() =>
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                op = "call_service",
+                service = "/niryo_robot/joints_interface/request_new_calibration",
+                type = "niryo_robot_msgs/SetInt",
+                args = new { value = 1 }
+            });
+
+        /// <summary>Step 2: triggers physical AUTO calibration movement (mirrors Niryo Studio "Auto Calibration" button).</summary>
         private static string BuildCalibrationCommand() =>
-            // Service: /niryo_robot/joints_interface/calibrate_motors
-            // Type:    niryo_robot_msgs/SetInt  (confirmed via rosservice type on Pi)
-            // value 1 = AUTO calibration (robot moves itself to calibrate)
-            // value 2 = MANUAL calibration (user holds joints)
-            // NOTE: do NOT call request_new_calibration before this — it blocks all
-            //       motion commands until calibration completes, causing a stuck state.
             System.Text.Json.JsonSerializer.Serialize(new
             {
                 op = "call_service",

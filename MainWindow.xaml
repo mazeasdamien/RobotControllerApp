@@ -528,6 +528,7 @@
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
                                         <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
                                     </Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
@@ -630,8 +631,8 @@
                                             CornerRadius="{StaticResource Radius.Medium}" Padding="24">
                                         <StackPanel Spacing="16">
                                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE7F4;" FontSize="20" Foreground="#0078D7"/>
-                                                <TextBlock Text="IK Matrix Solutions" Style="{StaticResource Text.Headline3}"/>
+                                                <FontIcon Glyph="&#xE7F4;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
+                                                <TextBlock Text="IK Matrix &#x2014; Robot 1" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
                                             <StackPanel Spacing="12">
                                                 <TextBlock Text="Target Pose (World Coordinates)" Opacity="0.6"/>
@@ -645,8 +646,29 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- â•â• ROW 1 â€” MEDIA PIPELINE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
+                                    <!-- IK Matrix - Robot 2 -->
                                     <Border Grid.Row="1" Grid.Column="1"
+                                            Background="{StaticResource Brush.Background.Card}"
+                                            CornerRadius="{StaticResource Radius.Medium}" Padding="24">
+                                        <StackPanel Spacing="16">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE7F4;" FontSize="20" Foreground="#FFD279"/>
+                                                <TextBlock Text="IK Matrix &#x2014; Robot 2" Style="{StaticResource Text.Headline3}"/>
+                                            </StackPanel>
+                                            <StackPanel Spacing="12">
+                                                <TextBlock Text="Target Pose (World Coordinates)" Opacity="0.6"/>
+                                                <Border Background="Black" Padding="12" CornerRadius="8">
+                                                    <StackPanel>
+                                                        <TextBlock x:Name="TelemIKPos2" Text="Pos: [0.00, 0.00, 0.00]" FontFamily="Consolas" FontSize="14" Foreground="#FFD279"/>
+                                                        <TextBlock x:Name="TelemIKRot2" Text="Rot: [0.00, 0.00, 0.00, 1.00]" FontFamily="Consolas" FontSize="14" Foreground="#FFD279" Margin="0,4,0,0"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Media Pipeline - Row 2 full width -->
+                                    <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
                                             Background="{StaticResource Brush.Background.Card}"
                                             CornerRadius="{StaticResource Radius.Medium}" Padding="24">
                                         <StackPanel Spacing="16">
@@ -654,21 +676,18 @@
                                                 <FontIcon Glyph="&#xE722;" FontSize="20" Foreground="#FFD279"/>
                                                 <TextBlock Text="Media Pipeline" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
-                                            <Grid ColumnSpacing="24" RowSpacing="12">
+                                            <Grid ColumnSpacing="48" RowSpacing="12">
                                                 <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*"/>
+                                                    <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
                                                 </Grid.ColumnDefinitions>
                                                 <Grid.RowDefinitions>
                                                     <RowDefinition Height="Auto"/>
                                                     <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="Auto"/>
                                                 </Grid.RowDefinitions>
-
-                                                <!-- Robot 1 Camera Feed -->
-                                                <TextBlock Text="[Robot 1 â€” Camera Feed]" Grid.Row="0" Grid.ColumnSpan="2"
-                                                           Opacity="0.8" FontSize="11" FontWeight="SemiBold"/>
+                                                <TextBlock Text="Robot 1 &#x2014; Camera Feed" Grid.Row="0" Grid.ColumnSpan="2" Opacity="0.8" FontSize="11" FontWeight="SemiBold"/>
                                                 <StackPanel Grid.Row="1" Grid.Column="0">
                                                     <TextBlock Text="Throughput" Opacity="0.6" FontSize="11"/>
                                                     <TextBlock x:Name="TelemFps" Text="0.0" FontSize="32" FontWeight="Bold"/>
@@ -679,16 +698,13 @@
                                                     <TextBlock x:Name="TelemTotalImages" Text="0" FontSize="32" FontWeight="Bold" Foreground="#FFD279"/>
                                                     <TextBlock Text="Encoded Images" FontSize="10" Opacity="0.5"/>
                                                 </StackPanel>
-
-                                                <!-- Operator Feed -->
-                                                <TextBlock Text="[Operator Webcam Feed]" Grid.Row="2" Grid.ColumnSpan="2"
-                                                           Opacity="0.8" FontSize="11" FontWeight="SemiBold" Margin="0,10,0,0"/>
-                                                <StackPanel Grid.Row="3" Grid.Column="0">
+                                                <TextBlock Text="Operator Webcam Feed" Grid.Row="0" Grid.Column="2" Grid.ColumnSpan="2" Opacity="0.8" FontSize="11" FontWeight="SemiBold"/>
+                                                <StackPanel Grid.Row="1" Grid.Column="2">
                                                     <TextBlock Text="Throughput" Opacity="0.6" FontSize="11"/>
                                                     <TextBlock x:Name="TelemOperatorFps" Text="0.0" FontSize="32" FontWeight="Bold"/>
                                                     <TextBlock Text="Frames / Second" FontSize="10" Opacity="0.5"/>
                                                 </StackPanel>
-                                                <StackPanel Grid.Row="3" Grid.Column="1">
+                                                <StackPanel Grid.Row="1" Grid.Column="3">
                                                     <TextBlock Text="Total Transmission" Opacity="0.6" FontSize="11"/>
                                                     <TextBlock x:Name="TelemOperatorTotalImages" Text="0" FontSize="32" FontWeight="Bold" Foreground="#0078D7"/>
                                                     <TextBlock Text="Encoded Images" FontSize="10" Opacity="0.5"/>
