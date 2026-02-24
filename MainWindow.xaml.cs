@@ -31,14 +31,10 @@ namespace RobotControllerApp
         // Network Performance History
         private readonly List<double> _unityLatencyHistory = [];
         private readonly List<double> _internetLatencyHistory = [];
-        private readonly List<double> _speedHistory = [];
-        private readonly List<double> _uploadHistory = [];
         private DispatcherTimer? _networkTimer;
-        private DispatcherTimer? _speedTestTimer;
         private readonly Ping _pinger = new();
         private bool _isNetworkPinging = false;
         private const int MaxHistory = 300; // 5 minutes (at 1 ping / second)
-        private const int MaxSpeedHistory = 20;
         private double _latencyMaxMs = 150.0; // Y-axis scale, driven by LatencyScaleSlider
 
         // Custom Telemetry from Unity Client
@@ -96,9 +92,19 @@ namespace RobotControllerApp
             // Wire up Logs
             RelayServerHost.OnLog += Log;
             RobotBridgeService.OnLog += Log;
-            // Robot status is driven exclusively by StartRelayStatusPoll (every 2s).
-            // Do NOT subscribe to OnInstanceConnectionChanged here — the ROS reconnect loop
-            // fires false every ~3s which would fight the poll and cause ACTIVE/WAITING flicker.
+            // Immediate status update on connect/disconnect — no waiting for the 2s poll
+            _robotBridge.OnInstanceConnectionChanged += (connected) =>
+                this.DispatcherQueue.TryEnqueue(() =>
+                {
+                    UpdateRobotStatus(connected);
+                    if (!connected) ClearHardwareInfoBox(R1StatusStr, R1RpiTemp, R1CalibStatus, R1MotorTemp, R1HwErrors);
+                });
+            _robotBridge2.OnInstanceConnectionChanged += (connected) =>
+                this.DispatcherQueue.TryEnqueue(() =>
+                {
+                    UpdateRobot2Status(connected);
+                    if (!connected) ClearHardwareInfoBox(R2StatusStr, R2RpiTemp, R2CalibStatus, R2MotorTemp, R2HwErrors);
+                });
 
             // Sync Learning Mode toggles with actual robot state
             // _updatingToggle prevents Toggled event from re-firing when we set IsOn programmatically
@@ -114,6 +120,17 @@ namespace RobotControllerApp
                 R2LearningToggle.IsOn = isOn;
                 _updatingToggle = false;
             });
+
+            // Wire hardware info boxes
+            _robotBridge.OnRobotStatusUpdated += (s) => this.DispatcherQueue.TryEnqueue(() =>
+                R1StatusStr.Text = s);
+            _robotBridge2.OnRobotStatusUpdated += (s) => this.DispatcherQueue.TryEnqueue(() =>
+                R2StatusStr.Text = s);
+
+            _robotBridge.OnHardwareStatusUpdated += (hw) => this.DispatcherQueue.TryEnqueue(() =>
+                UpdateHardwareInfoBox(hw, R1RpiTemp, R1CalibStatus, R1MotorTemp, R1HwErrors));
+            _robotBridge2.OnHardwareStatusUpdated += (hw) => this.DispatcherQueue.TryEnqueue(() =>
+                UpdateHardwareInfoBox(hw, R2RpiTemp, R2CalibStatus, R2MotorTemp, R2HwErrors));
 
             RelayServerHost.OnUnityConnectionChanged += (connected) =>
             {
@@ -293,7 +310,6 @@ namespace RobotControllerApp
             }
 
             StartNetworkMonitoring();
-            StartSpeedTestInterval();
             _ = TraceHubLocation(); // Initial async trace
             StatusPulseAnimation.Begin();
 
@@ -530,10 +546,10 @@ namespace RobotControllerApp
             {
                 var manager = RelayServerHost.CurrentManager;
 
-                // Primary: relay bridge connected (bridge WebSocket to Hub is open)
-                // Fallback: ROS-level IsConnected (physical robot socket)
-                bool r1 = (manager?.IsRobotConnected("Robot_Niryo_01") ?? false) || _robotBridge.IsConnected;
-                bool r2 = (manager?.IsRobotConnected("Robot_Niryo_02") ?? false) || _robotBridge2.IsConnected;
+                // ACTIVE only if the physical ROS socket to the Pi is open.
+                // Relay-only connection (bridge up but Pi down) = NOT active.
+                bool r1 = _robotBridge.IsConnected;
+                bool r2 = _robotBridge2.IsConnected;
 
                 string r1Text = Robot1ActiveText.Text;
                 string r2Text = Robot2ActiveText.Text;
@@ -554,6 +570,61 @@ namespace RobotControllerApp
                 }
             };
             pollTimer.Start();
+        }
+
+        private void UpdateHardwareInfoBox(
+            RobotControllerApp.Services.HardwareInfo hw,
+            TextBlock rpiTb, TextBlock calibTb, TextBlock motorTb, TextBlock errTb)
+        {
+            // RPi temperature
+            rpiTb.Text = $"{hw.RpiTemp}°C";
+            rpiTb.Foreground = hw.RpiTemp >= 65
+                ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 80, 80))   // red
+                : hw.RpiTemp >= 50
+                    ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 165, 0)) // orange
+                    : (SolidColorBrush)Application.Current.Resources["Brush.Text.Primary"];
+
+            // Calibration state
+            if (hw.CalibrationInProgress)
+            {
+                calibTb.Text = "In progress…";
+                calibTb.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 210, 121));
+            }
+            else if (hw.CalibrationNeeded)
+            {
+                calibTb.Text = "Required";
+                calibTb.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 80, 80));
+            }
+            else
+            {
+                calibTb.Text = "OK";
+                calibTb.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 80, 200, 120));
+            }
+
+            // Max motor temperature
+            motorTb.Text = $"{hw.MaxMotorTemp}°C";
+            motorTb.Foreground = hw.MaxMotorTemp >= 60
+                ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 80, 80))
+                : hw.MaxMotorTemp >= 45
+                    ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 165, 0))
+                    : (SolidColorBrush)Application.Current.Resources["Brush.Text.Primary"];
+
+            // Errors
+            errTb.Text = hw.ErrorCount == 0 ? "None" : hw.ErrorCount.ToString();
+            errTb.Foreground = hw.ErrorCount > 0
+                ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 80, 80))
+                : (SolidColorBrush)Application.Current.Resources["Brush.Text.Primary"];
+        }
+
+        private void ClearHardwareInfoBox(
+            TextBlock statusTb, TextBlock rpiTb, TextBlock calibTb, TextBlock motorTb, TextBlock errTb)
+        {
+            var defaultBrush = (SolidColorBrush)Application.Current.Resources["Brush.Text.Primary"];
+            statusTb.Text = "\u2014"; statusTb.Foreground = defaultBrush;
+            rpiTb.Text = "\u2014"; rpiTb.Foreground = defaultBrush;
+            calibTb.Text = "\u2014"; calibTb.Foreground = defaultBrush;
+            motorTb.Text = "\u2014"; motorTb.Foreground = defaultBrush;
+            errTb.Text = "\u2014"; errTb.Foreground = defaultBrush;
         }
 
         private async Task TraceHubLocation()
@@ -620,7 +691,6 @@ namespace RobotControllerApp
 
                 try
                 {
-                    _speedTestTimer?.Stop();
                     _cvCaptureCts?.Cancel();
                     if (_cvCapture != null)
                     {
@@ -772,209 +842,8 @@ namespace RobotControllerApp
             }
         }
 
-        private async void RunSpeedTest_Click(object sender, RoutedEventArgs e)
-        {
-            await RunSpeedTest();
-        }
-
-        private async Task RunSpeedTest()
-        {
-            DispatcherQueue.TryEnqueue(() =>
-            {
-                NetworkStatusText.Text = "Testing...";
-                RunSpeedTestButton.IsEnabled = false;
-            });
-
-            await Task.Run(async () =>
-            {
-                try
-                {
-                    double downMbps = -1;
-                    double upMbps = -1;
-
-                    using var client = new HttpClient();
-                    client.Timeout = TimeSpan.FromSeconds(30);
-
-                    // ── 1. DOWNLOAD TEST ──────────────────────────────────────────────────
-                    try
-                    {
-                        long totalBytes = 0;
-                        var sw = System.Diagnostics.Stopwatch.StartNew();
-
-                        // Some endpoints reject requests without a User-Agent
-                        client.DefaultRequestHeaders.TryAddWithoutValidation(
-                            "User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)");
-
-                        using var response = await client.GetAsync(
-                            $"https://speed.cloudflare.com/__down?bytes=10000000&nocache={Guid.NewGuid()}",
-                            HttpCompletionOption.ResponseHeadersRead);
-
-                        response.EnsureSuccessStatusCode();
-
-                        using var stream = await response.Content.ReadAsStreamAsync();
-                        byte[] buf = new byte[65536];
-                        int read;
-                        while ((read = await stream.ReadAsync(buf.AsMemory())) > 0)
-                            totalBytes += read;
-
-                        sw.Stop();
-                        if (sw.Elapsed.TotalSeconds > 0 && totalBytes > 1000)
-                            downMbps = (totalBytes * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
-                        else
-                            downMbps = -1;
-                    }
-                    catch
-                    {
-                        // Fallback: smaller file from a different CDN
-                        try
-                        {
-                            long totalBytes = 0;
-                            var sw = System.Diagnostics.Stopwatch.StartNew();
-                            using var response = await client.GetAsync(
-                                "https://proof.ovh.net/files/10Mb.dat",
-                                HttpCompletionOption.ResponseHeadersRead);
-                            response.EnsureSuccessStatusCode();
-                            using var stream = await response.Content.ReadAsStreamAsync();
-                            byte[] buf = new byte[65536];
-                            int read;
-                            while ((read = await stream.ReadAsync(buf.AsMemory())) > 0)
-                                totalBytes += read;
-                            sw.Stop();
-                            if (sw.Elapsed.TotalSeconds > 0 && totalBytes > 1000)
-                                downMbps = (totalBytes * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
-                            else
-                                downMbps = -1;
-                        }
-                        catch { downMbps = -1; }
-                    }
-
-                    // ── 2. UPLOAD TEST ────────────────────────────────────────────────────
-                    try
-                    {
-                        byte[] upData = new byte[4_000_000]; // 4 MB
-                        new Random().NextBytes(upData);
-
-                        var sw = System.Diagnostics.Stopwatch.StartNew();
-                        using var content = new ByteArrayContent(upData);
-                        var resp = await client.PostAsync($"https://speed.cloudflare.com/__up?nocache={Guid.NewGuid()}", content);
-                        sw.Stop();
-
-                        if (resp.IsSuccessStatusCode && sw.Elapsed.TotalSeconds > 0)
-                            upMbps = (upData.Length * 8.0 / 1_000_000.0) / sw.Elapsed.TotalSeconds;
-                    }
-                    catch (Exception)
-                    {
-                        upMbps = -1;
-                    }
-
-                    DispatcherQueue.TryEnqueue(() =>
-                {
-                    // Reset colors
-                    InternetSpeedText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Primary"];
-                    InternetUploadText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 210, 121, 255));
-
-                    if (downMbps >= 0)
-                    {
-                        InternetSpeedText.Text = $"{downMbps:F1} Mbps";
-                        UpdateHistory(_speedHistory, downMbps, MaxSpeedHistory);
-
-                        UpdateSpeedStats();
-                    }
-                    else InternetSpeedText.Text = "Err";
-
-                    if (upMbps >= 0)
-                    {
-                        InternetUploadText.Text = $"{upMbps:F1} Mbps";
-                        UpdateHistory(_uploadHistory, upMbps, MaxSpeedHistory);
-                    }
-                    else InternetUploadText.Text = "Err";
-
-                    NetworkStatusText.Text = "Idle";
-                    RunSpeedTestButton.IsEnabled = true;
-                });
-                }
-                catch
-                {
-                    DispatcherQueue.TryEnqueue(() =>
-                    {
-                        NetworkStatusText.Text = "Failed";
-                        RunSpeedTestButton.IsEnabled = true;
-                    });
-                }
-            });
-        }
-
-        private void StartSpeedTestInterval()
-        {
-            _speedTestTimer?.Stop();
-            _speedTestTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) }; // Run every 60s to save bandwidth
-            _nextSpeedTest = DateTime.Now.Add(_speedTestTimer.Interval);
-
-            _speedTestTimer.Tick += async (s, e) =>
-            {
-                await RunSpeedTest();
-                _nextSpeedTest = DateTime.Now.Add(_speedTestTimer.Interval);
-            };
-
-            if (AutoMonitorToggle.IsOn)
-            {
-                _speedTestTimer.Start();
-            }
-        }
-
-        private void AutoMonitorToggle_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (AutoMonitorToggle.IsOn)
-            {
-                if (_speedTestTimer != null)
-                {
-                    _nextSpeedTest = DateTime.Now.Add(_speedTestTimer.Interval);
-                    _speedTestTimer.Start();
-                }
-                if (NetworkStatusText != null) NetworkStatusText.Text = "Resuming...";
-            }
-            else
-            {
-                _speedTestTimer?.Stop();
-                if (NetworkStatusText != null) NetworkStatusText.Text = "Paused";
-            }
-        }
-
-        private void UpdateSpeedStats()
-        {
-            if (_speedHistory.Count == 0) return;
-
-            double low = _speedHistory.Min();
-            double high = _speedHistory.Max();
-            double avg = _speedHistory.Average();
-
-            SpeedLowText.Text = $"{low:F1} Mbps";
-            SpeedHighText.Text = $"{high:F1} Mbps";
-            SpeedAvgText.Text = $"{avg:F1} Mbps";
-
-            if (_uploadHistory.Count > 0)
-            {
-                // Optionally can populate texts for upload here as well if UI handles it. But for now only graph is strictly required. 
-            }
-        }
-
-        private DateTime _nextSpeedTest = DateTime.MinValue;
-        private void UpdateSpeedCountdown()
-        {
-            if (NetworkView.Visibility != Visibility.Visible) return;
-            if (_nextSpeedTest == DateTime.MinValue) return;
-
-            var remaining = _nextSpeedTest - DateTime.Now;
-            if (remaining.TotalSeconds > 0)
-            {
-                if (NetworkStatusText.Text != "Testing...")
-                    NetworkStatusText.Text = $"Next in {(int)remaining.TotalSeconds}s";
-            }
-        }
-
-        // DrawSpeedGraph removed — speed history graph was replaced by topology node cards.
-
         // ─── Log state ─────────────────────────────────────────────────────────
+
         private string _lastLogMessage = string.Empty;
         private int _lastLogCount = 1;
         private Run? _lastLogRun = null;   // The Run we update in-place for stacking
@@ -1178,9 +1047,6 @@ namespace RobotControllerApp
 
         private async void R1CalibrateButton_Click(object sender, RoutedEventArgs e)
         {
-            // Step 1: request new calibration (forces re-calib even if already calibrated)
-            await SendDebugCommand(_robotBridge, BuildRequestCalibrationCommand());
-            // Step 2: start AUTO calibration (value:2 = AUTO, value:1 = MANUAL/release joints)
             bool ok = await SendDebugCommand(_robotBridge, BuildCalibrationCommand());
             Log(ok ? "✅ R1 — Auto-calibration started (robot will move)"
                    : "❌ R1 — Calibration: ROS not connected");
@@ -1188,31 +1054,24 @@ namespace RobotControllerApp
 
         private async void R2CalibrateButton_Click(object sender, RoutedEventArgs e)
         {
-            await SendDebugCommand(_robotBridge2, BuildRequestCalibrationCommand());
             bool ok = await SendDebugCommand(_robotBridge2, BuildCalibrationCommand());
             Log(ok ? "✅ R2 — Auto-calibration started (robot will move)"
                    : "❌ R2 — Calibration: ROS not connected");
         }
 
-        private static string BuildRequestCalibrationCommand() =>
-            // Flags the robot as needing recalibration (required before calibrate_motors)
-            System.Text.Json.JsonSerializer.Serialize(new
-            {
-                op = "call_service",
-                service = "/niryo_robot/joints_interface/request_new_calibration",
-                args = new { }
-            });
-
         private static string BuildCalibrationCommand() =>
             // Service: /niryo_robot/joints_interface/calibrate_motors
-            // Type:    niryo_robot_msgs/SetInt  (confirmed: rosservice type on Pi)
-            // value:   1 = MANUAL (releases joints), 2 = AUTO (robot moves itself)
+            // Type:    niryo_robot_msgs/SetInt  (confirmed via rosservice type on Pi)
+            // value 1 = AUTO calibration (robot moves itself to calibrate)
+            // value 2 = MANUAL calibration (user holds joints)
+            // NOTE: do NOT call request_new_calibration before this — it blocks all
+            //       motion commands until calibration completes, causing a stuck state.
             System.Text.Json.JsonSerializer.Serialize(new
             {
                 op = "call_service",
                 service = "/niryo_robot/joints_interface/calibrate_motors",
                 type = "niryo_robot_msgs/SetInt",
-                args = new { value = 2 }
+                args = new { value = 1 }
             });
 
         /// <summary>
@@ -1320,7 +1179,6 @@ namespace RobotControllerApp
                     DrawNetworkGraph();
 
                     UpdateLatencyStats();
-                    UpdateSpeedCountdown();
                 }
                 finally
                 {
@@ -1329,9 +1187,6 @@ namespace RobotControllerApp
             };
             _networkTimer.Start();
 
-            // Run first speed test automatically
-            _ = RunSpeedTest();
-            StartSpeedTestInterval();
         }
 
         private void UpdateExpertStatus(bool connected)

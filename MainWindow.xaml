@@ -79,6 +79,7 @@
                                 <RowDefinition Height="Auto"/> <!-- Header -->
                                 <RowDefinition Height="Auto"/> <!-- Status Cards -->
                                 <RowDefinition Height="Auto"/> <!-- Robot Controls -->
+                                <RowDefinition Height="Auto"/> <!-- Robot Info -->
                                 <RowDefinition Height="Auto"/> <!-- Video Feeds -->
                                 <RowDefinition Height="*"/>    <!-- Logs -->
                             </Grid.RowDefinitions>
@@ -245,14 +246,84 @@
                                 </Border>
                             </Grid>
 
-                            <!-- VIDEO FEEDS â€” fixed height so both cards are always equal -->
-                            <Grid Grid.Row="3" ColumnSpacing="24" Margin="0,0,0,24" Height="360">
+                            <!-- ROBOT INFO BOXES -->
+                            <Grid Grid.Row="3" ColumnSpacing="8" Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Background="{StaticResource Brush.Background.Card}"
+                                        CornerRadius="{StaticResource Radius.Medium}" Padding="14,10">
+                                    <Grid ColumnSpacing="20">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="STATUS" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
+                                            <TextBlock x:Name="R1StatusStr" Text="&#x2014;" FontSize="11" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="RPi TEMP" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
+                                            <TextBlock x:Name="R1RpiTemp" Text="&#x2014;" FontSize="11"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="CALIBRATION" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
+                                            <TextBlock x:Name="R1CalibStatus" Text="&#x2014;" FontSize="11"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3">
+                                            <TextBlock Text="MOTOR MAX" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
+                                            <TextBlock x:Name="R1MotorTemp" Text="&#x2014;" FontSize="11"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="ERRORS" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
+                                            <TextBlock x:Name="R1HwErrors" Text="&#x2014;" FontSize="11"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                                <Border Grid.Column="1" Background="{StaticResource Brush.Background.Card}"
+                                        CornerRadius="{StaticResource Radius.Medium}" Padding="14,10">
+                                    <Grid ColumnSpacing="20">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="STATUS" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
+                                            <TextBlock x:Name="R2StatusStr" Text="&#x2014;" FontSize="11" FontWeight="SemiBold"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="RPi TEMP" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
+                                            <TextBlock x:Name="R2RpiTemp" Text="&#x2014;" FontSize="11"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="CALIBRATION" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
+                                            <TextBlock x:Name="R2CalibStatus" Text="&#x2014;" FontSize="11"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="3">
+                                            <TextBlock Text="MOTOR MAX" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
+                                            <TextBlock x:Name="R2MotorTemp" Text="&#x2014;" FontSize="11"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="ERRORS" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
+                                            <TextBlock x:Name="R2HwErrors" Text="&#x2014;" FontSize="11"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
 
-                                <!-- â”€â”€ ROBOT 1 VIDEO FEED â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
+                            <!-- VIDEO FEEDS -->
+                            <Grid Grid.Row="4" ColumnSpacing="24" Margin="0,0,0,24" Height="360">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
                                 <Border Background="{StaticResource Brush.Background.Card}"
                                         CornerRadius="{StaticResource Radius.Medium}"
                                         Padding="16">
@@ -387,7 +458,7 @@
 
                             <!-- LOGS & TELEMETRY -->
                             <!-- LOGS & MINIMAL FEEDBACK -->
-                            <Grid Grid.Row="4" ColumnSpacing="24">
+                            <Grid Grid.Row="5" ColumnSpacing="24">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
@@ -694,49 +765,12 @@
                                                     </StackPanel>
                                                 </StackPanel>
 
-                                                <StackPanel Grid.Row="0" Grid.Column="1" Margin="0,0,0,16">
-                                                    <TextBlock Text="DOWNLOAD" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
-                                                    <TextBlock Text="-- Mbps" FontSize="20" FontWeight="SemiBold" x:Name="InternetSpeedText" Foreground="{StaticResource Brush.Primary}"/>
-                                                </StackPanel>
-                                                <StackPanel Grid.Row="0" Grid.Column="2" Margin="0,0,0,16">
-                                                    <TextBlock Text="UPLOAD" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
-                                                    <TextBlock Text="-- Mbps" FontSize="20" FontWeight="SemiBold" x:Name="InternetUploadText" Foreground="#D279FF"/>
-                                                </StackPanel>
-                                                
-                                                <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2">
-                                                    <TextBlock Text="STATUS" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
-                                                    <TextBlock Text="Idle" FontSize="16" FontWeight="SemiBold" x:Name="NetworkStatusText"/>
-                                                </StackPanel>
-                                                
-                                                <StackPanel Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" VerticalAlignment="Center" HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8">
-                                                    <TextBlock Text="AUTO-MONITORING" FontSize="11" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" VerticalAlignment="Center" Opacity="0.8"/>
-                                                    <ToggleSwitch x:Name="AutoMonitorToggle" IsOn="True" OnContent="Active" OffContent="Paused" MinWidth="0" Margin="0,0,0,-8" Toggled="AutoMonitorToggle_Toggled"/>
-                                                </StackPanel>
-                                                <Button x:Name="RunSpeedTestButton" Visibility="Collapsed" IsEnabled="True"/>
-                                            </Grid>
-
-                                            <!-- Speed Stats -->
-                                            <Border Background="Black" Opacity="0.3" Height="1" Margin="0,8"/>
-                                            <Grid>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <StackPanel>
-                                                    <TextBlock Text="LOW" FontSize="10" Opacity="0.5"/>
-                                                    <TextBlock x:Name="SpeedLowText" Text="-- Mbps" FontSize="12" FontWeight="Bold"/>
-                                                </StackPanel>
-                                                <StackPanel Grid.Column="1">
-                                                    <TextBlock Text="HIGH" FontSize="10" Opacity="0.5"/>
-                                                    <TextBlock x:Name="SpeedHighText" Text="-- Mbps" FontSize="12" FontWeight="Bold"/>
-                                                </StackPanel>
-                                                <StackPanel Grid.Column="2">
-                                                    <TextBlock Text="AVG" FontSize="10" Opacity="0.5"/>
-                                                    <TextBlock x:Name="SpeedAvgText" Text="-- Mbps" FontSize="12" FontWeight="Bold" Foreground="{StaticResource Brush.Primary}"/>
-                                                </StackPanel>
-                                            </Grid>
-                                        </StackPanel>
+                                                 <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3">
+                                                     <TextBlock Text="STATUS" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
+                                                     <TextBlock Text="Idle" FontSize="16" FontWeight="SemiBold" x:Name="NetworkStatusText"/>
+                                                 </StackPanel>
+                                             </Grid>
+                                         </StackPanel>
 
                                         <!-- Topology Nodes (replaces Speed History graph) -->
                                         <Grid Grid.Column="1" ColumnSpacing="16">
@@ -798,7 +832,7 @@
                                                 <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="12" CornerRadius="10">
                                                     <StackPanel Spacing="5">
                                                         <TextBlock x:Name="R2IpText" Text="Offline" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                        <TextBlock x:Name="R2LocText" Text="N/A" FontSize="10" Opacity="0.5"/>
+                                                         <TextBlock x:Name="R2LocText" Text="LAN / Ethernet" FontSize="10" Opacity="0.5"/>
                                                         <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,3,0,0">
                                                             <Ellipse x:Name="R2RelayDot" Width="6" Height="6" Fill="#808080"/>
                                                             <TextBlock x:Name="R2RelayText" Text="OFFLINE" FontSize="10" FontWeight="SemiBold" Foreground="#808080"/>

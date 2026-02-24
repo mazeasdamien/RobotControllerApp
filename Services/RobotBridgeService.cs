@@ -25,6 +25,12 @@ namespace RobotControllerApp.Services
 
         /// <summary>Fires whenever the robot reports a learning mode state change via /niryo_robot/robot_state.</summary>
         public event Action<bool>? OnLearningModeChanged;
+
+        /// <summary>Fires on each hardware_status update with key metrics.</summary>
+        public event Action<HardwareInfo>? OnHardwareStatusUpdated;
+
+        /// <summary>Fires on each robot_status update with the status string.</summary>
+        public event Action<string>? OnRobotStatusUpdated;
         /// <summary>Indicates if the WebSocket to the physical robot is currently open.</summary>
         public bool IsConnected { get; private set; }
 
@@ -113,6 +119,8 @@ namespace RobotControllerApp.Services
 
                         var message = Encoding.UTF8.GetString(ms.ToArray());
                         ParseLearningModeIfPresent(message);
+                        ParseHardwareStatusIfPresent(message);
+                        ParseRobotStatusIfPresent(message);
                         await SendToRelay(message); // Forward to Relay
                     }
                 }
@@ -253,6 +261,50 @@ namespace RobotControllerApp.Services
             catch { /* malformed message — ignore */ }
         }
 
+        private void ParseHardwareStatusIfPresent(string json)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("topic", out var t)) return;
+                if (t.GetString() != "/niryo_robot_hardware_interface/hardware_status") return;
+                if (!root.TryGetProperty("msg", out var msg)) return;
+
+                int rpiTemp = msg.TryGetProperty("rpi_temperature", out var rpiEl) ? rpiEl.GetInt32() : 0;
+                bool calibNeeded = msg.TryGetProperty("calibration_needed", out var cnEl) && cnEl.GetBoolean();
+                bool calibInProgress = msg.TryGetProperty("calibration_in_progress", out var cipEl) && cipEl.GetBoolean();
+
+                int maxMotorTemp = 0;
+                if (msg.TryGetProperty("temperatures", out var tempsEl) && tempsEl.ValueKind == JsonValueKind.Array)
+                    foreach (var el in tempsEl.EnumerateArray())
+                        maxMotorTemp = Math.Max(maxMotorTemp, (int)el.GetDouble());
+
+                int errorCount = 0;
+                if (msg.TryGetProperty("hardware_errors", out var errEl) && errEl.ValueKind == JsonValueKind.Array)
+                    foreach (var el in errEl.EnumerateArray())
+                        if (el.GetInt32() != 0) errorCount++;
+
+                OnHardwareStatusUpdated?.Invoke(new HardwareInfo(rpiTemp, calibNeeded, calibInProgress, maxMotorTemp, errorCount));
+            }
+            catch { }
+        }
+
+        private void ParseRobotStatusIfPresent(string json)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(json);
+                var root = doc.RootElement;
+                if (!root.TryGetProperty("topic", out var t)) return;
+                if (t.GetString() != "/niryo_robot_status/robot_status") return;
+                if (!root.TryGetProperty("msg", out var msg)) return;
+                if (!msg.TryGetProperty("robot_status_str", out var sEl)) return;
+                OnRobotStatusUpdated?.Invoke(sEl.GetString() ?? "");
+            }
+            catch { }
+        }
+
         private async Task SubscribeToJointStates()
         {
             var subscribeJoints = new
@@ -294,6 +346,24 @@ namespace RobotControllerApp.Services
                 throttle_rate = 1000
             };
             await SendToRobotAsync(JsonSerializer.Serialize(subscribeState));
+
+            var subscribeHwStatus = new
+            {
+                op = "subscribe",
+                topic = "/niryo_robot_hardware_interface/hardware_status",
+                type = "niryo_robot_msgs/HardwareStatus",
+                throttle_rate = 2000
+            };
+            await SendToRobotAsync(JsonSerializer.Serialize(subscribeHwStatus));
+
+            var subscribeRobotStatus = new
+            {
+                op = "subscribe",
+                topic = "/niryo_robot_status/robot_status",
+                type = "niryo_robot_msgs/RobotStatus",
+                throttle_rate = 1000
+            };
+            await SendToRobotAsync(JsonSerializer.Serialize(subscribeRobotStatus));
         }
 
         private async Task SendToRobotAsync(string json)
@@ -317,4 +387,13 @@ namespace RobotControllerApp.Services
             }
         }
     }
+
+    /// <summary>Snapshot of key metrics from /niryo_robot_hardware_interface/hardware_status.</summary>
+    public record HardwareInfo(
+        int RpiTemp,
+        bool CalibrationNeeded,
+        bool CalibrationInProgress,
+        int MaxMotorTemp,
+        int ErrorCount
+    );
 }
