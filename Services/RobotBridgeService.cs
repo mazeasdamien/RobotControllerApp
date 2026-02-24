@@ -278,6 +278,9 @@ namespace RobotControllerApp.Services
             }
         }
 
+        /// <summary>Sends a ROS command (service call or publish) directly to the robot WebSocket. Used by the Debug panel.</summary>
+        public Task SendDirectToRobotAsync(string json) => SendToRobotAsync(json);
+
         async Task SendToRelay(string json)
         {
             if (_relayWebSocket?.State == WebSocketState.Open)

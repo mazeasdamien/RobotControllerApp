@@ -93,8 +93,9 @@ namespace RobotControllerApp
             // Wire up Logs
             RelayServerHost.OnLog += Log;
             RobotBridgeService.OnLog += Log;
-            _robotBridge.OnInstanceConnectionChanged += (connected) => this.DispatcherQueue.TryEnqueue(() => UpdateRobotStatus(connected));
-            _robotBridge2.OnInstanceConnectionChanged += (connected) => this.DispatcherQueue.TryEnqueue(() => UpdateRobot2Status(connected));
+            // Robot status is driven exclusively by StartRelayStatusPoll (every 2s).
+            // Do NOT subscribe to OnInstanceConnectionChanged here — the ROS reconnect loop
+            // fires false every ~3s which would fight the poll and cause ACTIVE/WAITING flicker.
 
             RelayServerHost.OnUnityConnectionChanged += (connected) =>
             {
@@ -489,6 +490,15 @@ namespace RobotControllerApp
             if (Robot2StatusIndicator != null) Robot2StatusIndicator.Visibility = isConnected ? Visibility.Visible : Visibility.Collapsed;
         }
 
+        private void UpdateDebugBadge(TextBlock badge, bool connected)
+        {
+            if (badge == null) return;
+            var successBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
+            var mutedBrush = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
+            badge.Text = connected ? "ACTIVE" : "WAITING";
+            badge.Foreground = connected ? successBrush : mutedBrush;
+        }
+
         /// <summary>
         /// Polls the relay ConnectionManager every 2 s and updates robot status cards.
         /// Uses the relay bridge connection (ConnectionManager) as primary truth — a robot is
@@ -515,6 +525,10 @@ namespace RobotControllerApp
 
                 if (r2 && r2Text != "ACTIVE") UpdateRobot2Status(true);
                 else if (!r2 && r2Text == "ACTIVE") UpdateRobot2Status(false);
+
+                // Update Debug badge status
+                UpdateDebugBadge(R1DebugStatusBadge, r1);
+                UpdateDebugBadge(R2DebugStatusBadge, r2);
 
                 // Update Network topology IP labels
                 if (manager != null)
@@ -1034,6 +1048,7 @@ namespace RobotControllerApp
             TelemetryView.Visibility = Visibility.Collapsed;
             SettingsView.Visibility = Visibility.Collapsed;
             NetworkView.Visibility = Visibility.Collapsed;
+            DebugView.Visibility = Visibility.Collapsed;
 
             // Show selected view
             if (args.IsSettingsSelected)
@@ -1050,6 +1065,9 @@ namespace RobotControllerApp
                     case "telemetry":
                         TelemetryView.Visibility = Visibility.Visible;
                         break;
+                    case "debug":
+                        DebugView.Visibility = Visibility.Visible;
+                        break;
                     case "settings":
                         SettingsView.Visibility = Visibility.Visible;
                         break;
@@ -1065,10 +1083,66 @@ namespace RobotControllerApp
             Log("Refreshing camera feed connection...");
             CameraImage.Visibility = Visibility.Collapsed;
             CameraOfflineState.Visibility = Visibility.Visible;
+        }
 
-            // Re-subscribe just in case (though it's already active)
-            // The real 'refresh' happens at the robot/bridge level, 
-            // but resetting the UI state gives user feedback.
+        // ── DEBUG PANEL ─────────────────────────────────────────────────────────
+
+        private static string BuildLearningModeCommand(bool activate) =>
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                op = "call_service",
+                service = "/niryo_robot/activate_learning_mode",
+                args = new { value = activate }
+            });
+
+        private static string BuildHomeCommand() =>
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                op = "call_service",
+                service = "/niryo_robot_commander/robot_action",
+                args = new
+                {
+                    cmd_type = 1, // CMD_TYPE_JOINTS
+                    joints = new[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
+                }
+            });
+
+        private async void R1LearningToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            bool on = R1LearningToggle.IsOn;
+            string cmd = BuildLearningModeCommand(on);
+            await _robotBridge.SendDirectToRobotAsync(cmd);
+            string ts = DateTime.Now.ToString("HH:mm:ss");
+            R1DebugLog.Text = $"[{ts}] learning_mode → {(on ? "ON" : "OFF")}";
+            Log($"[Debug][R1] Learning mode set to {(on ? "ON" : "OFF")}");
+        }
+
+        private async void R2LearningToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            bool on = R2LearningToggle.IsOn;
+            string cmd = BuildLearningModeCommand(on);
+            await _robotBridge2.SendDirectToRobotAsync(cmd);
+            string ts = DateTime.Now.ToString("HH:mm:ss");
+            R2DebugLog.Text = $"[{ts}] learning_mode → {(on ? "ON" : "OFF")}";
+            Log($"[Debug][R2] Learning mode set to {(on ? "ON" : "OFF")}");
+        }
+
+        private async void R1HomeButton_Click(object sender, RoutedEventArgs e)
+        {
+            string cmd = BuildHomeCommand();
+            await _robotBridge.SendDirectToRobotAsync(cmd);
+            string ts = DateTime.Now.ToString("HH:mm:ss");
+            R1DebugLog.Text = $"[{ts}] home → joints [0, 0, 0, 0, 0, 0]";
+            Log("[Debug][R1] Home command sent.");
+        }
+
+        private async void R2HomeButton_Click(object sender, RoutedEventArgs e)
+        {
+            string cmd = BuildHomeCommand();
+            await _robotBridge2.SendDirectToRobotAsync(cmd);
+            string ts = DateTime.Now.ToString("HH:mm:ss");
+            R2DebugLog.Text = $"[{ts}] home → joints [0, 0, 0, 0, 0, 0]";
+            Log("[Debug][R2] Home command sent.");
         }
 
         // WhatsApp block removed completely

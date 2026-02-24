@@ -38,6 +38,11 @@
             </NavigationView.MenuItems>
 
             <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="Debug" Tag="debug">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xEBE8;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem Content="Settings" Tag="settings">
                     <NavigationViewItem.Icon>
                         <SymbolIcon Symbol="Setting"/>
@@ -879,7 +884,164 @@
 
 
 
-                <!-- 4. SETTINGS VIEW -->
+                <!-- 5. DEBUG VIEW -->
+                <Grid x:Name="DebugView" Visibility="Collapsed">
+                    <Border Padding="{StaticResource Padding.Page}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <StackPanel Spacing="24">
+
+                                <!-- Header -->
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <FontIcon Glyph="&#xEBE8;" FontSize="22" Foreground="{StaticResource Brush.Primary}"/>
+                                    <TextBlock Text="Robot Debug Console" Style="{StaticResource Text.Headline3}" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <!-- Robot columns -->
+                                <Grid ColumnSpacing="24">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- ══ ROBOT 1 ══════════════════════════════════════════ -->
+                                    <Border Grid.Column="0"
+                                            Background="{StaticResource Brush.Background.Card}"
+                                            CornerRadius="{StaticResource Radius.Medium}"
+                                            Padding="28">
+                                        <StackPanel Spacing="20">
+                                            <!-- Header -->
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <FontIcon Glyph="&#xEBC5;" FontSize="22" Foreground="{StaticResource Brush.Primary}"/>
+                                                <TextBlock Text="ROBOT 1" Style="{StaticResource Text.Headline3}" VerticalAlignment="Center"/>
+                                                <Border Background="#1AFF6600" BorderBrush="#33FF6600" BorderThickness="1"
+                                                        CornerRadius="4" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="R1DebugStatusBadge" Text="WAITING" FontSize="10"
+                                                               FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}"/>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <Border Height="1" Background="White" Opacity="0.08"/>
+
+                                            <!-- Learning Mode -->
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Text="LEARNING MODE" FontSize="10" FontWeight="SemiBold"
+                                                           Opacity="0.5" CharacterSpacing="60"/>
+                                                <TextBlock Text="Releases motor torque so the arm can be moved freely by hand. Disable before running autonomous commands."
+                                                           FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Activate learning mode" FontSize="13" VerticalAlignment="Center"/>
+                                                    <ToggleSwitch x:Name="R1LearningToggle"
+                                                                  HorizontalAlignment="Right"
+                                                                  OnContent="ON" OffContent="OFF"
+                                                                  MinWidth="0" Margin="0,0,0,-8"
+                                                                  Toggled="R1LearningToggle_Toggled"/>
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <Border Height="1" Background="White" Opacity="0.08"/>
+
+                                            <!-- Home Position -->
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Text="HOME POSITION" FontSize="10" FontWeight="SemiBold"
+                                                           Opacity="0.5" CharacterSpacing="60"/>
+                                                <TextBlock Text="Moves all joints to 0° (upright rest pose). Ensure the workspace is clear before triggering."
+                                                           FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
+                                                <Button x:Name="R1HomeButton"
+                                                        Content="⌂  MOVE TO HOME"
+                                                        Margin="0,8,0,0"
+                                                        Style="{StaticResource Button.Filled}"
+                                                        HorizontalAlignment="Left"
+                                                        Click="R1HomeButton_Click"/>
+                                            </StackPanel>
+
+                                            <Border Height="1" Background="White" Opacity="0.08"/>
+
+                                            <!-- Status log -->
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="LAST COMMAND" FontSize="10" FontWeight="SemiBold"
+                                                           Opacity="0.5" CharacterSpacing="60"/>
+                                                <Border Background="Black" CornerRadius="6" Padding="10,8">
+                                                    <TextBlock x:Name="R1DebugLog" Text="No command sent yet."
+                                                               FontFamily="Consolas" FontSize="11"
+                                                               Foreground="#00CC6A" TextWrapping="Wrap"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- ══ ROBOT 2 ══════════════════════════════════════════ -->
+                                    <Border Grid.Column="1"
+                                            Background="{StaticResource Brush.Background.Card}"
+                                            CornerRadius="{StaticResource Radius.Medium}"
+                                            Padding="28">
+                                        <StackPanel Spacing="20">
+                                            <!-- Header -->
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <FontIcon Glyph="&#xEBC5;" FontSize="22" Foreground="#FFD279"/>
+                                                <TextBlock Text="ROBOT 2" Style="{StaticResource Text.Headline3}" VerticalAlignment="Center"/>
+                                                <Border Background="#1AFFD279" BorderBrush="#33FFD279" BorderThickness="1"
+                                                        CornerRadius="4" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                    <TextBlock x:Name="R2DebugStatusBadge" Text="WAITING" FontSize="10"
+                                                               FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}"/>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <Border Height="1" Background="White" Opacity="0.08"/>
+
+                                            <!-- Learning Mode -->
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Text="LEARNING MODE" FontSize="10" FontWeight="SemiBold"
+                                                           Opacity="0.5" CharacterSpacing="60"/>
+                                                <TextBlock Text="Releases motor torque so the arm can be moved freely by hand. Disable before running autonomous commands."
+                                                           FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
+                                                <Grid Margin="0,4,0,0">
+                                                    <TextBlock Text="Activate learning mode" FontSize="13" VerticalAlignment="Center"/>
+                                                    <ToggleSwitch x:Name="R2LearningToggle"
+                                                                  HorizontalAlignment="Right"
+                                                                  OnContent="ON" OffContent="OFF"
+                                                                  MinWidth="0" Margin="0,0,0,-8"
+                                                                  Toggled="R2LearningToggle_Toggled"/>
+                                                </Grid>
+                                            </StackPanel>
+
+                                            <Border Height="1" Background="White" Opacity="0.08"/>
+
+                                            <!-- Home Position -->
+                                            <StackPanel Spacing="6">
+                                                <TextBlock Text="HOME POSITION" FontSize="10" FontWeight="SemiBold"
+                                                           Opacity="0.5" CharacterSpacing="60"/>
+                                                <TextBlock Text="Moves all joints to 0° (upright rest pose). Ensure the workspace is clear before triggering."
+                                                           FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
+                                                <Button x:Name="R2HomeButton"
+                                                        Content="⌂  MOVE TO HOME"
+                                                        Margin="0,8,0,0"
+                                                        Style="{StaticResource Button.Filled}"
+                                                        HorizontalAlignment="Left"
+                                                        Click="R2HomeButton_Click"/>
+                                            </StackPanel>
+
+                                            <Border Height="1" Background="White" Opacity="0.08"/>
+
+                                            <!-- Status log -->
+                                            <StackPanel Spacing="4">
+                                                <TextBlock Text="LAST COMMAND" FontSize="10" FontWeight="SemiBold"
+                                                           Opacity="0.5" CharacterSpacing="60"/>
+                                                <Border Background="Black" CornerRadius="6" Padding="10,8">
+                                                    <TextBlock x:Name="R2DebugLog" Text="No command sent yet."
+                                                               FontFamily="Consolas" FontSize="11"
+                                                               Foreground="#FFD279" TextWrapping="Wrap"/>
+                                                </Border>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+
+                <!-- 6. SETTINGS VIEW -->
+
                 <Grid x:Name="SettingsView" Visibility="Collapsed">
                     <Border Padding="{StaticResource Padding.Page}">
                         <StackPanel Spacing="{StaticResource Space.24}" MaxWidth="600" HorizontalAlignment="Left">
