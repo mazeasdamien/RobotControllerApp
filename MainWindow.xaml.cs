@@ -141,6 +141,28 @@ namespace RobotControllerApp
                 catch { }
             });
 
+            // Robot 2 Telemetry
+            RelayServerHost.OnRobot2JointsReceived += (joints) => this.DispatcherQueue.TryEnqueue(() =>
+            {
+                TelemJoints2.Text = "[" + string.Join(", ", System.Linq.Enumerable.Select(joints, j => j.ToString("0.00"))) + "]";
+            });
+
+            RelayServerHost.OnRobot2GripperReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
+            {
+                try
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(msg);
+                    if (doc.RootElement.TryGetProperty("msg", out var m))
+                    {
+                        if (m.TryGetProperty("state", out var s))
+                            TelemGripper2.Text = s.ToString().ToUpper();
+                        else if (m.TryGetProperty("opened", out var o))
+                            TelemGripper2.Text = o.GetBoolean() ? "OPEN" : "CLOSED";
+                    }
+                }
+                catch { }
+            });
+
             RelayServerHost.OnRobotStateReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
             {
             });

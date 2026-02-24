@@ -22,11 +22,13 @@ namespace RobotControllerApp.Services
     {
         public static event Action<string>? OnLog;
         // Telemetry Events
-        public static event Action<float[]>? OnJointsReceived;
+        public static event Action<float[]>? OnJointsReceived;          // Robot 1
+        public static event Action<float[]>? OnRobot2JointsReceived;    // Robot 2
         public static event Action<int, int>? OnImageStatsUpdated; // FPS, Total
         public static event Action<byte[]>? OnImageReceived; // Latest base64 decoded frame
         public static event Action<string>? OnUnityMessageReceived;
-        public static event Action<string>? OnGripperReceived;
+        public static event Action<string>? OnGripperReceived;           // Robot 1
+        public static event Action<string>? OnRobot2GripperReceived;    // Robot 2
         public static event Action<string>? OnRobotStateReceived;
         public static event Action<string, float, float, string>? OnUnityTelemetryReceived; // location, rx_kbps, tx_kbps, public_ip
 
@@ -41,9 +43,9 @@ namespace RobotControllerApp.Services
         public static ConnectionManager? CurrentManager { get; private set; }
 
         // Stats
-        public static int _imagesTotal = 0;
-        public static int _imagesLastSec = 0;
-        public static DateTime _lastFpsReset = DateTime.Now;
+        private static int _imagesTotal = 0;
+        private static int _imagesLastSec = 0;
+        private static DateTime _lastFpsReset = DateTime.Now;
 
         public int Port { get; set; } = 5000;
         public string PublicUrl { get; set; } = "";
@@ -88,7 +90,7 @@ namespace RobotControllerApp.Services
                 CurrentManager = connectionManager;
 
                 // WebSocket endpoint for Robot clients
-                app.Map("/robot", async (HttpContext context) =>
+                app.Map("/robot", async context =>
                 {
                     if (context.WebSockets.IsWebSocketRequest)
                     {
@@ -120,7 +122,7 @@ namespace RobotControllerApp.Services
                 });
 
                 // WebSocket endpoint for Unity clients
-                app.Map("/unity", async (HttpContext context) =>
+                app.Map("/unity", async context =>
                 {
                     if (context.WebSockets.IsWebSocketRequest)
                     {
@@ -206,7 +208,7 @@ namespace RobotControllerApp.Services
 
         // --- HANDLERS ---
 
-        async Task HandleRobotConnection(WebSocket ws, string robotId, ConnectionManager manager, CancellationToken token)
+        static async Task HandleRobotConnection(WebSocket ws, string robotId, ConnectionManager manager, CancellationToken token)
         {
             var buffer = new byte[1024 * 1024]; // 1MB buffer
             try
@@ -258,7 +260,10 @@ namespace RobotControllerApp.Services
                                     if (count < 6) positions[count++] = (float)p.GetDouble();
                                 }
                                 manager.UpdateJoints(positions);
-                                OnJointsReceived?.Invoke(positions);
+                                // Route to the correct robot's event
+                                bool isRobot2 = robotId.EndsWith("02") || robotId.EndsWith("_2");
+                                if (isRobot2) OnRobot2JointsReceived?.Invoke(positions);
+                                else OnJointsReceived?.Invoke(positions);
                             }
                         }
                         catch { /* Parsing error safe ignore */ }
@@ -272,14 +277,14 @@ namespace RobotControllerApp.Services
                             int dataPropIndex = message.IndexOf("\"data\"");
                             if (dataPropIndex != -1)
                             {
-                                int colonIndex = message.IndexOf(":", dataPropIndex);
+                                int colonIndex = message.IndexOf(':', dataPropIndex);
                                 if (colonIndex != -1)
                                 {
-                                    int startQuote = message.IndexOf("\"", colonIndex + 1);
+                                    int startQuote = message.IndexOf('"', colonIndex + 1);
                                     if (startQuote != -1)
                                     {
                                         int start = startQuote + 1;
-                                        int end = message.IndexOf("\"", start);
+                                        int end = message.IndexOf('"', start);
                                         if (end != -1)
                                         {
                                             string base64 = message[start..end];
@@ -311,7 +316,9 @@ namespace RobotControllerApp.Services
                     // 3. Gripper State
                     if (message.Contains("gripper_state", StringComparison.OrdinalIgnoreCase))
                     {
-                        OnGripperReceived?.Invoke(message);
+                        bool isRobot2Gripper = robotId.EndsWith("02") || robotId.EndsWith("_2");
+                        if (isRobot2Gripper) OnRobot2GripperReceived?.Invoke(message);
+                        else OnGripperReceived?.Invoke(message);
                     }
 
                     // 4. Robot System State
@@ -343,7 +350,7 @@ namespace RobotControllerApp.Services
             }
         }
 
-        async Task HandleUnityConnection(WebSocket ws, string robotId, ConnectionManager manager, CancellationToken token)
+        static async Task HandleUnityConnection(WebSocket ws, string robotId, ConnectionManager manager, CancellationToken token)
         {
             var buffer = new byte[1024 * 1024]; // 1MB buffer
             var pingWatch = new System.Diagnostics.Stopwatch();
