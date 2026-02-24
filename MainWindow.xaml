@@ -1,4 +1,4 @@
-<Window
+﻿<Window
     x:Class="RobotControllerApp.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -38,11 +38,6 @@
             </NavigationView.MenuItems>
 
             <NavigationView.FooterMenuItems>
-                <NavigationViewItem Content="Debug" Tag="debug">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xEBE8;"/>
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
                 <NavigationViewItem Content="Settings" Tag="settings">
                     <NavigationViewItem.Icon>
                         <SymbolIcon Symbol="Setting"/>
@@ -83,8 +78,9 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/> <!-- Header -->
                                 <RowDefinition Height="Auto"/> <!-- Status Cards -->
+                                <RowDefinition Height="Auto"/> <!-- Robot Controls -->
                                 <RowDefinition Height="Auto"/> <!-- Video Feeds -->
-                                <RowDefinition Height="*"/>    <!-- Logs & Telemetry -->
+                                <RowDefinition Height="*"/>    <!-- Logs -->
                             </Grid.RowDefinitions>
 
                             <!-- HEADER REMOVED -->
@@ -185,14 +181,70 @@
                                 </Border>
                             </Grid>
 
-                            <!-- VIDEO FEEDS — fixed height so both cards are always equal -->
-                            <Grid Grid.Row="2" ColumnSpacing="24" Margin="0,0,0,24" Height="360">
+                            <!-- ROBOT CONTROLS â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€” -->
+                            <Grid Grid.Row="2" ColumnSpacing="8" Margin="0,0,0,8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
 
-                                <!-- ── ROBOT 1 VIDEO FEED ─────────────────────────────────────────── -->
+                                <!-- R1 Controls -->
+                                <Border Grid.Column="0" Background="{StaticResource Brush.Background.Card}"
+                                        CornerRadius="{StaticResource Radius.Medium}" Padding="16,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <TextBlock Text="Robot 1" FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="{StaticResource Brush.Primary}" VerticalAlignment="Center"/>
+                                            <TextBlock Text="Learning Mode" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <ToggleSwitch x:Name="R1LearningToggle" Grid.Column="1"
+                                                      OnContent="ON" OffContent="OFF" MinWidth="0"
+                                                      Margin="0,0,16,0"
+                                                      Toggled="R1LearningToggle_Toggled"/>
+                                        <Button x:Name="R1HomeButton" Grid.Column="2"
+                                                Content="HOME" Style="{StaticResource Button.Filled}"
+                                                Click="R1HomeButton_Click"/>
+                                    </Grid>
+                                </Border>
+
+                                <!-- R2 Controls -->
+                                <Border Grid.Column="1" Background="{StaticResource Brush.Background.Card}"
+                                        CornerRadius="{StaticResource Radius.Medium}" Padding="16,10">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                            <TextBlock Text="Robot 2" FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="#FFD279" VerticalAlignment="Center"/>
+                                            <TextBlock Text="Learning Mode" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                        <ToggleSwitch x:Name="R2LearningToggle" Grid.Column="1"
+                                                      OnContent="ON" OffContent="OFF" MinWidth="0"
+                                                      Margin="0,0,16,0"
+                                                      Toggled="R2LearningToggle_Toggled"/>
+                                        <Button x:Name="R2HomeButton" Grid.Column="2"
+                                                Content="HOME" Style="{StaticResource Button.Filled}"
+                                                Click="R2HomeButton_Click"/>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <!-- VIDEO FEEDS â€” fixed height so both cards are always equal -->
+                            <Grid Grid.Row="3" ColumnSpacing="24" Margin="0,0,0,24" Height="360">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- â”€â”€ ROBOT 1 VIDEO FEED â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
                                 <Border Background="{StaticResource Brush.Background.Card}"
                                         CornerRadius="{StaticResource Radius.Medium}"
                                         Padding="16">
@@ -247,7 +299,7 @@
                                     </Grid>
                                 </Border>
 
-                                <!-- ── OPERATOR WEBCAM ────────────────────────────────────────────── -->
+                                <!-- â”€â”€ OPERATOR WEBCAM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
                                 <Border Grid.Column="1"
                                         Background="{StaticResource Brush.Background.Card}"
                                         CornerRadius="{StaticResource Radius.Medium}"
@@ -316,7 +368,7 @@
                                             </Button>
                                         </Grid>
 
-                                        <!-- Preview — CaptureElement works with USB webcams -->
+                                        <!-- Preview â€” CaptureElement works with USB webcams -->
                                         <Border Grid.Row="2" Background="#0A0A0A" CornerRadius="10"
                                                 BorderBrush="#1E1E1E" BorderThickness="1">
                                             <Image x:Name="LocalWebcamPreview" Stretch="Uniform" />
@@ -327,7 +379,7 @@
 
                             <!-- LOGS & TELEMETRY -->
                             <!-- LOGS & MINIMAL FEEDBACK -->
-                            <Grid Grid.Row="3" ColumnSpacing="24">
+                            <Grid Grid.Row="4" ColumnSpacing="24">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
@@ -346,7 +398,7 @@
                                                 <RichTextBlock x:Name="ConsoleLog" IsTextSelectionEnabled="True" Foreground="#00FF00" FontFamily="Consolas" FontSize="12"/>
                                             </ScrollViewer>
 
-                                            <!-- Jump-to-bottom button — premium pill style -->
+                                            <!-- Jump-to-bottom button â€” premium pill style -->
                                             <Button x:Name="ScrollToBottomBtn"
                                                     Click="ScrollToBottomBtn_Click"
                                                     Visibility="Collapsed"
@@ -403,7 +455,7 @@
                                         <ColumnDefinition Width="*"/>
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- ══ ROW 0 — ROBOT 1 STATE ══════════════════════════════ -->
+                                    <!-- â•â• ROW 0 â€” ROBOT 1 STATE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
                                     <Border Grid.Row="0" Grid.Column="0"
                                             Background="{StaticResource Brush.Background.Card}"
                                             CornerRadius="{StaticResource Radius.Medium}" Padding="24">
@@ -411,7 +463,7 @@
                                             <!-- Header -->
                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                                 <FontIcon Glyph="&#xEBC5;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
-                                                <TextBlock Text="ROBOT 1 — State" Style="{StaticResource Text.Headline3}"/>
+                                                <TextBlock Text="ROBOT 1 â€” State" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
                                             <!-- Section: Joints -->
                                             <StackPanel Spacing="12">
@@ -448,7 +500,7 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- ══ ROW 0 — ROBOT 2 STATE ══════════════════════════════ -->
+                                    <!-- â•â• ROW 0 â€” ROBOT 2 STATE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
                                     <Border Grid.Row="0" Grid.Column="1"
                                             Background="{StaticResource Brush.Background.Card}"
                                             CornerRadius="{StaticResource Radius.Medium}" Padding="24">
@@ -456,7 +508,7 @@
                                             <!-- Header -->
                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                                 <FontIcon Glyph="&#xEBC5;" FontSize="20" Foreground="#FFD279"/>
-                                                <TextBlock Text="ROBOT 2 — State" Style="{StaticResource Text.Headline3}"/>
+                                                <TextBlock Text="ROBOT 2 â€” State" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
                                             <!-- Section: Joints -->
                                             <StackPanel Spacing="12">
@@ -493,7 +545,7 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- ══ ROW 1 — IK MATRIX (Robot 1 / Expert) ══════════════ -->
+                                    <!-- â•â• ROW 1 â€” IK MATRIX (Robot 1 / Expert) â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
                                     <Border Grid.Row="1" Grid.Column="0"
                                             Background="{StaticResource Brush.Background.Card}"
                                             CornerRadius="{StaticResource Radius.Medium}" Padding="24">
@@ -514,7 +566,7 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <!-- ══ ROW 1 — MEDIA PIPELINE ════════════════════════════ -->
+                                    <!-- â•â• ROW 1 â€” MEDIA PIPELINE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
                                     <Border Grid.Row="1" Grid.Column="1"
                                             Background="{StaticResource Brush.Background.Card}"
                                             CornerRadius="{StaticResource Radius.Medium}" Padding="24">
@@ -536,7 +588,7 @@
                                                 </Grid.RowDefinitions>
 
                                                 <!-- Robot 1 Camera Feed -->
-                                                <TextBlock Text="[Robot 1 — Camera Feed]" Grid.Row="0" Grid.ColumnSpan="2"
+                                                <TextBlock Text="[Robot 1 â€” Camera Feed]" Grid.Row="0" Grid.ColumnSpan="2"
                                                            Opacity="0.8" FontSize="11" FontWeight="SemiBold"/>
                                                 <StackPanel Grid.Row="1" Grid.Column="0">
                                                     <TextBlock Text="Throughput" Opacity="0.6" FontSize="11"/>
@@ -783,7 +835,7 @@
                                                 <ColumnDefinition Width="40"/>
                                             </Grid.ColumnDefinitions>
 
-                                            <!-- ── Plot column ─────────────────────────── -->
+                                            <!-- â”€â”€ Plot column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
                                             <Grid Grid.Column="0">
                                                 <!-- Y-Axis Labels (named so code-behind updates them) -->
                                                 <Grid VerticalAlignment="Stretch" HorizontalAlignment="Left" Width="40" Margin="0,0,10,0">
@@ -813,7 +865,7 @@
                                                 </Canvas>
                                             </Grid>
 
-                                            <!-- ── Scale slider column ─────────────────── -->
+                                            <!-- â”€â”€ Scale slider column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
                                             <StackPanel Grid.Column="1" VerticalAlignment="Stretch" HorizontalAlignment="Center" Spacing="4">
                                                 <TextBlock x:Name="ScaleLabel" Text="300ms" FontSize="9" Opacity="0.5" HorizontalAlignment="Center"/>
                                                 <Slider x:Name="LatencyScaleSlider"
@@ -866,10 +918,10 @@
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="*"/>
                                             </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="−2 min" FontSize="9" Opacity="0.30" HorizontalAlignment="Left"/>
-                                            <TextBlock Grid.Column="1" Text="−90 s"  FontSize="9" Opacity="0.30" HorizontalAlignment="Center"/>
-                                            <TextBlock Grid.Column="2" Text="−60 s"  FontSize="9" Opacity="0.30" HorizontalAlignment="Center"/>
-                                            <TextBlock Grid.Column="3" Text="−30 s"  FontSize="9" Opacity="0.30" HorizontalAlignment="Center"/>
+                                            <TextBlock Grid.Column="0" Text="âˆ’2 min" FontSize="9" Opacity="0.30" HorizontalAlignment="Left"/>
+                                            <TextBlock Grid.Column="1" Text="âˆ’90 s"  FontSize="9" Opacity="0.30" HorizontalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="âˆ’60 s"  FontSize="9" Opacity="0.30" HorizontalAlignment="Center"/>
+                                            <TextBlock Grid.Column="3" Text="âˆ’30 s"  FontSize="9" Opacity="0.30" HorizontalAlignment="Center"/>
                                             <TextBlock Grid.Column="4" Text="now"    FontSize="9" Opacity="0.30" HorizontalAlignment="Right"/>
                                         </Grid>
 
@@ -884,203 +936,9 @@
 
 
 
-                <!-- 5. DEBUG VIEW -->
-                <Grid x:Name="DebugView" Visibility="Collapsed">
-                    <Border Padding="{StaticResource Padding.Page}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                            <StackPanel Spacing="24">
-
-                                <!-- Header -->
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <FontIcon Glyph="&#xEBE8;" FontSize="22" Foreground="{StaticResource Brush.Primary}"/>
-                                    <TextBlock Text="Robot Debug Console" Style="{StaticResource Text.Headline3}" VerticalAlignment="Center"/>
-                                </StackPanel>
-
-                                <!-- Robot columns -->
-                                <Grid ColumnSpacing="24">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <!-- ══ ROBOT 1 ══════════════════════════════════════════ -->
-                                    <Border Grid.Column="0"
-                                            Background="{StaticResource Brush.Background.Card}"
-                                            CornerRadius="{StaticResource Radius.Medium}"
-                                            Padding="28">
-                                        <StackPanel Spacing="20">
-                                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                                <FontIcon Glyph="&#xEBC5;" FontSize="22" Foreground="{StaticResource Brush.Primary}"/>
-                                                <TextBlock Text="ROBOT 1" Style="{StaticResource Text.Headline3}" VerticalAlignment="Center"/>
-                                                <Border Background="#1AFF6600" BorderBrush="#33FF6600" BorderThickness="1"
-                                                        CornerRadius="4" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                    <TextBlock x:Name="R1DebugStatusBadge" Text="WAITING" FontSize="10"
-                                                               FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}"/>
-                                                </Border>
-                                            </StackPanel>
-
-                                            <Border Height="1" Background="White" Opacity="0.08"/>
-
-                                            <!-- Learning Mode -->
-                                            <StackPanel Spacing="6">
-                                                <TextBlock Text="LEARNING MODE" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
-                                                <TextBlock Text="Releases motor torque so the arm can be moved freely by hand."
-                                                           FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
-                                                <Grid Margin="0,4,0,0">
-                                                    <TextBlock Text="Activate learning mode" FontSize="13" VerticalAlignment="Center"/>
-                                                    <ToggleSwitch x:Name="R1LearningToggle"
-                                                                  HorizontalAlignment="Right"
-                                                                  OnContent="ON" OffContent="OFF"
-                                                                  MinWidth="0" Margin="0,0,0,-8"
-                                                                  Toggled="R1LearningToggle_Toggled"/>
-                                                </Grid>
-                                            </StackPanel>
-
-                                            <Border Height="1" Background="White" Opacity="0.08"/>
-
-                                            <!-- Home Position -->
-                                            <StackPanel Spacing="6">
-                                                <TextBlock Text="HOME POSITION" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
-                                                <TextBlock Text="Moves all joints to 0°. Ensure the workspace is clear before triggering."
-                                                           FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
-                                                <Button x:Name="R1HomeButton"
-                                                        Content="MOVE TO HOME"
-                                                        Margin="0,8,0,0"
-                                                        Style="{StaticResource Button.Filled}"
-                                                        HorizontalAlignment="Left"
-                                                        Click="R1HomeButton_Click"/>
-                                            </StackPanel>
-
-                                            <Border Height="1" Background="White" Opacity="0.08"/>
-
-                                            <StackPanel Spacing="4">
-                                                <TextBlock Text="LAST COMMAND" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
-                                                <Border Background="Black" CornerRadius="6" Padding="10,8">
-                                                    <TextBlock x:Name="R1DebugLog" Text="No command sent yet."
-                                                               FontFamily="Consolas" FontSize="11"
-                                                               Foreground="#00CC6A" TextWrapping="Wrap"/>
-                                                </Border>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- ══ ROBOT 2 ══════════════════════════════════════════ -->
-                                    <Border Grid.Column="1"
-                                            Background="{StaticResource Brush.Background.Card}"
-                                            CornerRadius="{StaticResource Radius.Medium}"
-                                            Padding="28">
-                                        <StackPanel Spacing="20">
-                                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                                <FontIcon Glyph="&#xEBC5;" FontSize="22" Foreground="#FFD279"/>
-                                                <TextBlock Text="ROBOT 2" Style="{StaticResource Text.Headline3}" VerticalAlignment="Center"/>
-                                                <Border Background="#1AFFD279" BorderBrush="#33FFD279" BorderThickness="1"
-                                                        CornerRadius="4" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center">
-                                                    <TextBlock x:Name="R2DebugStatusBadge" Text="WAITING" FontSize="10"
-                                                               FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}"/>
-                                                </Border>
-                                            </StackPanel>
-
-                                            <Border Height="1" Background="White" Opacity="0.08"/>
-
-                                            <!-- Learning Mode -->
-                                            <StackPanel Spacing="6">
-                                                <TextBlock Text="LEARNING MODE" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
-                                                <TextBlock Text="Releases motor torque so the arm can be moved freely by hand."
-                                                           FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
-                                                <Grid Margin="0,4,0,0">
-                                                    <TextBlock Text="Activate learning mode" FontSize="13" VerticalAlignment="Center"/>
-                                                    <ToggleSwitch x:Name="R2LearningToggle"
-                                                                  HorizontalAlignment="Right"
-                                                                  OnContent="ON" OffContent="OFF"
-                                                                  MinWidth="0" Margin="0,0,0,-8"
-                                                                  Toggled="R2LearningToggle_Toggled"/>
-                                                </Grid>
-                                            </StackPanel>
-
-                                            <Border Height="1" Background="White" Opacity="0.08"/>
-
-                                            <!-- Home Position -->
-                                            <StackPanel Spacing="6">
-                                                <TextBlock Text="HOME POSITION" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
-                                                <TextBlock Text="Moves all joints to 0°. Ensure the workspace is clear before triggering."
-                                                           FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
-                                                <Button x:Name="R2HomeButton"
-                                                        Content="MOVE TO HOME"
-                                                        Margin="0,8,0,0"
-                                                        Style="{StaticResource Button.Filled}"
-                                                        HorizontalAlignment="Left"
-                                                        Click="R2HomeButton_Click"/>
-                                            </StackPanel>
-
-                                            <Border Height="1" Background="White" Opacity="0.08"/>
-
-                                            <StackPanel Spacing="4">
-                                                <TextBlock Text="LAST COMMAND" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
-                                                <Border Background="Black" CornerRadius="6" Padding="10,8">
-                                                    <TextBlock x:Name="R2DebugLog" Text="No command sent yet."
-                                                               FontFamily="Consolas" FontSize="11"
-                                                               Foreground="#FFD279" TextWrapping="Wrap"/>
-                                                </Border>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
-
-                                <!-- ══ CAMERA FEEDS ══════════════════════════════════════════ -->
-                                <Grid ColumnSpacing="24">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-
-                                    <!-- Robot 1 Camera -->
-                                    <Border Grid.Column="0"
-                                            Background="{StaticResource Brush.Background.Card}"
-                                            CornerRadius="{StaticResource Radius.Medium}"
-                                            Padding="20">
-                                        <StackPanel Spacing="12">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE99A;" FontSize="16" Foreground="{StaticResource Brush.Primary}"/>
-                                                <TextBlock Text="ROBOT 1 — Camera Feed" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                            <!-- Reuse the same Image control already present in DashboardView;
-                                                 we mirror it by binding to the same HTTP endpoint via a polling Image.
-                                                 The image source is refreshed by the existing camera timer. -->
-                                            <Border Background="Black" CornerRadius="8" Height="220">
-                                                <Image x:Name="DebugCameraImage"
-                                                       Stretch="Uniform"
-                                                       HorizontalAlignment="Stretch"
-                                                       VerticalAlignment="Stretch"/>
-                                            </Border>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- Operator Webcam -->
-                                    <Border Grid.Column="1"
-                                            Background="{StaticResource Brush.Background.Card}"
-                                            CornerRadius="{StaticResource Radius.Medium}"
-                                            Padding="20">
-                                        <StackPanel Spacing="12">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE8B7;" FontSize="16" Foreground="#FFD279"/>
-                                                <TextBlock Text="Operator Webcam" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                            <Border Background="Black" CornerRadius="8" Height="220">
-                                                <Image x:Name="DebugOperatorImage"
-                                                       Stretch="Uniform"
-                                                       HorizontalAlignment="Stretch"
-                                                       VerticalAlignment="Stretch"/>
-                                            </Border>
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
-
-                            </StackPanel>
-                        </ScrollViewer>
-                    </Border>
-                </Grid>
 
                 <!-- 6. SETTINGS VIEW -->
+
 
 
                 <Grid x:Name="SettingsView" Visibility="Collapsed">

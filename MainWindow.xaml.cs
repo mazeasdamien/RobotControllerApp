@@ -234,7 +234,6 @@ namespace RobotControllerApp
                         await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
                     }
                     CameraImage.Source = bitmap;
-                    DebugCameraImage.Source = bitmap; // mirror to Debug view
 
                     // Transition UI
                     if (CameraImage.Visibility == Visibility.Collapsed)
@@ -396,7 +395,6 @@ namespace RobotControllerApp
                                         await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
                                     }
                                     LocalWebcamPreview.Source = bitmap;
-                                    DebugOperatorImage.Source = bitmap; // mirror to Debug view
                                 }
                                 catch { }
                             });
@@ -528,9 +526,7 @@ namespace RobotControllerApp
                 if (r2 && r2Text != "ACTIVE") UpdateRobot2Status(true);
                 else if (!r2 && r2Text == "ACTIVE") UpdateRobot2Status(false);
 
-                // Update Debug badge status
-                UpdateDebugBadge(R1DebugStatusBadge, r1);
-                UpdateDebugBadge(R2DebugStatusBadge, r2);
+
 
                 // Update Network topology IP labels
                 if (manager != null)
@@ -1050,7 +1046,6 @@ namespace RobotControllerApp
             TelemetryView.Visibility = Visibility.Collapsed;
             SettingsView.Visibility = Visibility.Collapsed;
             NetworkView.Visibility = Visibility.Collapsed;
-            DebugView.Visibility = Visibility.Collapsed;
 
             // Show selected view
             if (args.IsSettingsSelected)
@@ -1066,9 +1061,6 @@ namespace RobotControllerApp
                         break;
                     case "telemetry":
                         TelemetryView.Visibility = Visibility.Visible;
-                        break;
-                    case "debug":
-                        DebugView.Visibility = Visibility.Visible;
                         break;
                     case "settings":
                         SettingsView.Visibility = Visibility.Visible;
@@ -1099,8 +1091,6 @@ namespace RobotControllerApp
             });
 
         private static string BuildHomeCommand() =>
-            // Publish a JointTrajectory to move all joints to 0 (home/rest pose)
-            // This avoids the need for an async service call/response cycle over rosbridge
             System.Text.Json.JsonSerializer.Serialize(new
             {
                 op = "publish",
@@ -1128,38 +1118,47 @@ namespace RobotControllerApp
         {
             bool on = R1LearningToggle.IsOn;
             string cmd = BuildLearningModeCommand(on);
-            await _robotBridge.SendDirectToRobotAsync(cmd);
-            string ts = DateTime.Now.ToString("HH:mm:ss");
-            R1DebugLog.Text = $"[{ts}] learning_mode → {(on ? "ON" : "OFF")}";
-            Log($"[Debug][R1] Learning mode set to {(on ? "ON" : "OFF")}");
+            bool ok = await SendDebugCommand(_robotBridge, cmd);
+            Log($"[Debug][R1] Learning mode {(on ? "ON" : "OFF")} — sent={ok}");
         }
 
         private async void R2LearningToggle_Toggled(object sender, RoutedEventArgs e)
         {
             bool on = R2LearningToggle.IsOn;
             string cmd = BuildLearningModeCommand(on);
-            await _robotBridge2.SendDirectToRobotAsync(cmd);
-            string ts = DateTime.Now.ToString("HH:mm:ss");
-            R2DebugLog.Text = $"[{ts}] learning_mode → {(on ? "ON" : "OFF")}";
-            Log($"[Debug][R2] Learning mode set to {(on ? "ON" : "OFF")}");
+            bool ok = await SendDebugCommand(_robotBridge2, cmd);
+            Log($"[Debug][R2] Learning mode {(on ? "ON" : "OFF")} — sent={ok}");
         }
 
         private async void R1HomeButton_Click(object sender, RoutedEventArgs e)
         {
             string cmd = BuildHomeCommand();
-            await _robotBridge.SendDirectToRobotAsync(cmd);
-            string ts = DateTime.Now.ToString("HH:mm:ss");
-            R1DebugLog.Text = $"[{ts}] home → joints [0, 0, 0, 0, 0, 0]";
-            Log("[Debug][R1] Home command sent.");
+            bool ok = await SendDebugCommand(_robotBridge, cmd);
+            Log($"[Debug][R1] Home command — sent={ok}");
         }
 
         private async void R2HomeButton_Click(object sender, RoutedEventArgs e)
         {
             string cmd = BuildHomeCommand();
-            await _robotBridge2.SendDirectToRobotAsync(cmd);
-            string ts = DateTime.Now.ToString("HH:mm:ss");
-            R2DebugLog.Text = $"[{ts}] home → joints [0, 0, 0, 0, 0, 0]";
-            Log("[Debug][R2] Home command sent.");
+            bool ok = await SendDebugCommand(_robotBridge2, cmd);
+            Log($"[Debug][R2] Home command — sent={ok}");
+        }
+
+        /// <summary>
+        /// Sends a command to a robot bridge and returns true if the ROS socket was open.
+        /// Logs the raw JSON to the app log for debugging.
+        /// </summary>
+        private async Task<bool> SendDebugCommand(RobotBridgeService bridge, string json)
+        {
+            if (!bridge.IsConnected)
+            {
+                Log($"[Debug] Command dropped — ROS WebSocket not connected for {bridge.RobotId}. " +
+                    $"Check that rosbridge_server is running on {bridge.RosIp}:{bridge.RosPort}.");
+                return false;
+            }
+            Log($"[Debug][{bridge.RobotId}] Sending: {json[..Math.Min(120, json.Length)]}...");
+            await bridge.SendDirectToRobotAsync(json);
+            return true;
         }
 
         // WhatsApp block removed completely
@@ -1282,11 +1281,11 @@ namespace RobotControllerApp
             // Add a 3-second buffer to prevent flickering due to dropped ICMP pings over Wi-Fi
             int uCount = _unityLatencyHistory.Count;
             bool isExpertReachable = uLat > 0 || (uCount > 0 && _unityLatencyHistory.Skip(System.Math.Max(0, uCount - 3)).Any(v => v > 0));
-            // Robot 1 is logically connected ONLY if the bridge is currently alive with ROS
-            bool isR1Connected = _robotBridge.IsConnected;
-
-            // Robot 2 is logically connected if we can reach its IP (as it has no specific bridge software yet)
-            bool isR2Connected = r2Lat > 0 && !string.IsNullOrEmpty(_settings.Robot2Ip);
+            // Robot connection truth: relay bridge open (ConnectionManager) OR physical ROS socket alive
+            // Using same logic as StartRelayStatusPoll to keep Network and Dashboard in sync.
+            var cm = RelayServerHost.CurrentManager;
+            bool isR1Connected = (cm?.IsRobotConnected("Robot_Niryo_01") ?? false) || _robotBridge.IsConnected;
+            bool isR2Connected = (cm?.IsRobotConnected("Robot_Niryo_02") ?? false) || _robotBridge2.IsConnected;
 
             // ---------- Dashboard Status Cards ----------
             var successBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Success"];
@@ -1321,8 +1320,8 @@ namespace RobotControllerApp
             {
                 QuestIpText.Text = expertDisplayIp;
             }
-            R1IpText.Text = (isR1Connected) ? ExtractIp(_settings.RobotIp) : "Offline";
-            R2IpText.Text = (r2Lat > 0) ? ExtractIp(_settings.Robot2Ip) : "Offline";
+            R1IpText.Text = isR1Connected ? ExtractIp(_settings.RobotIp) : "Offline";
+            R2IpText.Text = isR2Connected ? ExtractIp(_settings.Robot2Ip) : "Offline";
 
             if (isExpertWsConnected)
             {
