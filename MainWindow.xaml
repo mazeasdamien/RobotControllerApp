@@ -197,6 +197,9 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                             <TextBlock Text="Robot 1" FontSize="12" FontWeight="SemiBold"
@@ -212,8 +215,21 @@
                                                 Margin="0,0,8,0"
                                                 Click="R1HomeButton_Click"/>
                                         <Button x:Name="R1CalibrateButton" Grid.Column="2"
-                                                Content="CALIBRATE"
+                                                Content="CALIBRATE" Margin="0,0,8,0"
                                                 Click="R1CalibrateButton_Click"/>
+                                        <Border Grid.Column="3" Width="1" Background="White" Opacity="0.15" Margin="0,6"/>
+                                        <Button x:Name="R1GripperOpenButton" Grid.Column="4"
+                                                Content="OPEN" Margin="8,0,4,0"
+                                                Background="#1A7A4A" Foreground="#00CC6A"
+                                                BorderBrush="#00CC6A" BorderThickness="1"
+                                                Click="R1GripperOpenButton_Click"
+                                                ToolTipService.ToolTip="Open Robot 1 Gripper"/>
+                                        <Button x:Name="R1GripperCloseButton" Grid.Column="5"
+                                                Content="CLOSE"
+                                                Background="#5C3000" Foreground="#FFD279"
+                                                BorderBrush="#FFD279" BorderThickness="1"
+                                                Click="R1GripperCloseButton_Click"
+                                                ToolTipService.ToolTip="Close Robot 1 Gripper"/>
                                     </Grid>
                                 </Border>
 
@@ -223,6 +239,9 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
@@ -240,8 +259,21 @@
                                                 Margin="0,0,8,0"
                                                 Click="R2HomeButton_Click"/>
                                         <Button x:Name="R2CalibrateButton" Grid.Column="2"
-                                                Content="CALIBRATE"
+                                                Content="CALIBRATE" Margin="0,0,8,0"
                                                 Click="R2CalibrateButton_Click"/>
+                                        <Border Grid.Column="3" Width="1" Background="White" Opacity="0.15" Margin="0,6"/>
+                                        <Button x:Name="R2GripperOpenButton" Grid.Column="4"
+                                                Content="OPEN" Margin="8,0,4,0"
+                                                Background="#1A7A4A" Foreground="#00CC6A"
+                                                BorderBrush="#00CC6A" BorderThickness="1"
+                                                Click="R2GripperOpenButton_Click"
+                                                ToolTipService.ToolTip="Open Robot 2 Gripper"/>
+                                        <Button x:Name="R2GripperCloseButton" Grid.Column="5"
+                                                Content="CLOSE"
+                                                Background="#5C3000" Foreground="#FFD279"
+                                                BorderBrush="#FFD279" BorderThickness="1"
+                                                Click="R2GripperCloseButton_Click"
+                                                ToolTipService.ToolTip="Close Robot 2 Gripper"/>
                                     </Grid>
                                 </Border>
                             </Grid>

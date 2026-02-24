@@ -138,7 +138,8 @@ namespace RobotControllerApp.Services
                         UnityClientIp = context.Connection.RemoteIpAddress?.ToString();
                         UnityClientConnected = true;
                         OnUnityConnectionChanged?.Invoke(true);
-                        Log($"[Hub] Unity Connected for robot: {robotId} from {UnityClientIp}");
+                        string cleanIp = UnityClientIp?.Replace("::ffff:", "") ?? "?";
+                        Log($"🟢 [Relay] Remote Expert connected — {robotId}  ({cleanIp})");
 
                         connectionManager.AddUnityClient(robotId, ws);
                         await HandleUnityConnection(ws, robotId, connectionManager, token);
@@ -148,7 +149,7 @@ namespace RobotControllerApp.Services
                         LastQuestLatencyMs = 0;
                         connectionManager.RemoveUnityClient(robotId);
 
-                        Log($"[Hub] Unity Disconnected from robot: {robotId}");
+                        Log($"🔴 [Relay] Remote Expert disconnected — {robotId}");
                     }
                     else
                     {

@@ -311,13 +311,11 @@ namespace RobotControllerApp
                             {
                                 _lastIkSendR1 = now;
                                 _ = _robotBridge.SendDirectToRobotAsync(cmd);
-                                Log($"[IK→R1] Pose ({px:0.00}, {py:0.00}, {pz:0.00}) RPY ({roll:0.00}, {pitch:0.00}, {yaw:0.00})");
                             }
                             else
                             {
                                 _lastIkSendR2 = now;
                                 _ = _robotBridge2.SendDirectToRobotAsync(cmd);
-                                Log($"[IK→R2] Pose ({px:0.00}, {py:0.00}, {pz:0.00}) RPY ({roll:0.00}, {pitch:0.00}, {yaw:0.00})");
                             }
                         }
                     }
@@ -1157,6 +1155,60 @@ namespace RobotControllerApp
                 service = "/niryo_robot/joints_interface/calibrate_motors",
                 type = "niryo_robot_msgs/SetInt",
                 args = new { value = 1 }
+            });
+
+        // ── Gripper handlers ─────────────────────────────────────────────────────
+
+        private async void R1GripperOpenButton_Click(object sender, RoutedEventArgs e)
+        {
+            bool ok = await SendDebugCommand(_robotBridge, BuildGripperOpenCommand());
+            Log(ok ? "✅ R1 — Gripper OPEN" : "❌ R1 — Gripper Open: ROS not connected");
+        }
+
+        private async void R1GripperCloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            bool ok = await SendDebugCommand(_robotBridge, BuildGripperCloseCommand());
+            Log(ok ? "✅ R1 — Gripper CLOSED" : "❌ R1 — Gripper Close: ROS not connected");
+        }
+
+        private async void R2GripperOpenButton_Click(object sender, RoutedEventArgs e)
+        {
+            bool ok = await SendDebugCommand(_robotBridge2, BuildGripperOpenCommand());
+            Log(ok ? "✅ R2 — Gripper OPEN" : "❌ R2 — Gripper Open: ROS not connected");
+        }
+
+        private async void R2GripperCloseButton_Click(object sender, RoutedEventArgs e)
+        {
+            bool ok = await SendDebugCommand(_robotBridge2, BuildGripperCloseCommand());
+            Log(ok ? "✅ R2 — Gripper CLOSED" : "❌ R2 — Gripper Close: ROS not connected");
+        }
+
+        /// <summary>
+        /// Opens the Niryo gripper.
+        /// Service: /niryo_robot/tools/open_gripper  type: tools_interface/ToolCommand
+        /// Fields: id (motor ID), position (open target), speed, hold_torque (0-1000), max_torque (0-1000)
+        /// </summary>
+        private static string BuildGripperOpenCommand() =>
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                op = "call_service",
+                service = "/niryo_robot/tools/open_gripper",
+                type = "tools_interface/ToolCommand",
+                args = new { id = 11, position = 1000, speed = 400, hold_torque = 300, max_torque = 600 }
+            });
+
+        /// <summary>
+        /// Closes the Niryo gripper.
+        /// Service: /niryo_robot/tools/close_gripper  type: tools_interface/ToolCommand
+        /// hold_torque=1000 (max) to prevent releasing after service returns.
+        /// </summary>
+        private static string BuildGripperCloseCommand() =>
+            System.Text.Json.JsonSerializer.Serialize(new
+            {
+                op = "call_service",
+                service = "/niryo_robot/tools/close_gripper",
+                type = "tools_interface/ToolCommand",
+                args = new { id = 11, position = 0, speed = 400, hold_torque = 700, max_torque = 800 }
             });
 
         /// <summary>
