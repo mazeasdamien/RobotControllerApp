@@ -34,6 +34,8 @@ namespace RobotControllerApp.Services
         public int RosPort { get; set; } = 9090;
         public string RelayServerUrl { get; set; } = "ws://localhost:5000/robot";
         public int TelemetryIntervalMs { get; set; } = 100;
+        /// <summary>Set to false for robots without a camera (skips camera topic subscription).</summary>
+        public bool HasCamera { get; set; } = true;
 
         /// <summary>Most recent measurement of round-trip latency to the local relay.</summary>
         public long LastLatencyMs { get; private set; } = 0;
@@ -235,14 +237,18 @@ namespace RobotControllerApp.Services
             };
             await SendToRobotAsync(JsonSerializer.Serialize(subscribeJoints));
 
-            var subscribeCamera = new
+            // Only subscribe to camera if robot has one
+            if (HasCamera)
             {
-                op = "subscribe",
-                topic = "/niryo_robot_vision/compressed_video_stream",
-                type = "sensor_msgs/CompressedImage",
-                throttle_rate = 0
-            };
-            await SendToRobotAsync(JsonSerializer.Serialize(subscribeCamera));
+                var subscribeCamera = new
+                {
+                    op = "subscribe",
+                    topic = "/niryo_robot_vision/compressed_video_stream",
+                    type = "sensor_msgs/CompressedImage",
+                    throttle_rate = 0
+                };
+                await SendToRobotAsync(JsonSerializer.Serialize(subscribeCamera));
+            }
 
             var subscribeGripper = new
             {

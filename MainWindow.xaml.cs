@@ -74,8 +74,8 @@ namespace RobotControllerApp
             // Initialize Services
             _settings = AppSettings.Load();
             _relayServer = new RelayServerHost();
-            _robotBridge = new RobotBridgeService() { RobotId = "Robot_Niryo_01" };
-            _robotBridge2 = new RobotBridgeService() { RobotId = "Robot_Niryo_02" };
+            _robotBridge = new RobotBridgeService() { RobotId = "Robot_Niryo_01", HasCamera = true };
+            _robotBridge2 = new RobotBridgeService() { RobotId = "Robot_Niryo_02", HasCamera = false };
 
             // Initialize Settings UI values
             RelayPortInput.Text = _settings.RelayPort.ToString();
@@ -491,20 +491,21 @@ namespace RobotControllerApp
 
         /// <summary>
         /// Polls the relay ConnectionManager every 2 s and updates robot status cards.
-        /// This is the authoritative source of truth for whether a robot is reachable,
-        /// even when the ROS bridge event path has fired a disconnect (e.g. ROS restarting).
+        /// Uses the relay bridge connection (ConnectionManager) as primary truth — a robot is
+        /// considered ACTIVE if its bridge WebSocket to the relay hub is open, regardless of
+        /// whether the ROS socket to the physical robot is established.
         /// </summary>
         private void StartRelayStatusPoll()
         {
             var pollTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
             pollTimer.Tick += (_, _) =>
             {
-                // Use the ROS-level IsConnected flag on each bridge:
-                // ConnectionManager.IsRobotConnected() only tells us if the bridge
-                // WebSocket to the relay is open (always true while the app runs).
-                // _robotBridge.IsConnected is set false the moment the ROS socket drops.
-                bool r1 = _robotBridge.IsConnected;
-                bool r2 = _robotBridge2.IsConnected;
+                var manager = RelayServerHost.CurrentManager;
+
+                // Primary: relay bridge connected (bridge WebSocket to Hub is open)
+                // Fallback: ROS-level IsConnected (physical robot socket)
+                bool r1 = (manager?.IsRobotConnected("Robot_Niryo_01") ?? false) || _robotBridge.IsConnected;
+                bool r2 = (manager?.IsRobotConnected("Robot_Niryo_02") ?? false) || _robotBridge2.IsConnected;
 
                 string r1Text = Robot1ActiveText.Text;
                 string r2Text = Robot2ActiveText.Text;
@@ -514,6 +515,13 @@ namespace RobotControllerApp
 
                 if (r2 && r2Text != "ACTIVE") UpdateRobot2Status(true);
                 else if (!r2 && r2Text == "ACTIVE") UpdateRobot2Status(false);
+
+                // Update Network topology IP labels
+                if (manager != null)
+                {
+                    R1IpText.Text = _robotBridge.IsConnected ? _settings.RobotIp : (r1 ? $"{_settings.RobotIp} (bridge)" : "Offline");
+                    R2IpText.Text = _robotBridge2.IsConnected ? _settings.Robot2Ip : (r2 ? $"{_settings.Robot2Ip} (bridge)" : "Offline");
+                }
             };
             pollTimer.Start();
         }
