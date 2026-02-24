@@ -909,7 +909,6 @@
                                             CornerRadius="{StaticResource Radius.Medium}"
                                             Padding="28">
                                         <StackPanel Spacing="20">
-                                            <!-- Header -->
                                             <StackPanel Orientation="Horizontal" Spacing="10">
                                                 <FontIcon Glyph="&#xEBC5;" FontSize="22" Foreground="{StaticResource Brush.Primary}"/>
                                                 <TextBlock Text="ROBOT 1" Style="{StaticResource Text.Headline3}" VerticalAlignment="Center"/>
@@ -924,9 +923,8 @@
 
                                             <!-- Learning Mode -->
                                             <StackPanel Spacing="6">
-                                                <TextBlock Text="LEARNING MODE" FontSize="10" FontWeight="SemiBold"
-                                                           Opacity="0.5" CharacterSpacing="60"/>
-                                                <TextBlock Text="Releases motor torque so the arm can be moved freely by hand. Disable before running autonomous commands."
+                                                <TextBlock Text="LEARNING MODE" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
+                                                <TextBlock Text="Releases motor torque so the arm can be moved freely by hand."
                                                            FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
                                                 <Grid Margin="0,4,0,0">
                                                     <TextBlock Text="Activate learning mode" FontSize="13" VerticalAlignment="Center"/>
@@ -942,12 +940,11 @@
 
                                             <!-- Home Position -->
                                             <StackPanel Spacing="6">
-                                                <TextBlock Text="HOME POSITION" FontSize="10" FontWeight="SemiBold"
-                                                           Opacity="0.5" CharacterSpacing="60"/>
-                                                <TextBlock Text="Moves all joints to 0° (upright rest pose). Ensure the workspace is clear before triggering."
+                                                <TextBlock Text="HOME POSITION" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
+                                                <TextBlock Text="Moves all joints to 0°. Ensure the workspace is clear before triggering."
                                                            FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
                                                 <Button x:Name="R1HomeButton"
-                                                        Content="⌂  MOVE TO HOME"
+                                                        Content="MOVE TO HOME"
                                                         Margin="0,8,0,0"
                                                         Style="{StaticResource Button.Filled}"
                                                         HorizontalAlignment="Left"
@@ -956,10 +953,8 @@
 
                                             <Border Height="1" Background="White" Opacity="0.08"/>
 
-                                            <!-- Status log -->
                                             <StackPanel Spacing="4">
-                                                <TextBlock Text="LAST COMMAND" FontSize="10" FontWeight="SemiBold"
-                                                           Opacity="0.5" CharacterSpacing="60"/>
+                                                <TextBlock Text="LAST COMMAND" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
                                                 <Border Background="Black" CornerRadius="6" Padding="10,8">
                                                     <TextBlock x:Name="R1DebugLog" Text="No command sent yet."
                                                                FontFamily="Consolas" FontSize="11"
@@ -975,7 +970,6 @@
                                             CornerRadius="{StaticResource Radius.Medium}"
                                             Padding="28">
                                         <StackPanel Spacing="20">
-                                            <!-- Header -->
                                             <StackPanel Orientation="Horizontal" Spacing="10">
                                                 <FontIcon Glyph="&#xEBC5;" FontSize="22" Foreground="#FFD279"/>
                                                 <TextBlock Text="ROBOT 2" Style="{StaticResource Text.Headline3}" VerticalAlignment="Center"/>
@@ -990,9 +984,8 @@
 
                                             <!-- Learning Mode -->
                                             <StackPanel Spacing="6">
-                                                <TextBlock Text="LEARNING MODE" FontSize="10" FontWeight="SemiBold"
-                                                           Opacity="0.5" CharacterSpacing="60"/>
-                                                <TextBlock Text="Releases motor torque so the arm can be moved freely by hand. Disable before running autonomous commands."
+                                                <TextBlock Text="LEARNING MODE" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
+                                                <TextBlock Text="Releases motor torque so the arm can be moved freely by hand."
                                                            FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
                                                 <Grid Margin="0,4,0,0">
                                                     <TextBlock Text="Activate learning mode" FontSize="13" VerticalAlignment="Center"/>
@@ -1008,12 +1001,11 @@
 
                                             <!-- Home Position -->
                                             <StackPanel Spacing="6">
-                                                <TextBlock Text="HOME POSITION" FontSize="10" FontWeight="SemiBold"
-                                                           Opacity="0.5" CharacterSpacing="60"/>
-                                                <TextBlock Text="Moves all joints to 0° (upright rest pose). Ensure the workspace is clear before triggering."
+                                                <TextBlock Text="HOME POSITION" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
+                                                <TextBlock Text="Moves all joints to 0°. Ensure the workspace is clear before triggering."
                                                            FontSize="11" Opacity="0.5" TextWrapping="Wrap"/>
                                                 <Button x:Name="R2HomeButton"
-                                                        Content="⌂  MOVE TO HOME"
+                                                        Content="MOVE TO HOME"
                                                         Margin="0,8,0,0"
                                                         Style="{StaticResource Button.Filled}"
                                                         HorizontalAlignment="Left"
@@ -1022,10 +1014,8 @@
 
                                             <Border Height="1" Background="White" Opacity="0.08"/>
 
-                                            <!-- Status log -->
                                             <StackPanel Spacing="4">
-                                                <TextBlock Text="LAST COMMAND" FontSize="10" FontWeight="SemiBold"
-                                                           Opacity="0.5" CharacterSpacing="60"/>
+                                                <TextBlock Text="LAST COMMAND" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
                                                 <Border Background="Black" CornerRadius="6" Padding="10,8">
                                                     <TextBlock x:Name="R2DebugLog" Text="No command sent yet."
                                                                FontFamily="Consolas" FontSize="11"
@@ -1035,12 +1025,63 @@
                                         </StackPanel>
                                     </Border>
                                 </Grid>
+
+                                <!-- ══ CAMERA FEEDS ══════════════════════════════════════════ -->
+                                <Grid ColumnSpacing="24">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <!-- Robot 1 Camera -->
+                                    <Border Grid.Column="0"
+                                            Background="{StaticResource Brush.Background.Card}"
+                                            CornerRadius="{StaticResource Radius.Medium}"
+                                            Padding="20">
+                                        <StackPanel Spacing="12">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE99A;" FontSize="16" Foreground="{StaticResource Brush.Primary}"/>
+                                                <TextBlock Text="ROBOT 1 — Camera Feed" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <!-- Reuse the same Image control already present in DashboardView;
+                                                 we mirror it by binding to the same HTTP endpoint via a polling Image.
+                                                 The image source is refreshed by the existing camera timer. -->
+                                            <Border Background="Black" CornerRadius="8" Height="220">
+                                                <Image x:Name="DebugCameraImage"
+                                                       Stretch="Uniform"
+                                                       HorizontalAlignment="Stretch"
+                                                       VerticalAlignment="Stretch"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <!-- Operator Webcam -->
+                                    <Border Grid.Column="1"
+                                            Background="{StaticResource Brush.Background.Card}"
+                                            CornerRadius="{StaticResource Radius.Medium}"
+                                            Padding="20">
+                                        <StackPanel Spacing="12">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <FontIcon Glyph="&#xE8B7;" FontSize="16" Foreground="#FFD279"/>
+                                                <TextBlock Text="Operator Webcam" FontSize="13" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                            <Border Background="Black" CornerRadius="8" Height="220">
+                                                <Image x:Name="DebugOperatorImage"
+                                                       Stretch="Uniform"
+                                                       HorizontalAlignment="Stretch"
+                                                       VerticalAlignment="Stretch"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
                             </StackPanel>
                         </ScrollViewer>
                     </Border>
                 </Grid>
 
                 <!-- 6. SETTINGS VIEW -->
+
 
                 <Grid x:Name="SettingsView" Visibility="Collapsed">
                     <Border Padding="{StaticResource Padding.Page}">

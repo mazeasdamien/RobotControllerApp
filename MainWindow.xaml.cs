@@ -234,6 +234,7 @@ namespace RobotControllerApp
                         await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
                     }
                     CameraImage.Source = bitmap;
+                    DebugCameraImage.Source = bitmap; // mirror to Debug view
 
                     // Transition UI
                     if (CameraImage.Visibility == Visibility.Collapsed)
@@ -395,6 +396,7 @@ namespace RobotControllerApp
                                         await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
                                     }
                                     LocalWebcamPreview.Source = bitmap;
+                                    DebugOperatorImage.Source = bitmap; // mirror to Debug view
                                 }
                                 catch { }
                             });
@@ -1092,18 +1094,33 @@ namespace RobotControllerApp
             {
                 op = "call_service",
                 service = "/niryo_robot/activate_learning_mode",
+                type = "niryo_robot_msgs/SetBool",
                 args = new { value = activate }
             });
 
         private static string BuildHomeCommand() =>
+            // Publish a JointTrajectory to move all joints to 0 (home/rest pose)
+            // This avoids the need for an async service call/response cycle over rosbridge
             System.Text.Json.JsonSerializer.Serialize(new
             {
-                op = "call_service",
-                service = "/niryo_robot_commander/robot_action",
-                args = new
+                op = "publish",
+                topic = "/niryo_robot_arm_commander/joint_trajectory",
+                type = "trajectory_msgs/JointTrajectory",
+                msg = new
                 {
-                    cmd_type = 1, // CMD_TYPE_JOINTS
-                    joints = new[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 }
+                    header = new { seq = 0, stamp = new { secs = 0, nsecs = 0 }, frame_id = "" },
+                    joint_names = new[] { "joint_1", "joint_2", "joint_3", "joint_4", "joint_5", "joint_6" },
+                    points = new[]
+                    {
+                        new
+                        {
+                            positions = new[] { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0 },
+                            velocities = Array.Empty<double>(),
+                            accelerations = Array.Empty<double>(),
+                            effort = Array.Empty<double>(),
+                            time_from_start = new { secs = 3, nsecs = 0 }
+                        }
+                    }
                 }
             });
 
@@ -1276,24 +1293,13 @@ namespace RobotControllerApp
             var mutedBrush = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
             var warnBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
 
-            // Remote Expert
+            // Remote Expert only — Robot 1 and Robot 2 are handled exclusively by StartRelayStatusPoll
+            // to avoid ICMP ping flapping overriding the stable relay WebSocket state.
             bool expertActive = isExpertWsConnected || isExpertReachable;
             RelayActiveText.Text = expertActive ? "ACTIVE" : "WAITING";
             RelayActiveText.Foreground = expertActive ? successBrush : mutedBrush;
             RelayIcon.Foreground = expertActive ? successBrush : mutedBrush;
             if (RelayStatusIndicator != null) RelayStatusIndicator.Visibility = expertActive ? Visibility.Visible : Visibility.Collapsed;
-
-            // Robot 1
-            Robot1ActiveText.Text = isR1Connected ? "ACTIVE" : "WAITING";
-            Robot1ActiveText.Foreground = isR1Connected ? successBrush : mutedBrush;
-            Robot1Icon.Foreground = isR1Connected ? successBrush : mutedBrush;
-            if (Robot1StatusIndicator != null) Robot1StatusIndicator.Visibility = isR1Connected ? Visibility.Visible : Visibility.Collapsed;
-
-            // Robot 2
-            Robot2ActiveText.Text = isR2Connected ? "ACTIVE" : "WAITING";
-            Robot2ActiveText.Foreground = isR2Connected ? successBrush : mutedBrush;
-            Robot2Icon.Foreground = isR2Connected ? successBrush : mutedBrush;
-            if (Robot2StatusIndicator != null) Robot2StatusIndicator.Visibility = isR2Connected ? Visibility.Visible : Visibility.Collapsed;
 
             // 2. Discovery updates
             // Prefer the public IP reported by the Quest itself (from telemetry)
