@@ -354,14 +354,7 @@ namespace RobotControllerApp.Services
                 await SendToRobotAsync(JsonSerializer.Serialize(subscribeCamera));
             }
 
-            var subscribeGripper = new
-            {
-                op = "subscribe",
-                topic = "/niryo_robot_gripper/gripper_state",
-                type = "niryo_robot_msgs/GripperState",
-                throttle_rate = 500
-            };
-            await SendToRobotAsync(JsonSerializer.Serialize(subscribeGripper));
+            // Gripper subscription removed
 
             var subscribeState = new
             {

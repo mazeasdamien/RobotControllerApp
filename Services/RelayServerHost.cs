@@ -27,8 +27,6 @@ namespace RobotControllerApp.Services
         public static event Action<int, int>? OnImageStatsUpdated; // FPS, Total
         public static event Action<byte[]>? OnImageReceived; // Latest base64 decoded frame
         public static event Action<string>? OnUnityMessageReceived;
-        public static event Action<string>? OnGripperReceived;           // Robot 1
-        public static event Action<string>? OnRobot2GripperReceived;    // Robot 2
         public static event Action<string>? OnRobotStateReceived;
         public static event Action<string, float, float, string>? OnUnityTelemetryReceived; // location, rx_kbps, tx_kbps, public_ip
 
@@ -314,13 +312,6 @@ namespace RobotControllerApp.Services
                         catch { }
                     }
 
-                    // 3. Gripper State
-                    if (message.Contains("gripper_state", StringComparison.OrdinalIgnoreCase))
-                    {
-                        bool isRobot2Gripper = robotId.EndsWith("02") || robotId.EndsWith("_2");
-                        if (isRobot2Gripper) OnRobot2GripperReceived?.Invoke(message);
-                        else OnGripperReceived?.Invoke(message);
-                    }
 
                     // 4. Robot System State
                     if (message.Contains("robot_state", StringComparison.OrdinalIgnoreCase) && !message.Contains("gripper_state"))

@@ -197,9 +197,6 @@
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
                                             <TextBlock Text="Robot 1" FontSize="12" FontWeight="SemiBold"
@@ -215,22 +212,10 @@
                                                 Margin="0,0,8,0"
                                                 Click="R1HomeButton_Click"/>
                                         <Button x:Name="R1CalibrateButton" Grid.Column="2"
-                                                Content="CALIBRATE" Margin="0,0,8,0"
+                                                Content="CALIBRATE" Margin="0,0,0,0"
                                                 Click="R1CalibrateButton_Click"/>
-                                        <Border Grid.Column="3" Width="1" Background="White" Opacity="0.15" Margin="0,6"/>
-                                        <Button x:Name="R1GripperOpenButton" Grid.Column="4"
-                                                Content="OPEN" Margin="8,0,4,0"
-                                                Background="#1A7A4A" Foreground="#00CC6A"
-                                                BorderBrush="#00CC6A" BorderThickness="1"
-                                                Click="R1GripperOpenButton_Click"
-                                                ToolTipService.ToolTip="Open Robot 1 Gripper"/>
-                                        <Button x:Name="R1GripperCloseButton" Grid.Column="5"
-                                                Content="CLOSE"
-                                                Background="#5C3000" Foreground="#FFD279"
-                                                BorderBrush="#FFD279" BorderThickness="1"
-                                                Click="R1GripperCloseButton_Click"
-                                                ToolTipService.ToolTip="Close Robot 1 Gripper"/>
                                     </Grid>
+
                                 </Border>
 
                                 <!-- R2 Controls -->
@@ -239,9 +224,6 @@
                                     <Grid>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
@@ -259,22 +241,10 @@
                                                 Margin="0,0,8,0"
                                                 Click="R2HomeButton_Click"/>
                                         <Button x:Name="R2CalibrateButton" Grid.Column="2"
-                                                Content="CALIBRATE" Margin="0,0,8,0"
+                                                Content="CALIBRATE" Margin="0,0,0,0"
                                                 Click="R2CalibrateButton_Click"/>
-                                        <Border Grid.Column="3" Width="1" Background="White" Opacity="0.15" Margin="0,6"/>
-                                        <Button x:Name="R2GripperOpenButton" Grid.Column="4"
-                                                Content="OPEN" Margin="8,0,4,0"
-                                                Background="#1A7A4A" Foreground="#00CC6A"
-                                                BorderBrush="#00CC6A" BorderThickness="1"
-                                                Click="R2GripperOpenButton_Click"
-                                                ToolTipService.ToolTip="Open Robot 2 Gripper"/>
-                                        <Button x:Name="R2GripperCloseButton" Grid.Column="5"
-                                                Content="CLOSE"
-                                                Background="#5C3000" Foreground="#FFD279"
-                                                BorderBrush="#FFD279" BorderThickness="1"
-                                                Click="R2GripperCloseButton_Click"
-                                                ToolTipService.ToolTip="Close Robot 2 Gripper"/>
                                     </Grid>
+
                                 </Border>
                             </Grid>
 
@@ -575,7 +545,7 @@
                                             <!-- Header -->
                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                                 <FontIcon Glyph="&#xEBC5;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
-                                                <TextBlock Text="ROBOT 1 â€” State" Style="{StaticResource Text.Headline3}"/>
+                                                <TextBlock Text="ROBOT 1 / State" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
                                             <!-- Section: Joints -->
                                             <StackPanel Spacing="12">
@@ -586,20 +556,7 @@
                                                                HorizontalAlignment="Right" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"/>
                                                 </Grid>
                                             </StackPanel>
-                                            <Border Height="1" Background="White" Opacity="0.08"/>
-                                            <!-- Section: Gripper -->
-                                            <StackPanel Spacing="8">
-                                                <TextBlock Text="END EFFECTOR" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
-                                                <Grid>
-                                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                                        <FontIcon Glyph="&#xE7C8;" FontSize="14" Foreground="{StaticResource Brush.Primary}" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="Gripper" Opacity="0.6" FontSize="12" VerticalAlignment="Center"/>
-                                                    </StackPanel>
-                                                    <TextBlock x:Name="TelemGripper" Text="Unknown"
-                                                               HorizontalAlignment="Right" FontWeight="Bold"
-                                                               Foreground="{StaticResource Brush.Primary}"/>
-                                                </Grid>
-                                            </StackPanel>
+                                        </StackPanel>
                                             <Border Height="1" Background="White" Opacity="0.08"/>
                                             <!-- Section: Camera -->
                                             <StackPanel Spacing="8">
@@ -609,7 +566,6 @@
                                                     <TextBlock Text="Robot Feed Active" FontSize="12" Foreground="#00CC6A" FontWeight="SemiBold"/>
                                                 </StackPanel>
                                             </StackPanel>
-                                        </StackPanel>
                                     </Border>
 
                                     <!-- â•â• ROW 0 â€” ROBOT 2 STATE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
@@ -620,7 +576,7 @@
                                             <!-- Header -->
                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                                 <FontIcon Glyph="&#xEBC5;" FontSize="20" Foreground="#FFD279"/>
-                                                <TextBlock Text="ROBOT 2 â€” State" Style="{StaticResource Text.Headline3}"/>
+                                                <TextBlock Text="ROBOT 2 / State" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
                                             <!-- Section: Joints -->
                                             <StackPanel Spacing="12">
@@ -631,21 +587,6 @@
                                                                HorizontalAlignment="Right" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"/>
                                                 </Grid>
                                             </StackPanel>
-                                            <Border Height="1" Background="White" Opacity="0.08"/>
-                                            <!-- Section: Gripper -->
-                                            <StackPanel Spacing="8">
-                                                <TextBlock Text="END EFFECTOR" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
-                                                <Grid>
-                                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                                        <FontIcon Glyph="&#xE7C8;" FontSize="14" Foreground="#FFD279" VerticalAlignment="Center"/>
-                                                        <TextBlock Text="Gripper" Opacity="0.6" FontSize="12" VerticalAlignment="Center"/>
-                                                    </StackPanel>
-                                                    <TextBlock x:Name="TelemGripper2" Text="Unknown"
-                                                               HorizontalAlignment="Right" FontWeight="Bold"
-                                                               Foreground="#FFD279"/>
-                                                </Grid>
-                                            </StackPanel>
-                                            <Border Height="1" Background="White" Opacity="0.08"/>
                                             <!-- Section: Camera (N/A for Robot 2) -->
                                             <StackPanel Spacing="8">
                                                 <TextBlock Text="ROBOT CAMERA" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
@@ -664,7 +605,7 @@
                                         <StackPanel Spacing="16">
                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                                 <FontIcon Glyph="&#xE7F4;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
-                                                <TextBlock Text="IK Matrix &#x2014; Robot 1" Style="{StaticResource Text.Headline3}"/>
+                                                <TextBlock Text="IK Matrix / Robot 1" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
                                             <StackPanel Spacing="12">
                                                 <TextBlock Text="Target Pose (World Coordinates)" Opacity="0.6"/>
@@ -685,7 +626,7 @@
                                         <StackPanel Spacing="16">
                                             <StackPanel Orientation="Horizontal" Spacing="8">
                                                 <FontIcon Glyph="&#xE7F4;" FontSize="20" Foreground="#FFD279"/>
-                                                <TextBlock Text="IK Matrix &#x2014; Robot 2" Style="{StaticResource Text.Headline3}"/>
+                                                <TextBlock Text="IK Matrix / Robot 2" Style="{StaticResource Text.Headline3}"/>
                                             </StackPanel>
                                             <StackPanel Spacing="12">
                                                 <TextBlock Text="Target Pose (World Coordinates)" Opacity="0.6"/>

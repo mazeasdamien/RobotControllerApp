@@ -161,21 +161,8 @@ namespace RobotControllerApp
                 TelemTotalImages.Text = total.ToString();
             });
 
-            RelayServerHost.OnGripperReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
-            {
-                try
-                {
-                    using var doc = System.Text.Json.JsonDocument.Parse(msg);
-                    if (doc.RootElement.TryGetProperty("msg", out var m))
-                    {
-                        if (m.TryGetProperty("state", out var s))
-                            TelemGripper.Text = s.ToString().ToUpper();
-                        else if (m.TryGetProperty("opened", out var o))
-                            TelemGripper.Text = o.GetBoolean() ? "OPEN" : "CLOSED";
-                    }
-                }
-                catch { }
-            });
+
+
 
             // Robot 2 Telemetry
             RelayServerHost.OnRobot2JointsReceived += (joints) => this.DispatcherQueue.TryEnqueue(() =>
@@ -183,25 +170,10 @@ namespace RobotControllerApp
                 TelemJoints2.Text = "[" + string.Join(", ", System.Linq.Enumerable.Select(joints, j => j.ToString("0.00"))) + "]";
             });
 
-            RelayServerHost.OnRobot2GripperReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
-            {
-                try
-                {
-                    using var doc = System.Text.Json.JsonDocument.Parse(msg);
-                    if (doc.RootElement.TryGetProperty("msg", out var m))
-                    {
-                        if (m.TryGetProperty("state", out var s))
-                            TelemGripper2.Text = s.ToString().ToUpper();
-                        else if (m.TryGetProperty("opened", out var o))
-                            TelemGripper2.Text = o.GetBoolean() ? "OPEN" : "CLOSED";
-                    }
-                }
-                catch { }
-            });
-
             RelayServerHost.OnRobotStateReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
             {
             });
+
 
             DateTime lastUnityMsg = DateTime.MinValue;
             // Rate-limit IK forwarding: max 10 Hz per robot to avoid flooding rosbridge
@@ -1095,6 +1067,7 @@ namespace RobotControllerApp
                    : "❌ R2 — Learning mode: ROS not connected");
         }
 
+
         private async void R1HomeButton_Click(object sender, RoutedEventArgs e)
         {
             string cmd = BuildHomeCommand();
@@ -1157,59 +1130,6 @@ namespace RobotControllerApp
                 args = new { value = 1 }
             });
 
-        // ── Gripper handlers ─────────────────────────────────────────────────────
-
-        private async void R1GripperOpenButton_Click(object sender, RoutedEventArgs e)
-        {
-            bool ok = await SendDebugCommand(_robotBridge, BuildGripperOpenCommand());
-            Log(ok ? "✅ R1 — Gripper OPEN" : "❌ R1 — Gripper Open: ROS not connected");
-        }
-
-        private async void R1GripperCloseButton_Click(object sender, RoutedEventArgs e)
-        {
-            bool ok = await SendDebugCommand(_robotBridge, BuildGripperCloseCommand());
-            Log(ok ? "✅ R1 — Gripper CLOSED" : "❌ R1 — Gripper Close: ROS not connected");
-        }
-
-        private async void R2GripperOpenButton_Click(object sender, RoutedEventArgs e)
-        {
-            bool ok = await SendDebugCommand(_robotBridge2, BuildGripperOpenCommand());
-            Log(ok ? "✅ R2 — Gripper OPEN" : "❌ R2 — Gripper Open: ROS not connected");
-        }
-
-        private async void R2GripperCloseButton_Click(object sender, RoutedEventArgs e)
-        {
-            bool ok = await SendDebugCommand(_robotBridge2, BuildGripperCloseCommand());
-            Log(ok ? "✅ R2 — Gripper CLOSED" : "❌ R2 — Gripper Close: ROS not connected");
-        }
-
-        /// <summary>
-        /// Opens the Niryo gripper.
-        /// Service: /niryo_robot/tools/open_gripper  type: tools_interface/ToolCommand
-        /// Fields: id (motor ID), position (open target), speed, hold_torque (0-1000), max_torque (0-1000)
-        /// </summary>
-        private static string BuildGripperOpenCommand() =>
-            System.Text.Json.JsonSerializer.Serialize(new
-            {
-                op = "call_service",
-                service = "/niryo_robot/tools/open_gripper",
-                type = "tools_interface/ToolCommand",
-                args = new { id = 11, position = 1000, speed = 400, hold_torque = 300, max_torque = 600 }
-            });
-
-        /// <summary>
-        /// Closes the Niryo gripper.
-        /// Service: /niryo_robot/tools/close_gripper  type: tools_interface/ToolCommand
-        /// hold_torque=1000 (max) to prevent releasing after service returns.
-        /// </summary>
-        private static string BuildGripperCloseCommand() =>
-            System.Text.Json.JsonSerializer.Serialize(new
-            {
-                op = "call_service",
-                service = "/niryo_robot/tools/close_gripper",
-                type = "tools_interface/ToolCommand",
-                args = new { id = 11, position = 0, speed = 400, hold_torque = 700, max_torque = 800 }
-            });
 
         /// <summary>
         /// Sends a command to a robot bridge and returns true if the ROS socket was open.
