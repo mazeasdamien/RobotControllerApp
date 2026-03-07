@@ -24,6 +24,12 @@ namespace RobotControllerApp.Services
         /// <summary>The IP address of the remote expert client.</summary>
         public string ExpertIp { get; set; } = "";
 
+        /// <summary>The Orange API Key.</summary>
+        public string OrangeApiKey { get; set; } = "";
+        
+        /// <summary>The Google Gemini API Key.</summary>
+        public string GeminiApiKey { get; set; } = "";
+
         private static string SettingsPath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "RobotOrange", "settings.json");

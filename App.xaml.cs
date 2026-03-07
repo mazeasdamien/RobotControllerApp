@@ -15,6 +15,10 @@ namespace RobotControllerApp
         public App()
         {
             InitializeComponent();
+            this.UnhandledException += (s, e) => 
+            {
+                System.IO.File.WriteAllText("crash.txt", e.Message + "\n" + e.Exception?.ToString());
+            };
         }
 
         /// <summary>

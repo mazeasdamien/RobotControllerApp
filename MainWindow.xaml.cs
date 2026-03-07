@@ -13,6 +13,7 @@ using System.Net.NetworkInformation;
 using System.Threading.Tasks;
 using Windows.Graphics.Imaging;
 using System.Threading;
+using System.IO;
 using Windows.Media.Capture;
 using Windows.Media.Capture.Frames;
 using Windows.Media.Core;
@@ -21,6 +22,38 @@ using Windows.Media.Playback;
 
 namespace RobotControllerApp
 {
+    public class DetectedObjectViewModel
+    {
+        public string Name { get; set; } = "";
+        public Microsoft.UI.Xaml.Media.SolidColorBrush ColorBrush { get; set; } = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+        public Microsoft.UI.Xaml.Media.Imaging.BitmapImage? CroppedImage { get; set; }
+        public byte[]? CropJpgBytes { get; set; }
+        public bool IsAlreadyInLibrary { get; set; }
+        public double PreviewOpacity => IsAlreadyInLibrary ? 0.3 : 1.0;
+    }
+
+    public class GeneratedBananaImageModel
+    {
+        public string Name { get; set; } = "";
+        public Microsoft.UI.Xaml.Media.SolidColorBrush ColorBrush { get; set; } = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+        public Microsoft.UI.Xaml.Media.Imaging.BitmapImage? ImageSource { get; set; }
+    }
+    public class LibraryItemConfig
+    {
+        public string Name { get; set; } = "";
+        public string ColorHex { get; set; } = "#FFFFFF";
+        public string ImageFileName { get; set; } = "";
+        public string DateAdded { get; set; } = "";
+    }
+
+    public class LibraryItemViewModel
+    {
+        public string Name { get; set; } = "";
+        public Microsoft.UI.Xaml.Media.SolidColorBrush ColorBrush { get; set; } = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+        public string DateAdded { get; set; } = "";
+        public Microsoft.UI.Xaml.Media.Imaging.BitmapImage? ImageSource { get; set; }
+    }
+
     public sealed partial class MainWindow : Window
     {
         private readonly RelayServerHost _relayServer;
@@ -46,6 +79,16 @@ namespace RobotControllerApp
         // Guard flag: prevents Toggled event firing when toggle is updated programmatically
         private bool _updatingToggle = false;
 
+        private byte[]? _latestWebcamFrameBytes;
+        private readonly System.Collections.ObjectModel.ObservableCollection<DetectedObjectViewModel> _detectedObjects = new();
+        private readonly System.Collections.ObjectModel.ObservableCollection<GeneratedBananaImageModel> _bananaImages = new();
+
+        private System.Collections.ObjectModel.ObservableCollection<LibraryItemViewModel> _libraryItems = new();
+        private List<LibraryItemConfig> _libraryConfig = new();
+        
+        private static string LibraryPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RobotControllerApp", "Library");
+        private static string LibraryJsonPath => Path.Combine(LibraryPath, "library.json");
+
         public MainWindow()
         {
             this.InitializeComponent();
@@ -58,7 +101,8 @@ namespace RobotControllerApp
                 var titleBar = this.AppWindow.TitleBar;
                 titleBar.ButtonForegroundColor = Microsoft.UI.Colors.White;
                 titleBar.ButtonHoverForegroundColor = Microsoft.UI.Colors.White;
-                titleBar.ButtonHoverBackgroundColor = Windows.UI.Color.FromArgb(255, 50, 50, 50);
+                titleBar.ButtonBackgroundColor = Microsoft.UI.Colors.Transparent;
+                titleBar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
                 titleBar.ButtonPressedForegroundColor = Microsoft.UI.Colors.White;
                 titleBar.ButtonInactiveForegroundColor = Microsoft.UI.Colors.Gray;
 
@@ -69,6 +113,12 @@ namespace RobotControllerApp
                 }
                 catch { }
             }
+            
+            DetectedObjectsList.ItemsSource = _detectedObjects;
+            BananaImagesList.ItemsSource = _bananaImages;
+            LibraryList.ItemsSource = _libraryItems;
+
+            _ = LoadLibraryAsync();
 
             // Initialize Services
             _settings = AppSettings.Load();
@@ -80,6 +130,8 @@ namespace RobotControllerApp
             RelayPortInput.Text = _settings.RelayPort.ToString();
             RobotIpInput.Text = _settings.RobotIp;
             Robot2IpInput.Text = _settings.Robot2Ip;
+            OrangeApiKeyInput.Password = _settings.OrangeApiKey;
+            GeminiApiKeyInput.Password = _settings.GeminiApiKey;
 
             // Update Hub Card Status (Initialize as Waiting for Hub to start or Unity to connect)
             RelayActiveText.Text = "WAITING";
@@ -355,6 +407,61 @@ namespace RobotControllerApp
             _ = LoadCameraList();
         }
 
+        private async Task LoadLibraryAsync()
+        {
+            try
+            {
+                if (!Directory.Exists(LibraryPath))
+                    Directory.CreateDirectory(LibraryPath);
+
+                if (File.Exists(LibraryJsonPath))
+                {
+                    string json = await File.ReadAllTextAsync(LibraryJsonPath);
+                    _libraryConfig = System.Text.Json.JsonSerializer.Deserialize<List<LibraryItemConfig>>(json) ?? new List<LibraryItemConfig>();
+                    
+                    foreach (var item in _libraryConfig)
+                    {
+                        var vm = new LibraryItemViewModel { Name = item.Name, DateAdded = item.DateAdded };
+                        try {
+                            if (!string.IsNullOrEmpty(item.ColorHex))
+                            {
+                                var uiColor = Microsoft.UI.ColorHelper.FromArgb(255, 
+                                    Convert.ToByte(item.ColorHex.Substring(1, 2), 16),
+                                    Convert.ToByte(item.ColorHex.Substring(3, 2), 16),
+                                    Convert.ToByte(item.ColorHex.Substring(5, 2), 16));
+                                vm.ColorBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(uiColor);
+                            }
+                        } catch {}
+                        
+                        string imgPath = Path.Combine(LibraryPath, item.ImageFileName);
+                        if (File.Exists(imgPath))
+                        {
+                            byte[] bytes = await File.ReadAllBytesAsync(imgPath);
+                            var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                            using var ms = new System.IO.MemoryStream(bytes);
+                            await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
+                            vm.ImageSource = bitmap;
+                        }
+                        _libraryItems.Add(vm);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        private void SaveLibrary()
+        {
+            try
+            {
+                if (!Directory.Exists(LibraryPath))
+                    Directory.CreateDirectory(LibraryPath);
+                    
+                string json = System.Text.Json.JsonSerializer.Serialize(_libraryConfig);
+                File.WriteAllText(LibraryJsonPath, json);
+            }
+            catch { }
+        }
+
         private OpenCvSharp.VideoCapture? _cvCapture;
         private CancellationTokenSource? _cvCaptureCts;
         private int _operatorFpsCount = 0;
@@ -467,6 +574,8 @@ namespace RobotControllerApp
                                         await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
                                     }
                                     LocalWebcamPreview.Source = bitmap;
+                                    ContextWebcamPreview.Source = bitmap;
+                                    _latestWebcamFrameBytes = frameBytes;
                                 }
                                 catch { }
                             });
@@ -720,7 +829,17 @@ namespace RobotControllerApp
                 XamlRoot = this.Content.XamlRoot
             };
 
-            var result = await dialog.ShowAsync();
+            ContentDialogResult result = ContentDialogResult.None;
+            try
+            {
+                result = await dialog.ShowAsync();
+            }
+            catch
+            {
+                // If a ContentDialog is already open (e.g. an error message), ShowAsync will throw.
+                // In this case, we just assume the user wants to force close.
+                result = ContentDialogResult.Primary;
+            }
 
             if (result == ContentDialogResult.Primary)
             {
@@ -823,6 +942,8 @@ namespace RobotControllerApp
 
                 _settings.RobotIp = RobotIpInput.Text.Trim();
                 _settings.Robot2Ip = Robot2IpInput.Text.Trim();
+                _settings.OrangeApiKey = OrangeApiKeyInput.Password.Trim();
+                _settings.GeminiApiKey = GeminiApiKeyInput.Password.Trim();
                 _settings.Save();
                 _robotBridge.RosIp = SanitizeIp(_settings.RobotIp);
                 _robotBridge2.RosIp = SanitizeIp(_settings.Robot2Ip);
@@ -971,6 +1092,7 @@ namespace RobotControllerApp
             TelemetryView.Visibility = Visibility.Collapsed;
             SettingsView.Visibility = Visibility.Collapsed;
             NetworkView.Visibility = Visibility.Collapsed;
+            ContextView.Visibility = Visibility.Collapsed;
 
             // Show selected view
             if (args.IsSettingsSelected)
@@ -992,6 +1114,9 @@ namespace RobotControllerApp
                         break;
                     case "network":
                         NetworkView.Visibility = Visibility.Visible;
+                        break;
+                    case "context":
+                        ContextView.Visibility = Visibility.Visible;
                         break;
                 }
             }
@@ -1480,6 +1605,588 @@ namespace RobotControllerApp
 
             // Immediately redraw with new scale
             DrawNetworkGraph();
+        }
+
+        private Windows.UI.Color ColorFromLabel(string label)
+        {
+            string l = label.ToLower();
+            if (l.Contains("dark blue") || l.Contains("navy")) return Windows.UI.Color.FromArgb(255, 0, 0, 128);
+            if (l.Contains("blue")) return Microsoft.UI.Colors.Blue;
+            if (l.Contains("red")) return Microsoft.UI.Colors.Red;
+            if (l.Contains("lime")) return Microsoft.UI.Colors.Lime;
+            if (l.Contains("green")) return Windows.UI.Color.FromArgb(255, 0, 153, 0);
+            if (l.Contains("yellow")) return Microsoft.UI.Colors.Yellow;
+            if (l.Contains("orange")) return Microsoft.UI.Colors.Orange;
+            if (l.Contains("grey") || l.Contains("gray")) return Microsoft.UI.Colors.Gray;
+            if (l.Contains("black")) return Windows.UI.Color.FromArgb(255, 51, 51, 51);
+            if (l.Contains("pink")) return Microsoft.UI.Colors.Pink;
+            if (l.Contains("purple") || l.Contains("magenta")) return Microsoft.UI.Colors.Purple;
+            if (l.Contains("brown")) return Microsoft.UI.Colors.Brown;
+            return Microsoft.UI.Colors.White;
+        }
+
+        private async void GenerateObjectImagesBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(_settings.OrangeApiKey))
+            {
+                await new ContentDialog() { Title = "No API Key", Content = "Please define the Orange API Key in Settings.", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                return;
+            }
+
+            if (_latestWebcamFrameBytes == null)
+            {
+                await new ContentDialog() { Title = "No Camera Frame", Content = "Start the webcam first.", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                return;
+            }
+
+            GenerateObjectImagesBtn.IsEnabled = false;
+            GenerationProgress.IsActive = true;
+            GenerationProgress.Visibility = Visibility.Visible;
+
+            try
+            {
+                using var client = new HttpClient();
+                string url = "https://llmproxy.ai.orange/v1/chat/completions";
+                
+                string base64Image = Convert.ToBase64String(_latestWebcamFrameBytes);
+                
+                string prompt =
+                    "Identify all distinct physical objects (tools, parts, shapes) visible on the table. " +
+                    "For each, return normalised bounding box corners [ymin, xmin, ymax, xmax] in range 0–1000 " +
+                    "and a label starting with the object's colour. " +
+                    "RETURN JSON: { \"items\": [ { \"ymin\": 100, \"xmin\": 100, \"ymax\": 200, \"xmax\": 200, \"label\": \"blue cube\" } ] }";
+                
+                string safePrompt = prompt.Replace("\"", "\\\"").Replace("\n", "\\n");
+                
+                string body =
+                    $"{{\"model\": \"vertex_ai/gemini-2.0-flash\", \"temperature\": 0.0, " +
+                    $"\"response_format\": {{\"type\": \"json_object\"}}, " +
+                    $"\"messages\": [{{\"role\": \"user\", \"content\": [" +
+                    $"{{\"type\": \"text\", \"text\": \"{safePrompt}\"}}, " +
+                    $"{{\"type\": \"image_url\", \"image_url\": {{\"url\": \"data:image/jpeg;base64,{base64Image}\"}}}}]}}]}}";
+                
+                var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _settings.OrangeApiKey);
+                
+                var response = await client.PostAsync(url, content);
+                var responseString = await response.Content.ReadAsStringAsync();
+                
+                if (response.IsSuccessStatusCode)
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(responseString);
+                    _detectedObjects.Clear();
+                    
+                    var choices = doc.RootElement.GetProperty("choices");
+                    if (choices.GetArrayLength() > 0)
+                    {
+                        var messageContent = choices[0].GetProperty("message").GetProperty("content").GetString();
+                        if (!string.IsNullOrEmpty(messageContent))
+                        {
+                            int s = messageContent.IndexOf('{');
+                            int eIdx = messageContent.LastIndexOf('}');
+                            if (s >= 0 && eIdx > s)
+                            {
+                                string jsonStr = messageContent.Substring(s, eIdx - s + 1);
+                                using var itemsDoc = System.Text.Json.JsonDocument.Parse(jsonStr);
+                                if (itemsDoc.RootElement.TryGetProperty("items", out var itemsArray))
+                                {
+                                    using var sourceMat = OpenCvSharp.Cv2.ImDecode(_latestWebcamFrameBytes, OpenCvSharp.ImreadModes.Color);
+                                    int imgW = sourceMat.Width;
+                                    int imgH = sourceMat.Height;
+                                    
+                                    foreach (var item in itemsArray.EnumerateArray())
+                                    {
+                                        string label = item.TryGetProperty("label", out var labelProp) ? labelProp.GetString() ?? "Unknown" : "Unknown";
+                                        
+                                        int ymin = 0, xmin = 0, ymax = 0, xmax = 0;
+                                        if (item.TryGetProperty("box_2d", out var box2d) && box2d.GetArrayLength() >= 4)
+                                        {
+                                            ymin = box2d[0].GetInt32();
+                                            xmin = box2d[1].GetInt32();
+                                            ymax = box2d[2].GetInt32();
+                                            xmax = box2d[3].GetInt32();
+                                        }
+                                        else
+                                        {
+                                            int.TryParse(item.GetProperty("ymin").ToString(), out ymin);
+                                            int.TryParse(item.GetProperty("xmin").ToString(), out xmin);
+                                            int.TryParse(item.GetProperty("ymax").ToString(), out ymax);
+                                            int.TryParse(item.GetProperty("xmax").ToString(), out xmax);
+                                        }
+                                        
+                                        // Ignore objects cut off by the edge of the camera
+                                        if (xmin < 10 || ymin < 10 || xmax > 990 || ymax > 990) continue;
+                                        
+                                        int pixelXMin = (int)(xmin * imgW / 1000.0);
+                                        int pixelYMin = (int)(ymin * imgH / 1000.0);
+                                        int pixelXMax = (int)(xmax * imgW / 1000.0);
+                                        int pixelYMax = (int)(ymax * imgH / 1000.0);
+                                        
+                                        int width = pixelXMax - pixelXMin;
+                                        int height = pixelYMax - pixelYMin;
+                                        int padX = (int)(width * 0.40);
+                                        int padY = (int)(height * 0.40);
+                                        
+                                        pixelXMin = Math.Max(0, pixelXMin - padX);
+                                        pixelYMin = Math.Max(0, pixelYMin - padY);
+                                        pixelXMax = Math.Min(imgW, pixelXMax + padX);
+                                        pixelYMax = Math.Min(imgH, pixelYMax + padY);
+                                        
+                                        var rect = new OpenCvSharp.Rect(pixelXMin, pixelYMin, pixelXMax - pixelXMin, pixelYMax - pixelYMin);
+                                        rect.Width = Math.Min(imgW - rect.X, rect.Width);
+                                        rect.Height = Math.Min(imgH - rect.Y, rect.Height);
+                                        
+                                        if (rect.Width > 0 && rect.Height > 0)
+                                        {
+                                            using var cropMat = new OpenCvSharp.Mat(sourceMat, rect);
+                                            byte[] cropJpgBytes = cropMat.ImEncode(".jpg");
+                                            
+                                            var bitmap = new BitmapImage();
+                                            using var ms = new System.IO.MemoryStream(cropJpgBytes);
+                                            await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
+                                            
+                                            string objName = label.ToUpper();
+                                            bool isAlreadyInLibrary = _libraryConfig.Any(x => x.Name.Equals(objName, StringComparison.OrdinalIgnoreCase));
+                                            
+                                            var uiColor = ColorFromLabel(label);
+                                            
+
+                                            _detectedObjects.Add(new DetectedObjectViewModel
+                                            {
+                                                Name = objName,
+                                                ColorBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(uiColor),
+                                                CroppedImage = bitmap,
+                                                CropJpgBytes = cropJpgBytes,
+                                                IsAlreadyInLibrary = isAlreadyInLibrary
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                else
+                {
+                    await new ContentDialog() { Title = "API Error", Content = $"Error from Orange API:\n{responseString}", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                }
+                
+                double newObjectsCount = _detectedObjects.Count(x => !x.IsAlreadyInLibrary);
+                double costEuro = (newObjectsCount * 0.0672) * 0.94; // approx USD to EUR
+                BananaCostText.Text = $"Estimated Banana Pro Cost: {costEuro:0.000} €";
+            }
+            catch (Exception ex)
+            {
+                await new ContentDialog() { Title = "Execution Error", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+            }
+            finally
+            {
+                GenerateObjectImagesBtn.IsEnabled = true;
+                GenerationProgress.IsActive = false;
+                GenerationProgress.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void DeleteDetectedObject_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is DetectedObjectViewModel item)
+            {
+                _detectedObjects.Remove(item);
+                double newObjectsCount = _detectedObjects.Count(x => !x.IsAlreadyInLibrary);
+                double costEuro = (newObjectsCount * 0.0672) * 0.94;
+                BananaCostText.Text = $"Estimated Banana Pro Cost: {costEuro:0.000} €";
+            }
+        }
+
+        private void DeleteLibraryObject_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is LibraryItemViewModel item)
+            {
+                _libraryItems.Remove(item);
+                string name = item.Name;
+                
+                var configData = _libraryConfig.FirstOrDefault(x => x.Name == name);
+                if (configData != null)
+                {
+                    _libraryConfig.Remove(configData);
+                    SaveLibrary();
+                    
+                    try
+                    {
+                        string imgPath = Path.Combine(LibraryPath, configData.ImageFileName);
+                        if (File.Exists(imgPath)) File.Delete(imgPath);
+                    } catch { }
+                }
+                
+                // Re-enable scene detection item if it exists in the current session
+                var sceneItems = _detectedObjects.Where(x => x.Name == name).ToList();
+                foreach (var sceneItem in sceneItems)
+                {
+                    sceneItem.IsAlreadyInLibrary = false;
+                    var idx = _detectedObjects.IndexOf(sceneItem);
+                    if (idx >= 0) _detectedObjects[idx] = sceneItem; // trigger redraw
+                }
+            }
+        }
+
+        private void OpenLibraryFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (Directory.Exists(LibraryPath))
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo()
+                    {
+                        FileName = "explorer.exe",
+                        Arguments = $"\"{LibraryPath}\"",
+                        UseShellExecute = true
+                    });
+                }
+            }
+            catch (Exception)
+            {
+                // Ignore silent failure or log if necessary
+            }
+        }
+
+        private void Generate3DModel_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is LibraryItemViewModel item)
+            {
+                string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
+                string glbPath = Path.Combine(LibraryPath, $"{safeName}_3DModel.glb");
+                
+                if (File.Exists(glbPath))
+                {
+                    btn.Content = "Generated";
+                    btn.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.SeaGreen);
+                    btn.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+                    btn.IsEnabled = false;
+                }
+            }
+        }
+
+        private async void Generate3DModel_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is LibraryItemViewModel item)
+            {
+                var configData = _libraryConfig.FirstOrDefault(x => x.Name == item.Name);
+                if (configData == null) return;
+
+                btn.IsEnabled = false;
+                string originalContent = btn.Content?.ToString() ?? "To 3D Model";
+                btn.Content = "Starting TripoSR...";
+
+                bool serverWasAlreadyRunning = false;
+                System.Diagnostics.Process? tripoProcess = null;
+                bool generationSuccess = false;
+
+                try
+                {
+                    // Check if server is already running
+                    try
+                    {
+                        using var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+                        var res = await testClient.GetAsync("http://127.0.0.1:7860/");
+                        serverWasAlreadyRunning = true;
+                    } 
+                    catch { }
+
+                    if (!serverWasAlreadyRunning)
+                    {
+                        tripoProcess = new System.Diagnostics.Process();
+                        tripoProcess.StartInfo.FileName = @"C:\Users\QYTH4815\TripoSR-windows\run.bat";
+                        tripoProcess.StartInfo.WorkingDirectory = @"C:\Users\QYTH4815\TripoSR-windows";
+                        tripoProcess.StartInfo.UseShellExecute = true; // Use shell so the bat executes properly
+                        tripoProcess.StartInfo.CreateNoWindow = false; // Open a visible window to debug Anaconda/Python loading
+                        tripoProcess.Start();
+                    }
+
+                    btn.Content = "Generating 3D...";
+
+                    string imgPath = Path.Combine(LibraryPath, configData.ImageFileName);
+                    byte[] pngImageData = await File.ReadAllBytesAsync(imgPath);
+                    string base64Image = Convert.ToBase64String(pngImageData);
+                    string dataUri = $"data:image/png;base64,{base64Image}";
+
+                    var requestBody = new
+                    {
+                        data = new object[]
+                        {
+                            new { path = imgPath, url = dataUri }
+                        }
+                    };
+
+                    var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                    var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                    using var client = new HttpClient();
+                    client.Timeout = TimeSpan.FromMinutes(10); // Generation can take a while
+
+                    HttpResponseMessage? response = null;
+                    int maxRetries = 90; // approx 3 minutes to boot first time
+                    for (int i = 0; i < maxRetries; i++)
+                    {
+                        try
+                        {
+                            response = await client.PostAsync("http://127.0.0.1:7860/api/predict", content);
+                            break;
+                        }
+                        catch
+                        {
+                            if (i == maxRetries - 1) throw;
+                            await Task.Delay(2000);
+                        }
+                    }
+
+                    if (response == null || !response.IsSuccessStatusCode)
+                        throw new Exception("Le serveur TripoSR n'a pas répondu. Vérifiez que run.bat fonctionne correctement.");
+
+                    var responseString = await response.Content.ReadAsStringAsync();
+
+                    using (System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(responseString))
+                    {
+                        var resultData = doc.RootElement.GetProperty("data")[0];
+                        string? fileNameStr = null;
+
+                        if (resultData.ValueKind == System.Text.Json.JsonValueKind.String)
+                        {
+                            fileNameStr = resultData.GetString();
+                        }
+                        else if (resultData.ValueKind == System.Text.Json.JsonValueKind.Object)
+                        {
+                            if (resultData.TryGetProperty("path", out var pathProp) && pathProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                                fileNameStr = pathProp.GetString();
+                            else if (resultData.TryGetProperty("name", out var nameProp) && nameProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                                fileNameStr = nameProp.GetString();
+                            else if (resultData.TryGetProperty("url", out var urlProp) && urlProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                                fileNameStr = urlProp.GetString();
+                        }
+
+                        if (!string.IsNullOrEmpty(fileNameStr))
+                        {
+                            string fileUrl = fileNameStr.StartsWith("http") 
+                                ? fileNameStr 
+                                : $"http://127.0.0.1:7860/file={fileNameStr}";
+
+                            byte[] glbBytes = await client.GetByteArrayAsync(fileUrl);
+                            
+                            string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
+                            string glbPath = Path.Combine(LibraryPath, $"{safeName}_3DModel.glb");
+                            await File.WriteAllBytesAsync(glbPath, glbBytes);
+                            
+                            generationSuccess = true;
+                        }
+                        else
+                        {
+                            throw new Exception("Format de réponse inattendu. Json reçu :\n" + responseString.Substring(0, Math.Min(responseString.Length, 500)));
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    await new ContentDialog() { Title = "Erreur TripoSR", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                }
+                finally
+                {
+                    if (!serverWasAlreadyRunning && tripoProcess != null && !tripoProcess.HasExited)
+                    {
+                        try
+                        {
+                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("taskkill", $"/F /T /PID {tripoProcess.Id}")
+                            {
+                                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                                CreateNoWindow = true
+                            })?.WaitForExit();
+                        }
+                        catch { }
+                    }
+                    if (generationSuccess)
+                    {
+                        btn.Content = "Generated";
+                        btn.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.SeaGreen);
+                        btn.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+                    }
+                    else
+                    {
+                        btn.Content = originalContent;
+                        btn.IsEnabled = true;
+                    }
+                }
+            }
+        }
+
+        private async void GenerateBananaProImagesBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(_settings.GeminiApiKey))
+            {
+                await new ContentDialog() { Title = "No API Key", Content = "Please define the Google Gemini API Key in Settings.", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                return;
+            }
+
+            if (_detectedObjects.Count == 0)
+            {
+                await new ContentDialog() { Title = "No Detected Objects", Content = "Analyze the scene first to get cropped images.", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                return;
+            }
+
+            GenerateBananaProImagesBtn.IsEnabled = false;
+            BananaProgress.IsActive = true;
+            BananaProgress.Visibility = Visibility.Visible;
+
+            try
+            {
+                _bananaImages.Clear();
+                using var client = new HttpClient();
+                string url = $"https://generativelanguage.googleapis.com/v1alpha/models/gemini-3.1-flash-image-preview:generateContent?key={_settings.GeminiApiKey}";
+                
+                foreach (var obj in _detectedObjects.ToList())
+                {
+                    if (obj.IsAlreadyInLibrary) continue;
+
+                    if (obj.CropJpgBytes == null || obj.CropJpgBytes.Length == 0) continue;
+                    
+                    string base64Image = Convert.ToBase64String(obj.CropJpgBytes);
+                    
+                    bool isGreenish = obj.Name.Contains("GREEN", StringComparison.OrdinalIgnoreCase) || obj.Name.Contains("LIME", StringComparison.OrdinalIgnoreCase) || obj.Name.Contains("TEAL", StringComparison.OrdinalIgnoreCase);
+                    string chromaColorName = isGreenish ? "MAGENTA (#FF00FF)" : "NEON GREEN (#00FF00)";
+
+                    string promptText = $"Analyze the {obj.Name} and transform it into a hyper-realistic, 8k resolution, perfectly lit macro studio photograph. Completely ERASE any other objects (like phones, furniture, pieces of sofas, floors, or background elements) that are not the {obj.Name}. The final output must be exactly a perfectly square 1:1 ratio image entirely containing ONLY the {obj.Name} placed on a pure, solid {chromaColorName} chroma key background. IMPORTANT: There must be ABSOLUTELY NO SHADOWS, no ambient occlusion, and no reflections under or around the object. The background should be a completely flat, unshaded solid color. The object must be perfectly centered and occupy about 60% of the space. strictly maintain the original {obj.Name}'s form, color, and orientation.";
+                    
+                    var payload = new
+                    {
+                        contents = new[] {
+                            new {
+                                role = "user",
+                                parts = new object[] {
+                                    new { text = promptText },
+                                    new { inlineData = new { mimeType = "image/jpeg", data = base64Image } }
+                                }
+                            }
+                        }
+                    };
+                    
+                    var content = new StringContent(System.Text.Json.JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json");
+                    
+                    var response = await client.PostAsync(url, content);
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    
+                    if (response.IsSuccessStatusCode)
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(responseString);
+                        var candidates = doc.RootElement.GetProperty("candidates");
+                        foreach (var candidate in candidates.EnumerateArray())
+                        {
+                            var parts = candidate.GetProperty("content").GetProperty("parts");
+                            foreach (var part in parts.EnumerateArray())
+                            {
+                                if (part.TryGetProperty("inlineData", out var inlineData))
+                                {
+                                    string? b64 = inlineData.GetProperty("data").GetString();
+                                    if (!string.IsNullOrEmpty(b64))
+                                    {
+                                        byte[] bytes = Convert.FromBase64String(b64);
+                                        byte[] pngBytes;
+                                        
+                                        try
+                                        {
+                                            // Process the Gemini output through OpenCV to remove chroma key background
+                                            using var src = OpenCvSharp.Mat.FromImageData(bytes, OpenCvSharp.ImreadModes.Color);
+                                            using var argb = new OpenCvSharp.Mat();
+                                            OpenCvSharp.Cv2.CvtColor(src, argb, OpenCvSharp.ColorConversionCodes.BGR2BGRA);
+
+                                            using var mask = new OpenCvSharp.Mat();
+                                            
+                                            if (isGreenish)
+                                            {
+                                                // Magenta is high Red and Blue, low Green (OpenCV is BGR)
+                                                OpenCvSharp.Cv2.InRange(src, new OpenCvSharp.Scalar(150, 0, 150), new OpenCvSharp.Scalar(255, 120, 255), mask);
+                                            }
+                                            else
+                                            {
+                                                // Neon Green is high Green, low Red and Blue
+                                                OpenCvSharp.Cv2.InRange(src, new OpenCvSharp.Scalar(0, 150, 0), new OpenCvSharp.Scalar(120, 255, 120), mask);
+                                            }
+
+                                            // Slightly expand the mask and soften it to remove fringing artifacts cleanly
+                                            using var kernel = OpenCvSharp.Cv2.GetStructuringElement(OpenCvSharp.MorphShapes.Ellipse, new OpenCvSharp.Size(3, 3));
+                                            OpenCvSharp.Cv2.Dilate(mask, mask, kernel);
+                                            OpenCvSharp.Cv2.GaussianBlur(mask, mask, new OpenCvSharp.Size(3, 3), 0);
+
+                                            using var maskInv = new OpenCvSharp.Mat();
+                                            OpenCvSharp.Cv2.BitwiseNot(mask, maskInv);
+
+                                            // Apply mask to alpha channel
+                                            var channels = OpenCvSharp.Cv2.Split(argb);
+                                            maskInv.CopyTo(channels[3]); // Transparent where mask was chroma color
+                                            OpenCvSharp.Cv2.Merge(channels, argb);
+
+                                            pngBytes = argb.ImEncode(".png");
+                                            foreach (var c in channels) c.Dispose();
+                                        }
+                                        catch
+                                        {
+                                            pngBytes = bytes; // Fallback
+                                        }
+                                        
+                                        var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                                        using (var ms = new System.IO.MemoryStream(pngBytes)) {
+                                            await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
+                                        }
+                                        
+                                        _bananaImages.Add(new GeneratedBananaImageModel { Name = obj.Name, ColorBrush = obj.ColorBrush, ImageSource = bitmap });
+
+                                        // Now that we have the 3D render with transparent bg, we add it to persistent Library
+                                        string fileName = Guid.NewGuid().ToString() + ".png";
+                                        string filePath = Path.Combine(LibraryPath, fileName);
+                                        File.WriteAllBytes(filePath, pngBytes);
+                                        
+                                        var uiColor = obj.ColorBrush.Color;
+                                        var hexColor = $"#{uiColor.R:X2}{uiColor.G:X2}{uiColor.B:X2}";
+                                        var newConfig = new LibraryItemConfig 
+                                        { 
+                                            Name = obj.Name, 
+                                            ColorHex = hexColor, 
+                                            ImageFileName = fileName, 
+                                            DateAdded = DateTime.Now.ToString("g") 
+                                        };
+                                        _libraryConfig.Insert(0, newConfig);
+                                        SaveLibrary();
+                                        
+                                        var newVm = new LibraryItemViewModel 
+                                        { 
+                                            Name = obj.Name, 
+                                            ColorBrush = obj.ColorBrush, 
+                                            DateAdded = newConfig.DateAdded, 
+                                            ImageSource = bitmap 
+                                        };
+                                        _libraryItems.Insert(0, newVm);
+                                        
+                                        obj.IsAlreadyInLibrary = true;
+                                        // Update UI opacity immediately
+                                        int objIdx = _detectedObjects.IndexOf(obj);
+                                        if (objIdx >= 0) _detectedObjects[objIdx] = obj;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        await new ContentDialog() { Title = $"API Error for {obj.Name}", Content = $"Error from Gemini:\n{responseString}", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                await new ContentDialog() { Title = "Execution Error", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+            }
+            finally
+            {
+                GenerateBananaProImagesBtn.IsEnabled = true;
+                BananaProgress.IsActive = false;
+                BananaProgress.Visibility = Visibility.Collapsed;
+            }
         }
     }
 }

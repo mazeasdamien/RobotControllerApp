@@ -166,7 +166,6 @@ namespace RobotControllerApp.Services
                     return Results.NotFound("No image received yet");
                 });
 
-                // Operator Image Endpoint
                 app.MapGet("/image_operator", (ConnectionManager manager) =>
                 {
                     var img = manager.GetLatestOperatorImage();
@@ -175,6 +174,30 @@ namespace RobotControllerApp.Services
                         return Results.File(img, "image/jpeg");
                     }
                     return Results.NotFound("No operator image received yet");
+                });
+
+                // 3D Models Endpoints (For Quest 3 to fetch generated assets on the fly)
+                app.MapGet("/models/{filename}", (string filename) =>
+                {
+                    string libraryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RobotControllerApp", "Library");
+                    string filePath = Path.Combine(libraryPath, filename);
+                    if (File.Exists(filePath))
+                    {
+                        return Results.File(filePath, "model/gltf-binary"); // or "application/octet-stream"
+                    }
+                    return Results.NotFound($"Model {filename} not found");
+                });
+
+                app.MapGet("/models", () =>
+                {
+                    string libraryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RobotControllerApp", "Library");
+                    if (!Directory.Exists(libraryPath)) return Results.Ok(new string[0]);
+                    
+                    var files = Directory.GetFiles(libraryPath, "*.glb");
+                    var fileNames = new List<string>();
+                    foreach (var f in files) fileNames.Add(Path.GetFileName(f));
+                    
+                    return Results.Ok(fileNames);
                 });
 
                 // Removed WhatsApp Endpoint

@@ -35,6 +35,12 @@
                         <SymbolIcon Symbol="World"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+
+                <NavigationViewItem Content="Context" Tag="context">
+                    <NavigationViewItem.Icon>
+                        <SymbolIcon Symbol="Find"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
 
             <NavigationView.FooterMenuItems>
@@ -556,7 +562,6 @@
                                                                HorizontalAlignment="Right" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"/>
                                                 </Grid>
                                             </StackPanel>
-                                        </StackPanel>
                                             <Border Height="1" Background="White" Opacity="0.08"/>
                                             <!-- Section: Camera -->
                                             <StackPanel Spacing="8">
@@ -566,6 +571,7 @@
                                                     <TextBlock Text="Robot Feed Active" FontSize="12" Foreground="#00CC6A" FontWeight="SemiBold"/>
                                                 </StackPanel>
                                             </StackPanel>
+                                        </StackPanel>
                                     </Border>
 
                                     <!-- â•â• ROW 0 â€” ROBOT 2 STATE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
@@ -688,6 +694,192 @@
 
                                 </Grid>
                             </ScrollViewer>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <!-- CONTEXT VIEW -->
+                <Grid x:Name="ContextView" Visibility="Collapsed">
+                    <Border Padding="{StaticResource Padding.Page}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="5*"/>
+                                <RowDefinition Height="3*"/>
+                            </Grid.RowDefinitions>
+                            
+                            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24" Visibility="Collapsed">
+                                <FontIcon Glyph="&#xE8A5;" FontSize="28" Foreground="{StaticResource Brush.Primary}" VerticalAlignment="Center"/>
+                                <TextBlock Text="Project Context" Style="{StaticResource Text.Headline1}" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <Grid Grid.Row="1" ColumnSpacing="24" Margin="0,0,0,16">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Left Side: Webcam and Control -->
+                                <Border Grid.Column="0" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}" VerticalAlignment="Stretch">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        
+                                        <TextBlock Text="Operator Webcam Feed" Style="{StaticResource Text.Headline3}" Margin="0,0,0,16"/>
+                                        
+                                        <Border Grid.Row="1" Background="#0A0A0A" CornerRadius="10" BorderBrush="#1E1E1E" BorderThickness="1" Margin="0,0,0,16">
+                                            <Image x:Name="ContextWebcamPreview" Stretch="Uniform"/>
+                                        </Border>
+
+                                        <Viewbox Grid.Row="2" Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,0,0,16" MaxHeight="250">
+                                            <GridView x:Name="DetectedObjectsList" SelectionMode="None" MaxWidth="1000">
+                                                <GridView.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Grid>
+                                                            <StackPanel Margin="8" Opacity="{Binding PreviewOpacity}">
+                                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="18" Foreground="{Binding ColorBrush}" Margin="0,0,0,8" HorizontalAlignment="Center"/>
+                                                                <Border CornerRadius="8" BorderBrush="{Binding ColorBrush}" BorderThickness="3" Background="#0A0A0A" Width="200" Height="200">
+                                                                    <Image Source="{Binding CroppedImage}" Stretch="Uniform"/>
+                                                                </Border>
+                                                            </StackPanel>
+                                                            <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                                    HorizontalAlignment="Right" VerticalAlignment="Top" 
+                                                                    Margin="0,4,4,0" Width="28" Height="28" CornerRadius="14" Padding="0"
+                                                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                                    Background="#CC000000" Foreground="White" BorderThickness="0"
+                                                                    Click="DeleteDetectedObject_Click" Tag="{Binding Name}"
+                                                                    ToolTipService.ToolTip="Remove this object from analysis"/>
+                                                        </Grid>
+                                                    </DataTemplate>
+                                                </GridView.ItemTemplate>
+                                            </GridView>
+                                        </Viewbox>
+
+                                        <Button x:Name="GenerateObjectImagesBtn" Grid.Row="3" Content="Analyze Scene (Orange LLM)" HorizontalAlignment="Stretch" Style="{StaticResource Button.Filled}" Click="GenerateObjectImagesBtn_Click"/>
+                                        <ProgressRing x:Name="GenerationProgress" Grid.Row="3" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Right" Margin="0,0,10,0"/>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Right Side: Generated Images -->
+                                <Border Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}" VerticalAlignment="Stretch">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="Isolated 3D Renders (Banana Pro 2)" Style="{StaticResource Text.Headline3}" Margin="0,0,0,16"/>
+                                        
+                                        <Grid Grid.Row="1" Margin="0,0,0,16">
+                                            <StackPanel Spacing="4" HorizontalAlignment="Stretch">
+                                                <Button x:Name="GenerateBananaProImagesBtn" Content="Transform to Transparent Assets" HorizontalAlignment="Stretch" Style="{StaticResource Button.Filled}" Click="GenerateBananaProImagesBtn_Click"/>
+                                                <TextBlock x:Name="BananaCostText" Text="Estimated Banana Pro Cost: 0.00 €" FontSize="12" Opacity="0.5" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                            <ProgressRing x:Name="BananaProgress" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,30,0"/>
+                                        </Grid>
+
+                                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                                            <GridView x:Name="BananaImagesList" SelectionMode="None">
+                                                <GridView.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <StackPanel Margin="8">
+                                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14" Foreground="{Binding ColorBrush}" Margin="0,0,0,4"/>
+                                                            <Border CornerRadius="8" BorderBrush="#333333" BorderThickness="1" Background="#0A0A0A" Width="200" Height="200">
+                                                                <Image Source="{Binding ImageSource}" Stretch="Uniform"/>
+                                                            </Border>
+                                                        </StackPanel>
+                                                    </DataTemplate>
+                                                </GridView.ItemTemplate>
+                                            </GridView>
+                                        </ScrollViewer>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+
+                            <!-- Bottom Side: Persistent Library Table -->
+                            <Border Grid.Row="2" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}" VerticalAlignment="Stretch">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Grid>
+                                        <TextBlock Text="Detected Object Library" Style="{StaticResource Text.Headline3}" Margin="0,0,0,16"/>
+                                        <Button Content="Open PNG Folder" HorizontalAlignment="Right" VerticalAlignment="Top" 
+                                                Background="Transparent" BorderBrush="#333333" BorderThickness="1" Foreground="#AAAAAA"
+                                                Click="OpenLibraryFolder_Click" Margin="0,0,0,16"/>
+                                    </Grid>
+                                    <Grid Grid.Row="1">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="*"/>
+                                        </Grid.RowDefinitions>
+                                        
+                                        <!-- Header Table -->
+                                        <Grid Margin="0,0,0,8" Padding="12,0,12,8" BorderBrush="#333333" BorderThickness="0,0,0,1">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="100"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="200"/>
+                                                <ColumnDefinition Width="150"/>
+                                                <ColumnDefinition Width="60"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Grid.Column="0" Text="PREVIEW" FontWeight="SemiBold" Foreground="#888"/>
+                                            <TextBlock Grid.Column="1" Text="OBJECT TYPE (LLM NAME)" FontWeight="SemiBold" Foreground="#888"/>
+                                            <TextBlock Grid.Column="2" Text="DATE DISCOVERED" FontWeight="SemiBold" Foreground="#888"/>
+                                            <TextBlock Grid.Column="3" Text="GENERATE" FontWeight="SemiBold" Foreground="#888"/>
+                                        </Grid>
+                                        
+                                        <!-- Rows -->
+                                        <ListView x:Name="LibraryList" Grid.Row="1" SelectionMode="None">
+                                            <ListView.ItemContainerStyle>
+                                                <Style TargetType="ListViewItem">
+                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                                </Style>
+                                            </ListView.ItemContainerStyle>
+                                            <ListView.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Padding="0,8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="100"/>
+                                                            <ColumnDefinition Width="*"/>
+                                                            <ColumnDefinition Width="200"/>
+                                                            <ColumnDefinition Width="150"/>
+                                                            <ColumnDefinition Width="60"/>
+                                                        </Grid.ColumnDefinitions>
+                                                        
+                                                        <Button Grid.Column="0" Width="60" Height="60" Padding="0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Click to View Image">
+                                                            <Border CornerRadius="6" BorderBrush="{Binding ColorBrush}" BorderThickness="2" Background="#0A0A0A" Width="60" Height="60">
+                                                                <Image Source="{Binding ImageSource}" Stretch="Uniform"/>
+                                                            </Border>
+                                                            <Button.Flyout>
+                                                                <Flyout Placement="BottomEdgeAlignedLeft">
+                                                                    <Image Source="{Binding ImageSource}" Stretch="Uniform" MaxWidth="400" MaxHeight="400" Margin="0"/>
+                                                                </Flyout>
+                                                            </Button.Flyout>
+                                                        </Button>
+                                                        
+                                                        <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="16" Foreground="{Binding ColorBrush}"/>
+                                                        <TextBlock Grid.Column="2" Text="{Binding DateAdded}" VerticalAlignment="Center" Foreground="#888"/>
+                                                        
+                                                        <Button Grid.Column="3" Content="To 3D Model" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                                Style="{StaticResource Button.Filled}" Click="Generate3DModel_Click" Loaded="Generate3DModel_Loaded"/>
+
+                                                        <Button Grid.Column="4" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" 
+                                                                VerticalAlignment="Center" HorizontalAlignment="Center" Background="Transparent" Foreground="#888" BorderThickness="0"
+                                                                Click="DeleteLibraryObject_Click" Tag="{Binding Name}"
+                                                                ToolTipService.ToolTip="Delete from Library"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ListView.ItemTemplate>
+                                        </ListView>
+                                    </Grid>
+                                </Grid>
+                            </Border>
                         </Grid>
                     </Border>
                 </Grid>
@@ -976,7 +1168,17 @@
                     <Border Padding="{StaticResource Padding.Page}">
                         <StackPanel Spacing="{StaticResource Space.24}" MaxWidth="600" HorizontalAlignment="Left">
 
-                            
+                            <!-- AI Settings -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Orange LLM Proxy API Key" Style="{StaticResource Text.Body1}"/>
+                                <PasswordBox x:Name="OrangeApiKeyInput" PlaceholderText="sk-..." Width="400" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Required for Context features (Scene Understanding)." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,16"/>
+                                
+                                <TextBlock Text="Google Gemini API Key" Style="{StaticResource Text.Body1}"/>
+                                <PasswordBox x:Name="GeminiApiKeyInput" PlaceholderText="AIza..." Width="400" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Required for Banana Pro 2 Generation." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
+                            </StackPanel>
+
                             <!-- Relay Settings -->
                             <StackPanel Spacing="8">
                                 <TextBlock Text="Relay Server Port" Style="{StaticResource Text.Body1}"/>
