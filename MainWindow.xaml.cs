@@ -30,6 +30,12 @@ namespace RobotControllerApp
         public byte[]? CropJpgBytes { get; set; }
         public bool IsAlreadyInLibrary { get; set; }
         public double PreviewOpacity => IsAlreadyInLibrary ? 0.3 : 1.0;
+
+        // Bounding box in 0-1000 normalised space (from Gemini)
+        public double UvYmin { get; set; }
+        public double UvXmin { get; set; }
+        public double UvYmax { get; set; }
+        public double UvXmax { get; set; }
     }
 
     public class GeneratedBananaImageModel
@@ -81,10 +87,15 @@ namespace RobotControllerApp
 
         private byte[]? _latestWebcamFrameBytes;
         private readonly System.Collections.ObjectModel.ObservableCollection<DetectedObjectViewModel> _detectedObjects = new();
+        private readonly System.Collections.ObjectModel.ObservableCollection<DetectedObjectViewModel> _selectedForBanana = new();
         private readonly System.Collections.ObjectModel.ObservableCollection<GeneratedBananaImageModel> _bananaImages = new();
+
+        private double _totalGeminiCost = 0.0;
 
         private System.Collections.ObjectModel.ObservableCollection<LibraryItemViewModel> _libraryItems = new();
         private List<LibraryItemConfig> _libraryConfig = new();
+        
+        private DispatcherTimer _autoScanTimer;
 
         private static string LibraryPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RobotControllerApp", "Library");
         private static string LibraryJsonPath => Path.Combine(LibraryPath, "library.json");
@@ -115,8 +126,17 @@ namespace RobotControllerApp
             }
 
             DetectedObjectsList.ItemsSource = _detectedObjects;
+            SelectedObjectsList.ItemsSource = _selectedForBanana;
             BananaImagesList.ItemsSource = _bananaImages;
             LibraryList.ItemsSource = _libraryItems;
+
+            _autoScanTimer = new DispatcherTimer();
+            _autoScanTimer.Interval = TimeSpan.FromSeconds(7.5);
+            _autoScanTimer.Tick += async (s, e) => {
+                if (AutoScanToggle.IsChecked != true) return;
+                if (GenerationProgress.IsActive) return; // Wait until current scan finishes
+                await AnalyzeSceneAsync();
+            };
 
             _ = LoadLibraryAsync();
 
@@ -369,7 +389,6 @@ namespace RobotControllerApp
                         RobotFeedBadgeText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
                         RobotFeedBadge.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 180, 0, 0)); // Red background for LIVE
                         RobotFeedDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 0, 0)); // Bright Red Dot
-                        Log("[UI] Camera feed active.");
                     }
                 }
                 catch (Exception ex)
@@ -473,7 +492,6 @@ namespace RobotControllerApp
 
         // ── Camera Calibration ──────────────────────────────────────────────────
         private readonly RobotControllerApp.Services.CameraCalibrationService _calibService = new();
-        private string? _charucoGridPath;   // path of the last generated PNG
         private RobotControllerApp.Services.CameraPose? _lastValidPose;
 
         /// <summary>Start the selected camera safely using OpenCvSharp (DirectShow).</summary>
@@ -576,12 +594,17 @@ namespace RobotControllerApp
                                     }
 
                                     var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
-                                    using (var ms = new System.IO.MemoryStream(frameBytes))
+                                    
+                                    if (DashboardView.Visibility == Visibility.Visible || ContextView.Visibility == Visibility.Visible)
                                     {
-                                        await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
+                                        using (var ms = new System.IO.MemoryStream(frameBytes))
+                                        {
+                                            await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
+                                        }
+                                        if (DashboardView.Visibility == Visibility.Visible) LocalWebcamPreview.Source = bitmap;
+                                        if (ContextView.Visibility == Visibility.Visible) ContextWebcamPreview.Source = bitmap;
                                     }
-                                    LocalWebcamPreview.Source = bitmap;
-                                    ContextWebcamPreview.Source = bitmap;
+                                    
                                     _latestWebcamFrameBytes = frameBytes;
                                 }
                                 catch { }
@@ -803,7 +826,7 @@ namespace RobotControllerApp
                 {
                     HubIpText.Text = publicIp;
                     HubLocText.Text = $"{city}, {country} ({isp})";
-                    Log($"[Trace] Hub located in {city}, {country}");
+                    // Log($"[Trace] Hub located in {city}, {country}");
                 });
             }
             catch (Exception ex)
@@ -1123,6 +1146,7 @@ namespace RobotControllerApp
             NetworkView.Visibility = Visibility.Collapsed;
             ContextView.Visibility = Visibility.Collapsed;
             CalibrationView.Visibility = Visibility.Collapsed;
+            Preview3DView.Visibility = Visibility.Collapsed;
 
             // Show selected view
             if (args.IsSettingsSelected)
@@ -1152,9 +1176,137 @@ namespace RobotControllerApp
                         CalibrationView.Visibility = Visibility.Visible;
                         PopulateCalibCameraList();
                         break;
+                    case "preview3d":
+                        Preview3DView.Visibility = Visibility.Visible;
+                        var initTask = InitSceneWebViewAsync();
+                        break;
                 }
             }
         }
+
+        private bool _webViewReady = false;
+        private RobotControllerApp.Services.CameraPose? _savedPose;
+
+        private async Task InitSceneWebViewAsync()
+        {
+            if (_webViewReady) 
+            {
+                await PushObjectsToSceneAsync();
+                return;
+            }
+            try
+            {
+                await SceneWebView.EnsureCoreWebView2Async();
+                SceneWebView.CoreWebView2.Settings.AreDevToolsEnabled = false;
+                SceneWebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
+
+                string htmlPath = System.IO.Path.Combine(
+                    System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "",
+                    "Assets", "scene3d.html");
+                SceneWebView.Source = new Uri(htmlPath);
+                await Task.Delay(800);
+                _webViewReady = true;
+
+                // Load saved camera pose from calibration (fixed camera session)
+                string jsonPath = RobotControllerApp.Services.CameraCalibrationService.SavedPosePath;
+                if (File.Exists(jsonPath))
+                {
+                    string poseJson = await Task.Run(() => File.ReadAllText(jsonPath));
+                    _savedPose = System.Text.Json.JsonSerializer.Deserialize<RobotControllerApp.Services.CameraPose>(poseJson);
+                    
+                    poseJson = poseJson.Replace("\\", "\\\\").Replace("'", "\\'");
+                    await SceneWebView.ExecuteScriptAsync($"setCameraPose('{poseJson}');");
+                }
+
+                await PushObjectsToSceneAsync();
+            }
+            catch (Exception ex)
+            {
+                Log($"[3D Preview] WebView2 init failed: {ex.Message}");
+            }
+        }
+
+        private async Task PushObjectsToSceneAsync()
+        {
+            if (!_webViewReady) return;
+            try
+            {
+                // Camera intrinsics from calibration service
+                double fx = RobotControllerApp.Services.CameraCalibrationService.Fx;
+                double fy = RobotControllerApp.Services.CameraCalibrationService.Fy;
+                double cx = RobotControllerApp.Services.CameraCalibrationService.Cx;
+                double cy = RobotControllerApp.Services.CameraCalibrationService.Cy;
+                int frameW = RobotControllerApp.Services.CameraCalibrationService.FrameW;
+                int frameH = RobotControllerApp.Services.CameraCalibrationService.FrameH;
+
+                // Use stored pose values, or fallback if none
+                var pose = _lastValidPose ?? _savedPose;
+                double camX = pose?.X ?? 0;
+                double camY = pose?.Y ?? 0;
+                double camZ = pose?.Z ?? 1.0;
+
+                var items = _detectedObjects.Select(obj =>
+                {
+                    // Bounding box centre in 0-1000 → pixel coords
+                    double uNorm = (obj.UvXmin + obj.UvXmax) / 2.0 / 1000.0;
+                    double vNorm = (obj.UvYmin + obj.UvYmax) / 2.0 / 1000.0;
+                    double pixU = uNorm * frameW;
+                    double pixV = vNorm * frameH;
+
+                    // 1. Back-project pixel to ray vector (u, v, 1) * K^-1
+                    double rayX = (pixU - cx) / fx;
+                    double rayY = (pixV - cy) / fy;
+                    
+                    // 2. Scale by height (camZ) to hit the Z=0 table plane
+                    // (Assuming rotation is roughly looking straight down, hence ray_in_world ≈ ray_in_camera)
+                    // Then add camera World position (camX, camY) to translate it into place
+                    double worldX = camX + (camZ * rayX);
+                    double worldY = camY + (camZ * rayY);
+
+                    // Bounding box size → object footprint on table (metres)
+                    double bboxWNorm = (obj.UvXmax - obj.UvXmin) / 1000.0;
+                    double bboxHNorm = (obj.UvYmax - obj.UvYmin) / 1000.0;
+                    double sizeW = camZ * bboxWNorm * frameW / fx;
+                    double sizeH = camZ * bboxHNorm * frameH / fy;
+
+                    return new
+                    {
+                        label   = obj.Name,
+                        worldX,
+                        worldY,
+                        sizeW,
+                        sizeH
+                    };
+                }).ToList();
+
+                string json = System.Text.Json.JsonSerializer.Serialize(items);
+                json = json.Replace("\\", "\\\\").Replace("'", "\\'");
+                await SceneWebView.ExecuteScriptAsync($"setDetectedObjects('{json}');");
+
+                // Also refresh camera pose overlay
+                if (_lastValidPose != null)
+                    await PushCameraPoseAsync(_lastValidPose);
+            }
+            catch (Exception ex)
+            {
+                Log($"[3D Preview] Push failed: {ex.Message}");
+            }
+        }
+
+        private async Task PushCameraPoseAsync(RobotControllerApp.Services.CameraPose pose)
+        {
+            if (!_webViewReady) return;
+            try
+            {
+                var poseObj = new { pose.X, pose.Y, pose.Z, pose.Rx, pose.Ry, pose.Rz };
+                string json = System.Text.Json.JsonSerializer.Serialize(poseObj);
+                json = json.Replace("\\", "\\\\").Replace("'", "\\'");
+                await SceneWebView.ExecuteScriptAsync($"setCameraPose('{json}');");
+            }
+            catch { /* WebView not ready yet */ }
+        }
+
+
 
         private void RefreshFeed_Click(object sender, RoutedEventArgs e)
         {
@@ -1298,8 +1450,8 @@ namespace RobotControllerApp
         {
             if (!bridge.IsConnected)
             {
-                Log($"[Debug] Command dropped — ROS WebSocket not connected for {bridge.RobotId}. " +
-                    $"Check that rosbridge_server is running on {bridge.RosIp}:{bridge.RosPort}.");
+                // Log($"[Debug] Command dropped — ROS WebSocket not connected for {bridge.RobotId}. " +
+                //     $"Check that rosbridge_server is running on {bridge.RosIp}:{bridge.RosPort}.");
                 return false;
             }
             await bridge.SendDirectToRobotAsync(json);
@@ -1673,13 +1825,21 @@ namespace RobotControllerApp
                 return;
             }
 
+            await AnalyzeSceneAsync();
+        }
+
+        private async Task AnalyzeSceneAsync()
+        {
+            if (_latestWebcamFrameBytes == null || _latestWebcamFrameBytes.Length == 0) return;
+
             GenerateObjectImagesBtn.IsEnabled = false;
-            GenerationProgress.IsActive = true;
             GenerationProgress.Visibility = Visibility.Visible;
+            GenerationProgress.IsActive = true;
 
             try
             {
                 using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(15);
                 string url = "https://llmproxy.ai.orange/v1/chat/completions";
 
                 string base64Image = Convert.ToBase64String(_latestWebcamFrameBytes);
@@ -1692,8 +1852,10 @@ namespace RobotControllerApp
 
                 string safePrompt = prompt.Replace("\"", "\\\"").Replace("\n", "\\n");
 
+                string selectedModel = "vertex_ai/gemini-2.0-flash";
+
                 string body =
-                    $"{{\"model\": \"vertex_ai/gemini-2.0-flash\", \"temperature\": 0.0, " +
+                    $"{{\"model\": \"{selectedModel}\", \"temperature\": 0.0, " +
                     $"\"response_format\": {{\"type\": \"json_object\"}}, " +
                     $"\"messages\": [{{\"role\": \"user\", \"content\": [" +
                     $"{{\"type\": \"text\", \"text\": \"{safePrompt}\"}}, " +
@@ -1709,6 +1871,37 @@ namespace RobotControllerApp
                 {
                     using var doc = System.Text.Json.JsonDocument.Parse(responseString);
                     _detectedObjects.Clear();
+
+                    if (doc.RootElement.TryGetProperty("usage", out var usageProp))
+                    {
+                        double pTokens = usageProp.TryGetProperty("prompt_token_count", out var pt) ? pt.GetDouble() : 0.0;
+                        double cTokens = usageProp.TryGetProperty("candidates_token_count", out var ct) ? ct.GetDouble() : 0.0;
+                        
+                        // Fallback checking standard OpenAI-style properties if Google ones are empty
+                        if (pTokens == 0) pTokens = usageProp.TryGetProperty("prompt_tokens", out var pt2) ? pt2.GetDouble() : 0.0;
+                        if (cTokens == 0) cTokens = usageProp.TryGetProperty("completion_tokens", out var ct2) ? ct2.GetDouble() : 0.0;
+
+                        // Pricing per 1M tokens based on selected model
+                        double priceInX1M = 0;
+                        double priceOutX1M = 0;
+
+                        switch (selectedModel)
+                        {
+                            case "vertex_ai/gemini-2.0-flash":
+                                priceInX1M = 0.15; priceOutX1M = 0.60; break;
+                            case "vertex_ai/gemini-2.5-flash":
+                                priceInX1M = 0.30; priceOutX1M = 2.50; break;
+                            case "vertex_ai/gemini-2.5-flash-lite":
+                                priceInX1M = 0.10; priceOutX1M = 0.40; break;
+                            default:
+                                priceInX1M = 0.15; priceOutX1M = 0.60; break;
+                        }
+
+                        double costUsd = (pTokens / 1_000_000.0 * priceInX1M) + (cTokens / 1_000_000.0 * priceOutX1M);
+                        double costEur = costUsd * 0.94; // Approx USD -> EUR
+                        _totalGeminiCost += costEur;
+                        GeminiCostText.Text = $"Estimated Gemini Cost: {_totalGeminiCost:0.00000} €";
+                    }
 
                     var choices = doc.RootElement.GetProperty("choices");
                     if (choices.GetArrayLength() > 0)
@@ -1791,7 +1984,11 @@ namespace RobotControllerApp
                                                 ColorBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(uiColor),
                                                 CroppedImage = bitmap,
                                                 CropJpgBytes = cropJpgBytes,
-                                                IsAlreadyInLibrary = isAlreadyInLibrary
+                                                IsAlreadyInLibrary = isAlreadyInLibrary,
+                                                UvXmin = xmin,
+                                                UvYmin = ymin,
+                                                UvXmax = xmax,
+                                                UvYmax = ymax
                                             });
                                         }
                                     }
@@ -1800,36 +1997,82 @@ namespace RobotControllerApp
                         }
                     }
                 }
+                // Live-sync to 3D preview if open
+                if (_webViewReady) _ = PushObjectsToSceneAsync();
                 else
                 {
-                    await new ContentDialog() { Title = "API Error", Content = $"Error from Orange API:\n{responseString}", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                    if (AutoScanToggle.IsChecked != true)
+                        await new ContentDialog() { Title = "API Error", Content = $"Error from Orange API:\n{responseString}", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
                 }
-
-                double newObjectsCount = _detectedObjects.Count(x => !x.IsAlreadyInLibrary);
-                double costEuro = (newObjectsCount * 0.0672) * 0.94; // approx USD to EUR
-                BananaCostText.Text = $"Estimated Banana Pro Cost: {costEuro:0.000} €";
             }
             catch (Exception ex)
             {
-                await new ContentDialog() { Title = "Execution Error", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                if (AutoScanToggle.IsChecked != true)
+                    await new ContentDialog() { Title = "Execution Error", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
             }
             finally
             {
-                GenerateObjectImagesBtn.IsEnabled = true;
+                if (AutoScanToggle.IsChecked != true)
+                {
+                    GenerateObjectImagesBtn.IsEnabled = true;
+                    GenerateObjectImagesBtn.Content = "Analyze Scene Manually";
+                }
                 GenerationProgress.IsActive = false;
                 GenerationProgress.Visibility = Visibility.Collapsed;
             }
         }
 
-        private void DeleteDetectedObject_Click(object sender, RoutedEventArgs e)
+        private void AutoScanToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (AutoScanToggle.IsChecked == true)
+            {
+                AutoScanToggle.Content = "■ Stop Auto-Scan";
+                AutoScanToggle.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 150, 0));
+                
+                GenerateObjectImagesBtn.IsEnabled = false;
+                GenerateObjectImagesBtn.Content = "Auto-Scan Running...";
+
+                _autoScanTimer.Start();
+                _ = AnalyzeSceneAsync();
+            }
+            else
+            {
+                AutoScanToggle.Content = "Auto-Scan (8x/min)";
+                AutoScanToggle.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 51, 51, 51));
+                
+                GenerateObjectImagesBtn.IsEnabled = true;
+                GenerateObjectImagesBtn.Content = "Analyze Scene Manually";
+
+                _autoScanTimer.Stop();
+            }
+        }
+
+        private void AddSelectedObject_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.DataContext is DetectedObjectViewModel item)
             {
-                _detectedObjects.Remove(item);
-                double newObjectsCount = _detectedObjects.Count(x => !x.IsAlreadyInLibrary);
-                double costEuro = (newObjectsCount * 0.0672) * 0.94;
-                BananaCostText.Text = $"Estimated Banana Pro Cost: {costEuro:0.000} €";
+                if (!_selectedForBanana.Any(x => x.Name == item.Name))
+                {
+                    _selectedForBanana.Add(item);
+                    UpdateBananaCost();
+                }
             }
+        }
+
+        private void RemoveSelectedObject_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is DetectedObjectViewModel item)
+            {
+                _selectedForBanana.Remove(item);
+                UpdateBananaCost();
+            }
+        }
+
+        private void UpdateBananaCost()
+        {
+            double newObjectsCount = _selectedForBanana.Count;
+            double costEuro = (newObjectsCount * 0.0672) * 0.94; // approx USD to EUR
+            BananaCostText.Text = $"Estimated Banana Pro Cost: {costEuro:0.000} €";
         }
 
         private void DeleteLibraryObject_Click(object sender, RoutedEventArgs e)
@@ -2064,9 +2307,9 @@ namespace RobotControllerApp
                 return;
             }
 
-            if (_detectedObjects.Count == 0)
+            if (_selectedForBanana.Count == 0)
             {
-                await new ContentDialog() { Title = "No Detected Objects", Content = "Analyze the scene first to get cropped images.", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                await new ContentDialog() { Title = "No Detected Objects", Content = "Analyze the scene first and select objects to get cropped images.", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
                 return;
             }
 
@@ -2080,7 +2323,7 @@ namespace RobotControllerApp
                 using var client = new HttpClient();
                 string url = $"https://generativelanguage.googleapis.com/v1alpha/models/gemini-3.1-flash-image-preview:generateContent?key={_settings.GeminiApiKey}";
 
-                foreach (var obj in _detectedObjects.ToList())
+                foreach (var obj in _selectedForBanana.ToList())
                 {
                     if (obj.IsAlreadyInLibrary) continue;
 
@@ -2207,6 +2450,10 @@ namespace RobotControllerApp
                                         // Update UI opacity immediately
                                         int objIdx = _detectedObjects.IndexOf(obj);
                                         if (objIdx >= 0) _detectedObjects[objIdx] = obj;
+
+                                        // Remove from the selection queue since it was successfully processed
+                                        _selectedForBanana.Remove(obj);
+                                        UpdateBananaCost();
                                     }
                                 }
                             }
@@ -2263,63 +2510,6 @@ namespace RobotControllerApp
             StartCalibDetectionBtn.IsEnabled = CalibCameraComboBox.SelectedIndex >= 0;
         }
 
-        /// <summary>Generate and save the ChArUco grid PNG at screen resolution.</summary>
-        private async void GenerateGridBtn_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                GenerateGridBtn.IsEnabled = false;
-
-                // Get physical screen resolution (DPI-aware, same logic as calib.py)
-                int w = 1920, h = 1080;
-                try
-                {
-                    var displayArea = Microsoft.UI.Windowing.DisplayArea.GetFromWindowId(
-                        this.AppWindow.Id,
-                        Microsoft.UI.Windowing.DisplayAreaFallback.Primary);
-                    w = displayArea.OuterBounds.Width;
-                    h = displayArea.OuterBounds.Height;
-                }
-                catch { }
-
-                string outputDir = Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
-                string outputPath = Path.Combine(outputDir, "grille_charuco.png");
-
-                await Task.Run(() => _calibService.GenerateGrid(w, h, outputPath));
-
-                _charucoGridPath = outputPath;
-                OpenGridBtn.IsEnabled = true;
-                Log($"[Calib] Grid generated: {w}x{h} → {outputPath}");
-            }
-            catch (Exception ex)
-            {
-                Log($"[Calib] Grid generation failed: {ex.Message}");
-            }
-            finally
-            {
-                GenerateGridBtn.IsEnabled = true;
-            }
-        }
-
-        /// <summary>Open the generated grid PNG with the default viewer (fullscreen intent).</summary>
-        private void OpenGridBtn_Click(object sender, RoutedEventArgs e)
-        {
-            if (string.IsNullOrEmpty(_charucoGridPath) || !File.Exists(_charucoGridPath)) return;
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = _charucoGridPath,
-                    UseShellExecute = true
-                });
-            }
-            catch (Exception ex)
-            {
-                Log($"[Calib] Cannot open file: {ex.Message}");
-            }
-        }
-
         /// <summary>Toggle detection on/off.</summary>
         private void StartCalibDetectionBtn_Click(object sender, RoutedEventArgs e)
         {
@@ -2367,10 +2557,13 @@ namespace RobotControllerApp
             {
                 try
                 {
-                    var bmp = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
-                    using var ms = new System.IO.MemoryStream(jpeg);
-                    await bmp.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
-                    CalibCameraPreview.Source = bmp;
+                    if (CalibrationView.Visibility == Visibility.Visible)
+                    {
+                        var bmp = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                        using var ms = new System.IO.MemoryStream(jpeg);
+                        await bmp.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
+                        CalibCameraPreview.Source = bmp;
+                    }
                 }
                 catch { }
             });
@@ -2386,6 +2579,10 @@ namespace RobotControllerApp
                     CalibPoseX.Text = $"{pose.X:+0.000;-0.000}";
                     CalibPoseY.Text = $"{pose.Y:+0.000;-0.000}";
                     CalibPoseZ.Text = $"{pose.Z:0.000}";
+
+                    CalibPoseRx.Text = $"{pose.Rx:+0.000;-0.000}";
+                    CalibPoseRy.Text = $"{pose.Ry:+0.000;-0.000}";
+                    CalibPoseRz.Text = $"{pose.Rz:+0.000;-0.000}";
 
                     CalibDetectionIcon.Glyph = "\uE73E";  // Checkmark
                     CalibDetectionStatus.Text = "Grid detected — pose estimated";
@@ -2409,36 +2606,68 @@ namespace RobotControllerApp
         {
             if (_lastValidPose == null) return;
             var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
-            dp.SetText($"X={_lastValidPose.X:0.000} Y={_lastValidPose.Y:0.000} Z={_lastValidPose.Z:0.000}");
+            dp.SetText($"tvec: X={_lastValidPose.X:0.000} Y={_lastValidPose.Y:0.000} Z={_lastValidPose.Z:0.000}\n" +
+                       $"rvec: Rx={_lastValidPose.Rx:0.000} Ry={_lastValidPose.Ry:0.000} Rz={_lastValidPose.Rz:0.000}");
             Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
             Log("[Calib] Pose copied to clipboard.");
         }
 
         /// <summary>Save pose to a text file next to the grid PNG.</summary>
-        private void SaveCalibResultBtn_Click(object sender, RoutedEventArgs e)
+        private async void SaveCalibResultBtn_Click(object sender, RoutedEventArgs e)
         {
             if (_lastValidPose == null) return;
             try
             {
-                string dir = Path.GetDirectoryName(_charucoGridPath)
-                              ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string dir = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
                 string path = Path.Combine(dir, "camera_pose.txt");
                 string text = $"[Camera Calibration \u2014 {DateTime.Now:yyyy-MM-dd HH:mm:ss}]\r\n" +
-                              $"X = {_lastValidPose.X:0.000000} m\r\n" +
-                              $"Y = {_lastValidPose.Y:0.000000} m\r\n" +
-                              $"Z = {_lastValidPose.Z:0.000000} m  (height above board)\r\n" +
+                              $"[Camera World Position (cam_world = -R^T * tvec)]\r\n" +
+                              $"X = {_lastValidPose.X:0.000000} m  (right of board)\r\n" +
+                              $"Y = {_lastValidPose.Y:0.000000} m  (forward of board)\r\n" +
+                              $"Z = {_lastValidPose.Z:0.000000} m  (height above board)\r\n\r\n" +
+                              $"[Raw tvec (board-in-camera)]\r\n" +
+                              $"Tx = {_lastValidPose.TvecX:0.000000}\r\n" +
+                              $"Ty = {_lastValidPose.TvecY:0.000000}\r\n" +
+                              $"Tz = {_lastValidPose.TvecZ:0.000000}  (≈ height when cam looks down)\r\n\r\n" +
+                              $"[Rotation Vector - rvec]\r\n" +
+                              $"Rx = {_lastValidPose.Rx:0.000000}\r\n" +
+                              $"Ry = {_lastValidPose.Ry:0.000000}\r\n" +
+                              $"Rz = {_lastValidPose.Rz:0.000000}\r\n\r\n" +
                               $"Grid: {RobotControllerApp.Services.CameraCalibrationService.GridCols}x" +
                               $"{RobotControllerApp.Services.CameraCalibrationService.GridRows} ArUco markers  " +
                               $"MarkerSize={RobotControllerApp.Services.CameraCalibrationService.MarkerLength * 100:0.0}cm\r\n";
+
+                // Save JSON for 3D preview (camera fixed, single calibration session)
+                string jsonPath = RobotControllerApp.Services.CameraCalibrationService.SavedPosePath;
+                string json = System.Text.Json.JsonSerializer.Serialize(new {
+                    _lastValidPose.X, _lastValidPose.Y, _lastValidPose.Z,
+                    _lastValidPose.Rx, _lastValidPose.Ry, _lastValidPose.Rz,
+                    _lastValidPose.TvecX, _lastValidPose.TvecY, _lastValidPose.TvecZ,
+                    _lastValidPose.R11, _lastValidPose.R12, _lastValidPose.R13,
+                    _lastValidPose.R21, _lastValidPose.R22, _lastValidPose.R23,
+                    _lastValidPose.R31, _lastValidPose.R32, _lastValidPose.R33
+                });
+
+                // Write synchronously on UI thread so it doesn't freeze or lock
                 File.WriteAllText(path, text);
+                File.WriteAllText(jsonPath, json);
+
+                // Live update the 3D scene ONLY if visible to prevent WebView2 deadlock
+                if (_webViewReady && Preview3DView.Visibility == Visibility.Visible)
+                {
+                    string poseJsonStr = json.Replace("\\", "\\\\").Replace("'", "\\'");
+                    _ = SceneWebView.ExecuteScriptAsync($"setCameraPose('{poseJsonStr}');");
+                }
+
                 CalibSavedResult.Text = text;
-                Log($"[Calib] Pose saved to {path}");
+                Log($"[Calib] Pose saved to {path} + {jsonPath}");
             }
             catch (Exception ex)
             {
                 Log($"[Calib] Save failed: {ex.Message}");
             }
         }
+
 
         /// <summary>Reset calibration UI to stopped state.</summary>
         private void SetCalibStopped()

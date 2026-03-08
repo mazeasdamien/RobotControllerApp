@@ -6,12 +6,28 @@ using System.Threading.Tasks;
 
 namespace RobotControllerApp.Services
 {
-    /// <summary>Position of the camera relative to the ArUco grid centre.</summary>
+    /// <summary>Camera position in the world (board) frame, computed from ArUco detection.</summary>
     public class CameraPose
     {
-        public double X { get; set; }
-        public double Y { get; set; }
-        public double Z { get; set; }  // height above board
+        // tvec raw (board centre in camera coords) — kept for reference
+        public double TvecX { get; set; }
+        public double TvecY { get; set; }
+        public double TvecZ { get; set; }  // ≈ height above board when cam looks down
+
+        // True camera position in world/board frame (= -R^T * tvec)
+        public double X { get; set; }  // metres right of board centre
+        public double Y { get; set; }  // metres forward of board centre
+        public double Z { get; set; }  // metres above board (height)
+
+        // Rotation vector (rvec averaged across markers)
+        public double Rx { get; set; }
+        public double Ry { get; set; }
+        public double Rz { get; set; }
+
+        public double R11 { get; set; } public double R12 { get; set; } public double R13 { get; set; }
+        public double R21 { get; set; } public double R22 { get; set; } public double R23 { get; set; }
+        public double R31 { get; set; } public double R32 { get; set; } public double R33 { get; set; }
+
         public bool IsValid { get; set; }
     }
 
@@ -33,9 +49,23 @@ namespace RobotControllerApp.Services
         public const float MarkerGap = 0.01f;       // physical gap between markers (1 cm)
         public const int MarkerCount = GridCols * GridRows;    // 12 markers (0–11)
 
-        private const int MarkerPx = 150;         // pixels per marker side in the PNG
-        private const int GapPx = 50;          // pixels of gap in the PNG
-        private const int BorderPx = 80;          // white border around the grid
+        private const int MarkerPx = 150;
+        private const int GapPx = 50;
+        private const int BorderPx = 80;
+
+        // ── Camera intrinsics (approximate — replace with real calibration) ──
+        public const double Fx = 800.0;
+        public const double Fy = 800.0;
+        public const double Cx = 640.0;
+        public const double Cy = 360.0;
+        public const int FrameW = 1280;
+        public const int FrameH = 720;
+
+        // ── Saved calibration file path (JSON) — written by Save Pose ───────
+        public static string SavedPosePath =>
+            System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "robot_camera_pose.json");
 
         // ── Runtime state ───────────────────────────────────────────────────────
         private VideoCapture? _capture;
@@ -52,45 +82,7 @@ namespace RobotControllerApp.Services
         // PUBLIC API
         // ════════════════════════════════════════════════════════════════════════
 
-        /// <summary>
-        ///   Generate the ArUco marker grid PNG scaled to fill <paramref name="width"/>×
-        ///   <paramref name="height"/> pixels, and write it to <paramref name="outputPath"/>.
-        /// </summary>
-        public string GenerateGrid(int width, int height, string outputPath)
-        {
-            using var dict = CvAruco.GetPredefinedDictionary(PredefinedDictionaryName.Dict4X4_50);
 
-            // ── Compute natural grid size (un-stretched) ─────────────────────
-            int naturalW = BorderPx * 2 + GridCols * MarkerPx + (GridCols - 1) * GapPx;
-            int naturalH = BorderPx * 2 + GridRows * MarkerPx + (GridRows - 1) * GapPx;
-
-            // ── Build grid at natural size ───────────────────────────────────
-            using var grid = new Mat(naturalH, naturalW, MatType.CV_8UC1, new Scalar(255));
-
-            int markerId = 0;
-            using var markerImg = new Mat();
-            for (int row = 0; row < GridRows; row++)
-            {
-                for (int col = 0; col < GridCols; col++)
-                {
-                    int x = BorderPx + col * (MarkerPx + GapPx);
-                    int y = BorderPx + row * (MarkerPx + GapPx);
-
-                    dict.GenerateImageMarker(markerId++, MarkerPx, markerImg);
-
-                    // Copy the marker into the grid image
-                    using var roi = new Mat(grid, new Rect(x, y, MarkerPx, MarkerPx));
-                    markerImg.CopyTo(roi);
-                }
-            }
-
-            // ── Resize to target screen resolution ──────────────────────────
-            using var scaled = new Mat();
-            Cv2.Resize(grid, scaled, new Size(width, height), 0, 0, InterpolationFlags.Linear);
-            scaled.ImWrite(outputPath);
-
-            return outputPath;
-        }
 
         /// <summary>Start the live detection loop on DirectShow camera at <paramref name="cameraIndex"/>.</summary>
         public void StartDetection(int cameraIndex)
@@ -150,8 +142,7 @@ namespace RobotControllerApp.Services
                     continue;
                 }
 
-                // ── Send JPEG to UI ──────────────────────────────────────────
-                OnFrame?.Invoke(frame.ImEncode(".jpg"));
+                // ── Detection ──
 
                 // ── Detection ────────────────────────────────────────────────
                 Cv2.CvtColor(frame, gray, ColorConversionCodes.BGR2GRAY);
@@ -164,36 +155,88 @@ namespace RobotControllerApp.Services
 
                     if (ids != null && ids.Length >= 3)
                     {
-                        // Estimate pose per marker — MarkerLength is physical side in metres
-                        CvAruco.EstimatePoseSingleMarkers(
-                            corners, MarkerLength,
-                            cameraMatrix, distCoeffs,
-                            rvecs, tvecs);
+                        // Compute the true Board pose (world origin = board top left)
+                        // using all detected marker corners simultaneously!
+                        var objPtsList = new System.Collections.Generic.List<Point3f>();
+                        var imgPtsList = new System.Collections.Generic.List<Point2f>();
 
-                        // Average Z and centroid X/Y across all visible markers
-                        double sumX = 0, sumY = 0, sumZ = 0;
-                        int n = ids.Length;
-
-                        for (int i = 0; i < n; i++)
+                        for (int i = 0; i < ids.Length; i++)
                         {
-                            var t = tvecs.At<Vec3d>(0, i);
-                            sumX += t.Item0;
-                            sumY += t.Item1;
-                            sumZ += t.Item2;
+                            int id = ids[i];
+                            int col = id % GridCols;
+                            int row = id / GridCols;
+
+                            // Center of this marker relative to the Center of the Board!
+                            // X goes right, Y goes UP (forward on table).
+                            float cx = (float)((col - (GridCols - 1) / 2.0f) * (MarkerLength + MarkerGap));
+                            float cy = (float)(((GridRows - 1) / 2.0f - row) * (MarkerLength + MarkerGap));
+
+                            float half = MarkerLength / 2.0f;
+
+                            // Corners: TL, TR, BR, BL 
+                            // Y is UP. So TL is (-half, +half).
+                            objPtsList.Add(new Point3f(cx - half, cy + half, 0f));
+                            objPtsList.Add(new Point3f(cx + half, cy + half, 0f));
+                            objPtsList.Add(new Point3f(cx + half, cy - half, 0f));
+                            objPtsList.Add(new Point3f(cx - half, cy - half, 0f));
+
+                            imgPtsList.Add(corners[i][0]);
+                            imgPtsList.Add(corners[i][1]);
+                            imgPtsList.Add(corners[i][2]);
+                            imgPtsList.Add(corners[i][3]);
                         }
+
+                        // Convert to standard arrays so OpenCvSharp implicitly converts to InputArray
+                        Point3f[] objPts = objPtsList.ToArray();
+                        Point2f[] imgPts = imgPtsList.ToArray();
+
+                        using var avgRvec = new Mat(3, 1, MatType.CV_64FC1);
+                        using var tvec = new Mat(3, 1, MatType.CV_64FC1);
+
+                        // Solve for the entire board at once -> Rock stable Gizmo & Pose!
+                        Cv2.SolvePnP(InputArray.Create(objPts), InputArray.Create(imgPts), cameraMatrix, distCoeffs, avgRvec, tvec);
+
+                        double avgTx = tvec.At<double>(0), avgTy = tvec.At<double>(1), avgTz = tvec.At<double>(2);
+                        double avgRx = avgRvec.At<double>(0), avgRy = avgRvec.At<double>(1), avgRz = avgRvec.At<double>(2);
+
+                        // Build R from rvec using Rodrigues
+                        using var rotMat = new Mat(3, 3, MatType.CV_64FC1);
+                        Cv2.Rodrigues(avgRvec, rotMat);
+
+                        // cam_world = -R^T * tvec  (R^T[r,c] = R[c,r])
+                        double camWorldX = -(rotMat.At<double>(0,0)*avgTx + rotMat.At<double>(1,0)*avgTy + rotMat.At<double>(2,0)*avgTz);
+                        double camWorldY = -(rotMat.At<double>(0,1)*avgTx + rotMat.At<double>(1,1)*avgTy + rotMat.At<double>(2,1)*avgTz);
+                        double camWorldZ = -(rotMat.At<double>(0,2)*avgTx + rotMat.At<double>(1,2)*avgTy + rotMat.At<double>(2,2)*avgTz);
 
                         OnPose?.Invoke(new CameraPose
                         {
-                            X = sumX / n,
-                            Y = sumY / n,
-                            Z = sumZ / n,
+                            TvecX = avgTx, TvecY = avgTy, TvecZ = avgTz,
+                            X  = camWorldX,
+                            Y  = camWorldY,
+                            Z  = camWorldZ,   
+                            Rx = avgRx, Ry = avgRy, Rz = avgRz,
+                            R11 = rotMat.At<double>(0,0), R12 = rotMat.At<double>(1,0), R13 = rotMat.At<double>(2,0),
+                            R21 = rotMat.At<double>(0,1), R22 = rotMat.At<double>(1,1), R23 = rotMat.At<double>(2,1),
+                            R31 = rotMat.At<double>(0,2), R32 = rotMat.At<double>(1,2), R33 = rotMat.At<double>(2,2),
                             IsValid = true
                         });
+
+                        // Draw visual feedback
+                        CvAruco.DrawDetectedMarkers(frame, corners, ids, new Scalar(0, 255, 0));
+                        using var drawTvec = Mat.FromArray(new double[] { avgTx, avgTy, avgTz });
+                        Cv2.DrawFrameAxes(frame, cameraMatrix, distCoeffs, avgRvec, drawTvec, 0.1f, 3);
+
+                        // Send JPEG to UI with drawings
+                        OnFrame?.Invoke(frame.ImEncode(".jpg"));
+
                         Thread.Sleep(5);
                         continue;
                     }
                 }
                 catch { /* silently ignore per-frame errors */ }
+
+                // Send JPEG to UI even if no detections
+                OnFrame?.Invoke(frame.ImEncode(".jpg"));
 
                 OnPose?.Invoke(new CameraPose { IsValid = false });
                 Thread.Sleep(5);

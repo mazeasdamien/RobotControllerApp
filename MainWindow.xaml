@@ -47,6 +47,12 @@
                         <FontIcon Glyph="&#xE722;"/>
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
+
+                <NavigationViewItem Content="3D Preview" Tag="preview3d">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE943;"/>
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
 
             <NavigationView.FooterMenuItems>
@@ -752,21 +758,32 @@
                                                                     <Image Source="{Binding CroppedImage}" Stretch="Uniform"/>
                                                                 </Border>
                                                             </StackPanel>
-                                                            <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="12"
+                                                                <Button Content="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
                                                                     HorizontalAlignment="Right" VerticalAlignment="Top" 
                                                                     Margin="0,4,4,0" Width="28" Height="28" CornerRadius="14" Padding="0"
                                                                     HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                                                     Background="#CC000000" Foreground="White" BorderThickness="0"
-                                                                    Click="DeleteDetectedObject_Click" Tag="{Binding Name}"
-                                                                    ToolTipService.ToolTip="Remove this object from analysis"/>
+                                                                    Click="AddSelectedObject_Click" Tag="{Binding Name}"
+                                                                    ToolTipService.ToolTip="Select this object for 3D Render (Banana)"/>
                                                         </Grid>
                                                     </DataTemplate>
                                                 </GridView.ItemTemplate>
                                             </GridView>
                                         </Viewbox>
 
-                                        <Button x:Name="GenerateObjectImagesBtn" Grid.Row="3" Content="Analyze Scene (Orange LLM)" HorizontalAlignment="Stretch" Style="{StaticResource Button.Filled}" Click="GenerateObjectImagesBtn_Click"/>
-                                        <ProgressRing x:Name="GenerationProgress" Grid.Row="3" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Right" Margin="0,0,10,0"/>
+                                        <Grid Grid.Row="3" Margin="0,0,0,0" ColumnSpacing="8">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="*"/>
+                                            </Grid.ColumnDefinitions>
+                                            
+                                            <StackPanel Grid.Column="0" Spacing="4">
+                                                <Button x:Name="GenerateObjectImagesBtn" Content="Analyze Scene Manually" HorizontalAlignment="Stretch" Style="{StaticResource Button.Filled}" Click="GenerateObjectImagesBtn_Click"/>
+                                                <TextBlock x:Name="GeminiCostText" Text="Estimated Gemini Cost: 0.0000 €" FontSize="12" Opacity="0.5" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                            <ToggleButton x:Name="AutoScanToggle" Grid.Column="1" Content="Auto-Scan (8x/min)" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="36" Click="AutoScanToggle_Click"/>
+                                        </Grid>
+                                        <ProgressRing x:Name="GenerationProgress" Grid.Row="3" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4,6,0,0"/>
                                     </Grid>
                                 </Border>
 
@@ -776,11 +793,39 @@
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
                                             <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
                                         <TextBlock Text="Isolated 3D Renders (Banana Pro 2)" Style="{StaticResource Text.Headline3}" Margin="0,0,0,16"/>
                                         
-                                        <Grid Grid.Row="1" Margin="0,0,0,16">
+                                        <StackPanel Grid.Row="1" Margin="0,0,0,16">
+                                            <TextBlock Text="Selected Objects Queue" Opacity="0.5" FontSize="12" Margin="0,0,0,8"/>
+                                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" MaxHeight="160">
+                                                <GridView x:Name="SelectedObjectsList" SelectionMode="None">
+                                                    <GridView.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Grid>
+                                                                <StackPanel Margin="8">
+                                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="12" Foreground="{Binding ColorBrush}" Margin="0,0,0,4" HorizontalAlignment="Center"/>
+                                                                    <Border CornerRadius="8" BorderBrush="{Binding ColorBrush}" BorderThickness="3" Background="#0A0A0A" Width="80" Height="80">
+                                                                        <Image Source="{Binding CroppedImage}" Stretch="Uniform"/>
+                                                                    </Border>
+                                                                </StackPanel>
+                                                                <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                                                        HorizontalAlignment="Right" VerticalAlignment="Top" 
+                                                                        Margin="0,4,4,0" Width="20" Height="20" CornerRadius="10" Padding="0"
+                                                                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                                                        Background="#CC000000" Foreground="White" BorderThickness="0"
+                                                                        Click="RemoveSelectedObject_Click" Tag="{Binding Name}"
+                                                                        ToolTipService.ToolTip="Remove from selection"/>
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </GridView.ItemTemplate>
+                                                </GridView>
+                                            </ScrollViewer>
+                                        </StackPanel>
+
+                                        <Grid Grid.Row="2" Margin="0,0,0,16">
                                             <StackPanel Spacing="4" HorizontalAlignment="Stretch">
                                                 <Button x:Name="GenerateBananaProImagesBtn" Content="Transform to Transparent Assets" HorizontalAlignment="Stretch" Style="{StaticResource Button.Filled}" Click="GenerateBananaProImagesBtn_Click"/>
                                                 <TextBlock x:Name="BananaCostText" Text="Estimated Banana Pro Cost: 0.00 €" FontSize="12" Opacity="0.5" HorizontalAlignment="Center"/>
@@ -788,7 +833,7 @@
                                             <ProgressRing x:Name="BananaProgress" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,30,0"/>
                                         </Grid>
 
-                                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                                        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
                                             <GridView x:Name="BananaImagesList" SelectionMode="None">
                                                 <GridView.ItemTemplate>
                                                     <DataTemplate>
@@ -1166,25 +1211,16 @@
 
 
 
-                <!-- 6. CAMERA CALIBRATION VIEW -->
+                <!-- 7. 3D SCENE PREVIEW VIEW -->
+                <Grid x:Name="Preview3DView" Visibility="Collapsed">
+                    <WebView2 x:Name="SceneWebView" />
+                </Grid>
+
+                 <!-- 6. CAMERA CALIBRATION VIEW -->
                 <Grid x:Name="CalibrationView" Visibility="Collapsed">
                     <Border Padding="{StaticResource Padding.Page}">
-                        <Grid RowSpacing="16">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
+                        <Grid>
 
-                            <!-- Header -->
-                            <StackPanel Orientation="Horizontal" Spacing="12">
-                                <FontIcon Glyph="&#xE722;" FontSize="24" Foreground="{StaticResource Brush.Primary}" VerticalAlignment="Center"/>
-                                <StackPanel>
-                                    <TextBlock Text="Camera Calibration" Style="{StaticResource Text.Headline3}" FontSize="22"/>
-                                    <TextBlock Text="Detect camera position using a ChArUco board" Opacity="0.5" FontSize="12"/>
-                                </StackPanel>
-                            </StackPanel>
-
-                            <!-- Main content -->
                             <Grid Grid.Row="1" ColumnSpacing="16">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="3*"/>
@@ -1236,29 +1272,47 @@
 
                                         <!-- XYZ Pose Display -->
                                         <Border Grid.Row="2" Background="Black" CornerRadius="8" Padding="16,12" Margin="0,12,0,0">
-                                            <Grid ColumnSpacing="24">
+                                            <Grid ColumnSpacing="24" RowSpacing="12">
                                                 <Grid.ColumnDefinitions>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="*"/>
                                                     <ColumnDefinition Width="Auto"/>
                                                 </Grid.ColumnDefinitions>
-                                                <StackPanel>
-                                                    <TextBlock Text="X" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
-                                                    <TextBlock x:Name="CalibPoseX" Text="—" FontFamily="Consolas" FontSize="22" FontWeight="Bold" Foreground="#00E5FF"/>
+                                                <Grid.RowDefinitions>
+                                                    <RowDefinition Height="Auto"/>
+                                                    <RowDefinition Height="Auto"/>
+                                                </Grid.RowDefinitions>
+                                                <StackPanel Grid.Row="0" Grid.Column="0">
+                                                    <TextBlock Text="tvec X" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
+                                                    <TextBlock x:Name="CalibPoseX" Text="—" FontFamily="Consolas" FontSize="20" FontWeight="Bold" Foreground="#00E5FF"/>
                                                     <TextBlock Text="metres" FontSize="10" Opacity="0.4"/>
                                                 </StackPanel>
-                                                <StackPanel Grid.Column="1">
-                                                    <TextBlock Text="Y" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
-                                                    <TextBlock x:Name="CalibPoseY" Text="—" FontFamily="Consolas" FontSize="22" FontWeight="Bold" Foreground="#00CC6A"/>
+                                                <StackPanel Grid.Row="0" Grid.Column="1">
+                                                    <TextBlock Text="tvec Y" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
+                                                    <TextBlock x:Name="CalibPoseY" Text="—" FontFamily="Consolas" FontSize="20" FontWeight="Bold" Foreground="#00CC6A"/>
                                                     <TextBlock Text="metres" FontSize="10" Opacity="0.4"/>
                                                 </StackPanel>
-                                                <StackPanel Grid.Column="2">
-                                                    <TextBlock Text="Z (height)" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
-                                                    <TextBlock x:Name="CalibPoseZ" Text="—" FontFamily="Consolas" FontSize="22" FontWeight="Bold" Foreground="#FFD279"/>
+                                                <StackPanel Grid.Row="0" Grid.Column="2">
+                                                    <TextBlock Text="tvec Z" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
+                                                    <TextBlock x:Name="CalibPoseZ" Text="—" FontFamily="Consolas" FontSize="20" FontWeight="Bold" Foreground="#FFD279"/>
                                                     <TextBlock Text="metres" FontSize="10" Opacity="0.4"/>
                                                 </StackPanel>
-                                                <Button Grid.Column="3" x:Name="CalibCopyBtn"
+
+                                                <StackPanel Grid.Row="1" Grid.Column="0">
+                                                    <TextBlock Text="rvec X" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
+                                                    <TextBlock x:Name="CalibPoseRx" Text="—" FontFamily="Consolas" FontSize="18" FontWeight="SemiBold" Foreground="#888888"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Row="1" Grid.Column="1">
+                                                    <TextBlock Text="rvec Y" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
+                                                    <TextBlock x:Name="CalibPoseRy" Text="—" FontFamily="Consolas" FontSize="18" FontWeight="SemiBold" Foreground="#888888"/>
+                                                </StackPanel>
+                                                <StackPanel Grid.Row="1" Grid.Column="2">
+                                                    <TextBlock Text="rvec Z" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
+                                                    <TextBlock x:Name="CalibPoseRz" Text="—" FontFamily="Consolas" FontSize="18" FontWeight="SemiBold" Foreground="#888888"/>
+                                                </StackPanel>
+
+                                                <Button Grid.Row="0" Grid.RowSpan="2" Grid.Column="3" x:Name="CalibCopyBtn"
                                                         Content="&#xE8C8;" FontFamily="Segoe MDL2 Assets"
                                                         Background="Transparent" BorderBrush="#333333" Padding="8"
                                                         Click="CalibCopyBtn_Click"
@@ -1273,37 +1327,16 @@
                                 <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
                                     <StackPanel Spacing="12">
 
-                                        <!-- Step 1: Generate Grid -->
-                                        <Border Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="20">
-                                            <StackPanel Spacing="12">
-                                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                                    <Border Background="#00E5FF" CornerRadius="12" Width="24" Height="24">
-                                                        <TextBlock Text="1" FontSize="12" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                    <TextBlock Text="Generate ChArUco Grid" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                                <TextBlock Text="Generates a PNG grid exactly matching your screen resolution. Display it fullscreen on the calibration surface." Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
-                                                <StackPanel Spacing="3">
-                                                    <TextBlock Text="SQUARE SIZE" FontSize="9" Opacity="0.5" CharacterSpacing="60"/>
-                                                    <TextBlock Text="4 cm  |  Marker 3 cm  |  7×5 board" FontSize="12" FontWeight="SemiBold"/>
-                                                </StackPanel>
-                                                <Button x:Name="GenerateGridBtn" Content="Generate Grid (PNG)" HorizontalAlignment="Stretch"
-                                                        Style="{StaticResource Button.Filled}" Click="GenerateGridBtn_Click"/>
-                                                <Button x:Name="OpenGridBtn" Content="Open Fullscreen ↗" HorizontalAlignment="Stretch"
-                                                        IsEnabled="False" Click="OpenGridBtn_Click"/>
-                                            </StackPanel>
-                                        </Border>
-
-                                        <!-- Step 2: Camera Selection -->
+                                        <!-- Step 1: Camera Selection -->
                                         <Border Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="20">
                                             <StackPanel Spacing="12">
                                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                                     <Border Background="#00CC6A" CornerRadius="12" Width="24" Height="24">
-                                                        <TextBlock Text="2" FontSize="12" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="1" FontSize="12" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                     </Border>
                                                     <TextBlock Text="Select Camera" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                                 </StackPanel>
-                                                <TextBlock Text="Choose the camera positioned above the grid, pointing downward." Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                                                <TextBlock Text="Choose the camera positioned above the board, pointing downward." Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
                                                 <ComboBox x:Name="CalibCameraComboBox" HorizontalAlignment="Stretch"
                                                           PlaceholderText="Select camera..." FontSize="11"
                                                           Height="32" CornerRadius="6"
@@ -1311,16 +1344,16 @@
                                             </StackPanel>
                                         </Border>
 
-                                        <!-- Step 3: Start Detection -->
+                                        <!-- Step 2: Start Detection -->
                                         <Border Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="20">
                                             <StackPanel Spacing="12">
                                                 <StackPanel Orientation="Horizontal" Spacing="10">
                                                     <Border Background="#FFD279" CornerRadius="12" Width="24" Height="24">
-                                                        <TextBlock Text="3" FontSize="12" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                        <TextBlock Text="2" FontSize="12" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                                     </Border>
                                                     <TextBlock Text="Start Detection" FontWeight="SemiBold" VerticalAlignment="Center"/>
                                                 </StackPanel>
-                                                <TextBlock Text="Display the grid fullscreen on your screen. Point the camera at it and press Start." Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
+                                                <TextBlock Text="Keep the board visible in the camera frame and press Start." Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
                                                 <Button x:Name="StartCalibDetectionBtn" Content="▶  Start Detection"
                                                         HorizontalAlignment="Stretch" IsEnabled="False"
                                                         Style="{StaticResource Button.Filled}"
