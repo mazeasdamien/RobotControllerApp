@@ -30,6 +30,12 @@ namespace RobotControllerApp.Services
         /// <summary>The Google Gemini API Key.</summary>
         public string GeminiApiKey { get; set; } = "";
 
+        /// <summary>The Tripo3D API Key for cloud-based 3D model generation.</summary>
+        public string TripoApiKey { get; set; } = "";
+
+        /// <summary>If true, use the Tripo3D cloud API instead of the local TripoSR server.</summary>
+        public bool Use3DApiMode { get; set; } = false;
+
         private static string SettingsPath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "RobotOrange", "settings.json");

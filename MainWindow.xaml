@@ -1,4 +1,4 @@
-﻿<Window
+<Window
     x:Class="RobotControllerApp.MainWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -882,7 +882,7 @@
                                             <TextBlock Grid.Column="0" Text="PREVIEW" FontWeight="SemiBold" Foreground="#888"/>
                                             <TextBlock Grid.Column="1" Text="OBJECT TYPE (LLM NAME)" FontWeight="SemiBold" Foreground="#888"/>
                                             <TextBlock Grid.Column="2" Text="DATE DISCOVERED" FontWeight="SemiBold" Foreground="#888"/>
-                                            <TextBlock Grid.Column="3" Text="GENERATE" FontWeight="SemiBold" Foreground="#888"/>
+                                             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"><TextBlock Text="GENERATE" FontWeight="SemiBold" Foreground="#888" VerticalAlignment="Center"/><Border x:Name="ModelModeBadge" CornerRadius="4" Padding="5,2" Background="#1A4080"><TextBlock x:Name="ModelModeBadgeText" Text="LOCAL" FontSize="10" FontWeight="Bold" Foreground="#5599FF"/></Border></StackPanel>
                                         </Grid>
                                         
                                         <!-- Rows -->
@@ -1403,7 +1403,20 @@
                                 
                                 <TextBlock Text="Google Gemini API Key" Style="{StaticResource Text.Body1}"/>
                                 <PasswordBox x:Name="GeminiApiKeyInput" PlaceholderText="AIza..." Width="400" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Required for Banana Pro 2 Generation." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
+                                <TextBlock Text="Required for Banana Pro 2 Generation." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,16"/>
+
+                                <TextBlock Text="Tripo3D Cloud API Key" Style="{StaticResource Text.Body1}"/>
+                                <PasswordBox x:Name="TripoApiKeyInput" PlaceholderText="tsk_..." Width="400" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Required for 3D Model generation via Tripo3D cloud API." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,8"/>
+
+                                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
+                                    <ToggleSwitch x:Name="Use3DApiModeToggle" Header="" IsOn="False" MinWidth="0"
+                                                  Toggled="Use3DApiModeToggle_Toggled"/>
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Text="Use Cloud API (Tripo3D)" Style="{StaticResource Text.Body1}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="OFF = local TripoSR server · ON = Tripo3D cloud API" Style="{StaticResource Text.Caption}" Opacity="0.55"/>
+                                    </StackPanel>
+                                </StackPanel>
                             </StackPanel>
 
                             <!-- Relay Settings -->

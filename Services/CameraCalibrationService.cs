@@ -24,9 +24,15 @@ namespace RobotControllerApp.Services
         public double Ry { get; set; }
         public double Rz { get; set; }
 
-        public double R11 { get; set; } public double R12 { get; set; } public double R13 { get; set; }
-        public double R21 { get; set; } public double R22 { get; set; } public double R23 { get; set; }
-        public double R31 { get; set; } public double R32 { get; set; } public double R33 { get; set; }
+        public double R11 { get; set; }
+        public double R12 { get; set; }
+        public double R13 { get; set; }
+        public double R21 { get; set; }
+        public double R22 { get; set; }
+        public double R23 { get; set; }
+        public double R31 { get; set; }
+        public double R32 { get; set; }
+        public double R33 { get; set; }
 
         public bool IsValid { get; set; }
     }
@@ -166,19 +172,20 @@ namespace RobotControllerApp.Services
                             int col = id % GridCols;
                             int row = id / GridCols;
 
-                            // Center of this marker relative to the Center of the Board!
-                            // X goes right, Y goes UP (forward on table).
+                            // X goes right, Y goes DOWN (forward on table, matching the physical printed ArUco board).
                             float cx = (float)((col - (GridCols - 1) / 2.0f) * (MarkerLength + MarkerGap));
-                            float cy = (float)(((GridRows - 1) / 2.0f - row) * (MarkerLength + MarkerGap));
+
+                            // FIXED: 'row' is now positive-going so Y goes DOWN.
+                            float cy = (float)((row - (GridRows - 1) / 2.0f) * (MarkerLength + MarkerGap));
 
                             float half = MarkerLength / 2.0f;
 
                             // Corners: TL, TR, BR, BL 
-                            // Y is UP. So TL is (-half, +half).
-                            objPtsList.Add(new Point3f(cx - half, cy + half, 0f));
-                            objPtsList.Add(new Point3f(cx + half, cy + half, 0f));
-                            objPtsList.Add(new Point3f(cx + half, cy - half, 0f));
-                            objPtsList.Add(new Point3f(cx - half, cy - half, 0f));
+                            // Because Y now goes down, Top-Left is (-half, -half)
+                            objPtsList.Add(new Point3f(cx - half, cy - half, 0f)); // TL
+                            objPtsList.Add(new Point3f(cx + half, cy - half, 0f)); // TR
+                            objPtsList.Add(new Point3f(cx + half, cy + half, 0f)); // BR
+                            objPtsList.Add(new Point3f(cx - half, cy + half, 0f)); // BL
 
                             imgPtsList.Add(corners[i][0]);
                             imgPtsList.Add(corners[i][1]);
@@ -194,7 +201,7 @@ namespace RobotControllerApp.Services
                         using var tvec = new Mat(3, 1, MatType.CV_64FC1);
 
                         // Solve for the entire board at once -> Rock stable Gizmo & Pose!
-                        Cv2.SolvePnP(InputArray.Create(objPts), InputArray.Create(imgPts), cameraMatrix, distCoeffs, avgRvec, tvec);
+                        Cv2.SolvePnP(InputArray.Create(objPts), InputArray.Create(imgPts), cameraMatrix, distCoeffs, avgRvec, tvec, false, SolvePnPFlags.Ippe);
 
                         double avgTx = tvec.At<double>(0), avgTy = tvec.At<double>(1), avgTz = tvec.At<double>(2);
                         double avgRx = avgRvec.At<double>(0), avgRy = avgRvec.At<double>(1), avgRz = avgRvec.At<double>(2);
@@ -204,20 +211,30 @@ namespace RobotControllerApp.Services
                         Cv2.Rodrigues(avgRvec, rotMat);
 
                         // cam_world = -R^T * tvec  (R^T[r,c] = R[c,r])
-                        double camWorldX = -(rotMat.At<double>(0,0)*avgTx + rotMat.At<double>(1,0)*avgTy + rotMat.At<double>(2,0)*avgTz);
-                        double camWorldY = -(rotMat.At<double>(0,1)*avgTx + rotMat.At<double>(1,1)*avgTy + rotMat.At<double>(2,1)*avgTz);
-                        double camWorldZ = -(rotMat.At<double>(0,2)*avgTx + rotMat.At<double>(1,2)*avgTy + rotMat.At<double>(2,2)*avgTz);
+                        double camWorldX = -(rotMat.At<double>(0, 0) * avgTx + rotMat.At<double>(1, 0) * avgTy + rotMat.At<double>(2, 0) * avgTz);
+                        double camWorldY = -(rotMat.At<double>(0, 1) * avgTx + rotMat.At<double>(1, 1) * avgTy + rotMat.At<double>(2, 1) * avgTz);
+                        double camWorldZ = -(rotMat.At<double>(0, 2) * avgTx + rotMat.At<double>(1, 2) * avgTy + rotMat.At<double>(2, 2) * avgTz);
 
                         OnPose?.Invoke(new CameraPose
                         {
-                            TvecX = avgTx, TvecY = avgTy, TvecZ = avgTz,
-                            X  = camWorldX,
-                            Y  = camWorldY,
-                            Z  = camWorldZ,   
-                            Rx = avgRx, Ry = avgRy, Rz = avgRz,
-                            R11 = rotMat.At<double>(0,0), R12 = rotMat.At<double>(1,0), R13 = rotMat.At<double>(2,0),
-                            R21 = rotMat.At<double>(0,1), R22 = rotMat.At<double>(1,1), R23 = rotMat.At<double>(2,1),
-                            R31 = rotMat.At<double>(0,2), R32 = rotMat.At<double>(1,2), R33 = rotMat.At<double>(2,2),
+                            TvecX = avgTx,
+                            TvecY = avgTy,
+                            TvecZ = avgTz,
+                            X = camWorldX,
+                            Y = camWorldY,
+                            Z = camWorldZ,
+                            Rx = avgRx,
+                            Ry = avgRy,
+                            Rz = avgRz,
+                            R11 = rotMat.At<double>(0, 0),
+                            R12 = rotMat.At<double>(1, 0),
+                            R13 = rotMat.At<double>(2, 0),
+                            R21 = rotMat.At<double>(0, 1),
+                            R22 = rotMat.At<double>(1, 1),
+                            R23 = rotMat.At<double>(2, 1),
+                            R31 = rotMat.At<double>(0, 2),
+                            R32 = rotMat.At<double>(1, 2),
+                            R33 = rotMat.At<double>(2, 2),
                             IsValid = true
                         });
 

@@ -94,7 +94,7 @@ namespace RobotControllerApp
 
         private System.Collections.ObjectModel.ObservableCollection<LibraryItemViewModel> _libraryItems = new();
         private List<LibraryItemConfig> _libraryConfig = new();
-        
+
         private DispatcherTimer _autoScanTimer;
 
         private static string LibraryPath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RobotControllerApp", "Library");
@@ -132,7 +132,8 @@ namespace RobotControllerApp
 
             _autoScanTimer = new DispatcherTimer();
             _autoScanTimer.Interval = TimeSpan.FromSeconds(7.5);
-            _autoScanTimer.Tick += async (s, e) => {
+            _autoScanTimer.Tick += async (s, e) =>
+            {
                 if (AutoScanToggle.IsChecked != true) return;
                 if (GenerationProgress.IsActive) return; // Wait until current scan finishes
                 await AnalyzeSceneAsync();
@@ -152,6 +153,9 @@ namespace RobotControllerApp
             Robot2IpInput.Text = _settings.Robot2Ip;
             OrangeApiKeyInput.Password = _settings.OrangeApiKey;
             GeminiApiKeyInput.Password = _settings.GeminiApiKey;
+            TripoApiKeyInput.Password = _settings.TripoApiKey;
+            Use3DApiModeToggle.IsOn = _settings.Use3DApiMode;
+            UpdateModelModeBadge(_settings.Use3DApiMode);
 
             // Update Hub Card Status (Initialize as Waiting for Hub to start or Unity to connect)
             RelayActiveText.Text = "WAITING";
@@ -594,7 +598,7 @@ namespace RobotControllerApp
                                     }
 
                                     var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
-                                    
+
                                     if (DashboardView.Visibility == Visibility.Visible || ContextView.Visibility == Visibility.Visible)
                                     {
                                         using (var ms = new System.IO.MemoryStream(frameBytes))
@@ -604,7 +608,7 @@ namespace RobotControllerApp
                                         if (DashboardView.Visibility == Visibility.Visible) LocalWebcamPreview.Source = bitmap;
                                         if (ContextView.Visibility == Visibility.Visible) ContextWebcamPreview.Source = bitmap;
                                     }
-                                    
+
                                     _latestWebcamFrameBytes = frameBytes;
                                 }
                                 catch { }
@@ -974,6 +978,8 @@ namespace RobotControllerApp
                 _settings.Robot2Ip = Robot2IpInput.Text.Trim();
                 _settings.OrangeApiKey = OrangeApiKeyInput.Password.Trim();
                 _settings.GeminiApiKey = GeminiApiKeyInput.Password.Trim();
+                _settings.TripoApiKey = TripoApiKeyInput.Password.Trim();
+                _settings.Use3DApiMode = Use3DApiModeToggle.IsOn;
                 _settings.Save();
                 _robotBridge.RosIp = SanitizeIp(_settings.RobotIp);
                 _robotBridge2.RosIp = SanitizeIp(_settings.Robot2Ip);
@@ -1189,7 +1195,7 @@ namespace RobotControllerApp
 
         private async Task InitSceneWebViewAsync()
         {
-            if (_webViewReady) 
+            if (_webViewReady)
             {
                 await PushObjectsToSceneAsync();
                 return;
@@ -1213,7 +1219,7 @@ namespace RobotControllerApp
                 {
                     string poseJson = await Task.Run(() => File.ReadAllText(jsonPath));
                     _savedPose = System.Text.Json.JsonSerializer.Deserialize<RobotControllerApp.Services.CameraPose>(poseJson);
-                    
+
                     poseJson = poseJson.Replace("\\", "\\\\").Replace("'", "\\'");
                     await SceneWebView.ExecuteScriptAsync($"setCameraPose('{poseJson}');");
                 }
@@ -1245,33 +1251,51 @@ namespace RobotControllerApp
                 double camY = pose?.Y ?? 0;
                 double camZ = pose?.Z ?? 1.0;
 
+                // Extract Transposed Matrix R^T (if null, fallback to identity)
+                double r11 = pose?.R11 ?? 1.0, r12 = pose?.R12 ?? 0.0, r13 = pose?.R13 ?? 0.0;
+                double r21 = pose?.R21 ?? 0.0, r22 = pose?.R22 ?? 1.0, r23 = pose?.R23 ?? 0.0;
+                double r31 = pose?.R31 ?? 0.0, r32 = pose?.R32 ?? 0.0, r33 = pose?.R33 ?? 1.0;
+
+                // Use absolute height to guard against planar ambiguity flips
+                double safeCamZ = Math.Abs(camZ);
+
                 var items = _detectedObjects.Select(obj =>
                 {
-                    // Bounding box centre in 0-1000 → pixel coords
                     double uNorm = (obj.UvXmin + obj.UvXmax) / 2.0 / 1000.0;
                     double vNorm = (obj.UvYmin + obj.UvYmax) / 2.0 / 1000.0;
                     double pixU = uNorm * frameW;
                     double pixV = vNorm * frameH;
 
-                    // 1. Back-project pixel to ray vector (u, v, 1) * K^-1
-                    double rayX = (pixU - cx) / fx;
-                    double rayY = (pixV - cy) / fy;
-                    
-                    // 2. Scale by height (camZ) to hit the Z=0 table plane
-                    // (Assuming rotation is roughly looking straight down, hence ray_in_world ≈ ray_in_camera)
-                    // Then add camera World position (camX, camY) to translate it into place
-                    double worldX = camX + (camZ * rayX);
-                    double worldY = camY + (camZ * rayY);
+                    // 1. Back-project pixel to optical ray vector (Camera Space)
+                    double rayCamX = (pixU - cx) / fx;
+                    double rayCamY = (pixV - cy) / fy;
+                    double rayCamZ = 1.0;
 
-                    // Bounding box size → object footprint on table (metres)
+                    // 2. Rotate ray into Object (Table) Space using R^T
+                    double rayObjX = r11 * rayCamX + r12 * rayCamY + r13 * rayCamZ;
+                    double rayObjY = r21 * rayCamX + r22 * rayCamY + r23 * rayCamZ;
+                    double rayObjZ = r31 * rayCamX + r32 * rayCamY + r33 * rayCamZ;
+
+                    // 3. Intersect Ray with Z=0 Table Plane
+                    double t = 0;
+                    if (Math.Abs(rayObjZ) > 1e-6)
+                    {
+                        // Calculate physical distance along the optical ray to hit the table
+                        t = Math.Abs(safeCamZ / rayObjZ);
+                    }
+
+                    double worldX = camX + (t * rayObjX);
+                    double worldY = camY + (t * rayObjY);
+
+                    // Scale bounding box based on the true physical distance to the table
                     double bboxWNorm = (obj.UvXmax - obj.UvXmin) / 1000.0;
                     double bboxHNorm = (obj.UvYmax - obj.UvYmin) / 1000.0;
-                    double sizeW = camZ * bboxWNorm * frameW / fx;
-                    double sizeH = camZ * bboxHNorm * frameH / fy;
+                    double sizeW = t * bboxWNorm * frameW / fx;
+                    double sizeH = t * bboxHNorm * frameH / fy;
 
                     return new
                     {
-                        label   = obj.Name,
+                        label = obj.Name,
                         worldX,
                         worldY,
                         sizeW,
@@ -1876,7 +1900,7 @@ namespace RobotControllerApp
                     {
                         double pTokens = usageProp.TryGetProperty("prompt_token_count", out var pt) ? pt.GetDouble() : 0.0;
                         double cTokens = usageProp.TryGetProperty("candidates_token_count", out var ct) ? ct.GetDouble() : 0.0;
-                        
+
                         // Fallback checking standard OpenAI-style properties if Google ones are empty
                         if (pTokens == 0) pTokens = usageProp.TryGetProperty("prompt_tokens", out var pt2) ? pt2.GetDouble() : 0.0;
                         if (cTokens == 0) cTokens = usageProp.TryGetProperty("completion_tokens", out var ct2) ? ct2.GetDouble() : 0.0;
@@ -2028,7 +2052,7 @@ namespace RobotControllerApp
             {
                 AutoScanToggle.Content = "■ Stop Auto-Scan";
                 AutoScanToggle.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 150, 0));
-                
+
                 GenerateObjectImagesBtn.IsEnabled = false;
                 GenerateObjectImagesBtn.Content = "Auto-Scan Running...";
 
@@ -2039,7 +2063,7 @@ namespace RobotControllerApp
             {
                 AutoScanToggle.Content = "Auto-Scan (8x/min)";
                 AutoScanToggle.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 51, 51, 51));
-                
+
                 GenerateObjectImagesBtn.IsEnabled = true;
                 GenerateObjectImagesBtn.Content = "Analyze Scene Manually";
 
@@ -2149,6 +2173,32 @@ namespace RobotControllerApp
             }
         }
 
+        // ── Tripo mode badge helper ───────────────────────────────────────────
+        private void UpdateModelModeBadge(bool apiMode)
+        {
+            if (ModelModeBadge == null || ModelModeBadgeText == null) return;
+            if (apiMode)
+            {
+                ModelModeBadgeText.Text = "CLOUD API";
+                ModelModeBadgeText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
+                ModelModeBadge.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(40, 0, 204, 106));
+            }
+            else
+            {
+                ModelModeBadgeText.Text = "LOCAL";
+                ModelModeBadgeText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 85, 153, 255));
+                ModelModeBadge.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(40, 0, 64, 128));
+            }
+        }
+
+        private void Use3DApiModeToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            bool isOn = Use3DApiModeToggle.IsOn;
+            _settings.Use3DApiMode = isOn;
+            _settings.Save();
+            UpdateModelModeBadge(isOn);
+        }
+
         private async void Generate3DModel_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.DataContext is LibraryItemViewModel item)
@@ -2156,145 +2206,281 @@ namespace RobotControllerApp
                 var configData = _libraryConfig.FirstOrDefault(x => x.Name == item.Name);
                 if (configData == null) return;
 
-                btn.IsEnabled = false;
-                string originalContent = btn.Content?.ToString() ?? "To 3D Model";
-                btn.Content = "Starting TripoSR...";
+                if (_settings.Use3DApiMode)
+                    await Generate3DModel_ApiAsync(btn, item, configData);
+                else
+                    await Generate3DModel_LocalAsync(btn, item, configData);
+            }
+        }
 
-                bool serverWasAlreadyRunning = false;
-                System.Diagnostics.Process? tripoProcess = null;
-                bool generationSuccess = false;
+        // ── LOCAL TripoSR mode ────────────────────────────────────────────────
+        private async Task Generate3DModel_LocalAsync(Button btn, LibraryItemViewModel item, LibraryItemConfig configData)
+        {
+            btn.IsEnabled = false;
+            string originalContent = btn.Content?.ToString() ?? "To 3D Model";
+            btn.Content = "Starting TripoSR...";
 
+            bool serverWasAlreadyRunning = false;
+            System.Diagnostics.Process? tripoProcess = null;
+            bool generationSuccess = false;
+
+            try
+            {
+                // Check if server is already running
                 try
                 {
-                    // Check if server is already running
+                    using var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+                    var res = await testClient.GetAsync("http://127.0.0.1:7860/");
+                    serverWasAlreadyRunning = true;
+                }
+                catch { }
+
+                if (!serverWasAlreadyRunning)
+                {
+                    tripoProcess = new System.Diagnostics.Process();
+                    tripoProcess.StartInfo.FileName = @"C:\Users\QYTH4815\TripoSR-windows\run.bat";
+                    tripoProcess.StartInfo.WorkingDirectory = @"C:\Users\QYTH4815\TripoSR-windows";
+                    tripoProcess.StartInfo.UseShellExecute = true;
+                    tripoProcess.StartInfo.CreateNoWindow = false;
+                    tripoProcess.Start();
+                }
+
+                btn.Content = "Generating 3D...";
+
+                string imgPath = Path.Combine(LibraryPath, configData.ImageFileName);
+                byte[] pngImageData = await File.ReadAllBytesAsync(imgPath);
+                string base64Image = Convert.ToBase64String(pngImageData);
+                string dataUri = $"data:image/png;base64,{base64Image}";
+
+                var requestBody = new
+                {
+                    data = new object[]
+                    {
+                        new { path = imgPath, url = dataUri }
+                    }
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromMinutes(10);
+
+                HttpResponseMessage? response = null;
+                int maxRetries = 90;
+                for (int i = 0; i < maxRetries; i++)
+                {
                     try
                     {
-                        using var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-                        var res = await testClient.GetAsync("http://127.0.0.1:7860/");
-                        serverWasAlreadyRunning = true;
+                        response = await client.PostAsync("http://127.0.0.1:7860/api/predict", content);
+                        break;
                     }
-                    catch { }
-
-                    if (!serverWasAlreadyRunning)
+                    catch
                     {
-                        tripoProcess = new System.Diagnostics.Process();
-                        tripoProcess.StartInfo.FileName = @"C:\Users\QYTH4815\TripoSR-windows\run.bat";
-                        tripoProcess.StartInfo.WorkingDirectory = @"C:\Users\QYTH4815\TripoSR-windows";
-                        tripoProcess.StartInfo.UseShellExecute = true; // Use shell so the bat executes properly
-                        tripoProcess.StartInfo.CreateNoWindow = false; // Open a visible window to debug Anaconda/Python loading
-                        tripoProcess.Start();
-                    }
-
-                    btn.Content = "Generating 3D...";
-
-                    string imgPath = Path.Combine(LibraryPath, configData.ImageFileName);
-                    byte[] pngImageData = await File.ReadAllBytesAsync(imgPath);
-                    string base64Image = Convert.ToBase64String(pngImageData);
-                    string dataUri = $"data:image/png;base64,{base64Image}";
-
-                    var requestBody = new
-                    {
-                        data = new object[]
-                        {
-                            new { path = imgPath, url = dataUri }
-                        }
-                    };
-
-                    var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
-                    var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
-
-                    using var client = new HttpClient();
-                    client.Timeout = TimeSpan.FromMinutes(10); // Generation can take a while
-
-                    HttpResponseMessage? response = null;
-                    int maxRetries = 90; // approx 3 minutes to boot first time
-                    for (int i = 0; i < maxRetries; i++)
-                    {
-                        try
-                        {
-                            response = await client.PostAsync("http://127.0.0.1:7860/api/predict", content);
-                            break;
-                        }
-                        catch
-                        {
-                            if (i == maxRetries - 1) throw;
-                            await Task.Delay(2000);
-                        }
-                    }
-
-                    if (response == null || !response.IsSuccessStatusCode)
-                        throw new Exception("Le serveur TripoSR n'a pas répondu. Vérifiez que run.bat fonctionne correctement.");
-
-                    var responseString = await response.Content.ReadAsStringAsync();
-
-                    using (System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(responseString))
-                    {
-                        var resultData = doc.RootElement.GetProperty("data")[0];
-                        string? fileNameStr = null;
-
-                        if (resultData.ValueKind == System.Text.Json.JsonValueKind.String)
-                        {
-                            fileNameStr = resultData.GetString();
-                        }
-                        else if (resultData.ValueKind == System.Text.Json.JsonValueKind.Object)
-                        {
-                            if (resultData.TryGetProperty("path", out var pathProp) && pathProp.ValueKind == System.Text.Json.JsonValueKind.String)
-                                fileNameStr = pathProp.GetString();
-                            else if (resultData.TryGetProperty("name", out var nameProp) && nameProp.ValueKind == System.Text.Json.JsonValueKind.String)
-                                fileNameStr = nameProp.GetString();
-                            else if (resultData.TryGetProperty("url", out var urlProp) && urlProp.ValueKind == System.Text.Json.JsonValueKind.String)
-                                fileNameStr = urlProp.GetString();
-                        }
-
-                        if (!string.IsNullOrEmpty(fileNameStr))
-                        {
-                            string fileUrl = fileNameStr.StartsWith("http")
-                                ? fileNameStr
-                                : $"http://127.0.0.1:7860/file={fileNameStr}";
-
-                            byte[] glbBytes = await client.GetByteArrayAsync(fileUrl);
-
-                            string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
-                            string glbPath = Path.Combine(LibraryPath, $"{safeName}_3DModel.glb");
-                            await File.WriteAllBytesAsync(glbPath, glbBytes);
-
-                            generationSuccess = true;
-                        }
-                        else
-                        {
-                            throw new Exception("Format de réponse inattendu. Json reçu :\n" + responseString.Substring(0, Math.Min(responseString.Length, 500)));
-                        }
+                        if (i == maxRetries - 1) throw;
+                        await Task.Delay(2000);
                     }
                 }
-                catch (Exception ex)
+
+                if (response == null || !response.IsSuccessStatusCode)
+                    throw new Exception("Le serveur TripoSR n'a pas répondu. Vérifiez que run.bat fonctionne correctement.");
+
+                var responseString = await response.Content.ReadAsStringAsync();
+
+                using (System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(responseString))
                 {
-                    await new ContentDialog() { Title = "Erreur TripoSR", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
-                }
-                finally
-                {
-                    if (!serverWasAlreadyRunning && tripoProcess != null && !tripoProcess.HasExited)
+                    var resultData = doc.RootElement.GetProperty("data")[0];
+                    string? fileNameStr = null;
+
+                    if (resultData.ValueKind == System.Text.Json.JsonValueKind.String)
                     {
-                        try
-                        {
-                            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("taskkill", $"/F /T /PID {tripoProcess.Id}")
-                            {
-                                WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
-                                CreateNoWindow = true
-                            })?.WaitForExit();
-                        }
-                        catch { }
+                        fileNameStr = resultData.GetString();
                     }
-                    if (generationSuccess)
+                    else if (resultData.ValueKind == System.Text.Json.JsonValueKind.Object)
                     {
-                        btn.Content = "Generated";
-                        btn.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.SeaGreen);
-                        btn.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+                        if (resultData.TryGetProperty("path", out var pathProp) && pathProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                            fileNameStr = pathProp.GetString();
+                        else if (resultData.TryGetProperty("name", out var nameProp) && nameProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                            fileNameStr = nameProp.GetString();
+                        else if (resultData.TryGetProperty("url", out var urlProp) && urlProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                            fileNameStr = urlProp.GetString();
+                    }
+
+                    if (!string.IsNullOrEmpty(fileNameStr))
+                    {
+                        string fileUrl = fileNameStr.StartsWith("http")
+                            ? fileNameStr
+                            : $"http://127.0.0.1:7860/file={fileNameStr}";
+
+                        byte[] glbBytes = await client.GetByteArrayAsync(fileUrl);
+
+                        string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
+                        string glbPath = Path.Combine(LibraryPath, $"{safeName}_3DModel.glb");
+                        await File.WriteAllBytesAsync(glbPath, glbBytes);
+
+                        generationSuccess = true;
                     }
                     else
                     {
-                        btn.Content = originalContent;
-                        btn.IsEnabled = true;
+                        throw new Exception("Format de réponse inattendu. Json reçu :\n" + responseString.Substring(0, Math.Min(responseString.Length, 500)));
                     }
+                }
+            }
+            catch (Exception ex)
+            {
+                await new ContentDialog() { Title = "Erreur TripoSR", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+            }
+            finally
+            {
+                if (!serverWasAlreadyRunning && tripoProcess != null && !tripoProcess.HasExited)
+                {
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("taskkill", $"/F /T /PID {tripoProcess.Id}")
+                        {
+                            WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                            CreateNoWindow = true
+                        })?.WaitForExit();
+                    }
+                    catch { }
+                }
+                if (generationSuccess)
+                {
+                    btn.Content = "Generated";
+                    btn.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.SeaGreen);
+                    btn.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+                }
+                else
+                {
+                    btn.Content = "To 3D Model";
+                    btn.IsEnabled = true;
+                }
+            }
+        }
+
+        // ── CLOUD API Tripo3D mode ────────────────────────────────────────────
+        private async Task Generate3DModel_ApiAsync(Button btn, LibraryItemViewModel item, LibraryItemConfig configData)
+        {
+            if (string.IsNullOrWhiteSpace(_settings.TripoApiKey))
+            {
+                await new ContentDialog() { Title = "Clé API manquante", Content = "Veuillez définir la clé Tripo3D API dans les paramètres.", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                return;
+            }
+
+            btn.IsEnabled = false;
+            string originalContent = btn.Content?.ToString() ?? "To 3D Model";
+            bool generationSuccess = false;
+
+            try
+            {
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _settings.TripoApiKey);
+                client.Timeout = TimeSpan.FromMinutes(10);
+
+                // ── 1. Upload image ──────────────────────────────────────────
+                btn.Content = "Uploading image...";
+                string imgPath = Path.Combine(LibraryPath, configData.ImageFileName);
+                byte[] imgBytes = await File.ReadAllBytesAsync(imgPath);
+
+                string uploadTaskId;
+                using (var formData = new MultipartFormDataContent())
+                {
+                    var imageContent = new ByteArrayContent(imgBytes);
+                    imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+                    formData.Add(imageContent, "file", "image.png");
+
+                    var uploadRes = await client.PostAsync("https://api.tripo3d.ai/v2/openapi/upload", formData);
+                    var uploadStr = await uploadRes.Content.ReadAsStringAsync();
+                    if (!uploadRes.IsSuccessStatusCode)
+                        throw new Exception($"Erreur upload Tripo3D ({uploadRes.StatusCode}):\n{uploadStr}");
+
+                    using var uploadDoc = System.Text.Json.JsonDocument.Parse(uploadStr);
+                    var uploadData = uploadDoc.RootElement.GetProperty("data");
+                    string fileToken = uploadData.GetProperty("image_token").GetString()
+                        ?? throw new Exception("Tripo3D: image_token non reçu.");
+
+                    // ── 2. Create image-to-model task ────────────────────────
+                    btn.Content = "Creating task...";
+                    var taskPayload = new
+                    {
+                        type = "image_to_model",
+                        file = new { type = "png", file_token = fileToken }
+                    };
+                    var taskJson = System.Text.Json.JsonSerializer.Serialize(taskPayload);
+                    var taskContent = new StringContent(taskJson, System.Text.Encoding.UTF8, "application/json");
+
+                    var taskRes = await client.PostAsync("https://api.tripo3d.ai/v2/openapi/task", taskContent);
+                    var taskStr = await taskRes.Content.ReadAsStringAsync();
+                    if (!taskRes.IsSuccessStatusCode)
+                        throw new Exception($"Erreur création task Tripo3D ({taskRes.StatusCode}):\n{taskStr}");
+
+                    using var taskDoc = System.Text.Json.JsonDocument.Parse(taskStr);
+                    uploadTaskId = taskDoc.RootElement.GetProperty("data").GetProperty("task_id").GetString()
+                        ?? throw new Exception("Tripo3D: task_id non reçu.");
+                }
+
+                // ── 3. Poll status ───────────────────────────────────────────
+                btn.Content = "Generating 3D (API)...";
+                string? glbUrl = null;
+                for (int attempt = 0; attempt < 120; attempt++) // max ~4 min
+                {
+                    await Task.Delay(2000);
+                    var pollRes = await client.GetAsync($"https://api.tripo3d.ai/v2/openapi/task/{uploadTaskId}");
+                    var pollStr = await pollRes.Content.ReadAsStringAsync();
+                    if (!pollRes.IsSuccessStatusCode)
+                        throw new Exception($"Erreur poll Tripo3D ({pollRes.StatusCode}):\n{pollStr}");
+
+                    using var pollDoc = System.Text.Json.JsonDocument.Parse(pollStr);
+                    var pollData = pollDoc.RootElement.GetProperty("data");
+                    string status = pollData.GetProperty("status").GetString() ?? "";
+                    int progress = pollData.TryGetProperty("progress", out var prog) ? prog.GetInt32() : 0;
+
+                    btn.Content = $"Generating 3D (API) {progress}%...";
+
+                    if (status == "success")
+                    {
+                        var output = pollData.GetProperty("output");
+                        glbUrl = output.TryGetProperty("model", out var modelProp) ? modelProp.GetString() : null;
+                        glbUrl ??= output.TryGetProperty("pbr_model", out var pbrProp) ? pbrProp.GetString() : null;
+                        glbUrl ??= output.TryGetProperty("base_model", out var baseProp) ? baseProp.GetString() : null;
+                        break;
+                    }
+                    else if (status is "failed" or "cancelled" or "banned" or "expired")
+                    {
+                        throw new Exception($"Tripo3D task terminée avec statut : {status}");
+                    }
+                }
+
+                if (string.IsNullOrEmpty(glbUrl))
+                    throw new Exception("Tripo3D: timeout dépassé ou URL du modèle introuvable.");
+
+                // ── 4. Download GLB ──────────────────────────────────────────
+                btn.Content = "Downloading GLB...";
+                byte[] glbBytes = await client.GetByteArrayAsync(glbUrl);
+
+                string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
+                string glbPath = Path.Combine(LibraryPath, $"{safeName}_3DModel.glb");
+                await File.WriteAllBytesAsync(glbPath, glbBytes);
+
+                generationSuccess = true;
+            }
+            catch (Exception ex)
+            {
+                await new ContentDialog() { Title = "Erreur Tripo3D API", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+            }
+            finally
+            {
+                if (generationSuccess)
+                {
+                    btn.Content = "Generated";
+                    btn.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.SeaGreen);
+                    btn.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+                }
+                else
+                {
+                    btn.Content = "To 3D Model";
+                    btn.IsEnabled = true;
                 }
             }
         }
@@ -2639,13 +2825,26 @@ namespace RobotControllerApp
 
                 // Save JSON for 3D preview (camera fixed, single calibration session)
                 string jsonPath = RobotControllerApp.Services.CameraCalibrationService.SavedPosePath;
-                string json = System.Text.Json.JsonSerializer.Serialize(new {
-                    _lastValidPose.X, _lastValidPose.Y, _lastValidPose.Z,
-                    _lastValidPose.Rx, _lastValidPose.Ry, _lastValidPose.Rz,
-                    _lastValidPose.TvecX, _lastValidPose.TvecY, _lastValidPose.TvecZ,
-                    _lastValidPose.R11, _lastValidPose.R12, _lastValidPose.R13,
-                    _lastValidPose.R21, _lastValidPose.R22, _lastValidPose.R23,
-                    _lastValidPose.R31, _lastValidPose.R32, _lastValidPose.R33
+                string json = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    _lastValidPose.X,
+                    _lastValidPose.Y,
+                    _lastValidPose.Z,
+                    _lastValidPose.Rx,
+                    _lastValidPose.Ry,
+                    _lastValidPose.Rz,
+                    _lastValidPose.TvecX,
+                    _lastValidPose.TvecY,
+                    _lastValidPose.TvecZ,
+                    _lastValidPose.R11,
+                    _lastValidPose.R12,
+                    _lastValidPose.R13,
+                    _lastValidPose.R21,
+                    _lastValidPose.R22,
+                    _lastValidPose.R23,
+                    _lastValidPose.R31,
+                    _lastValidPose.R32,
+                    _lastValidPose.R33
                 });
 
                 // Write synchronously on UI thread so it doesn't freeze or lock
