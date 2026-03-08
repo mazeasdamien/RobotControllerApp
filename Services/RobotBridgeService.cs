@@ -143,7 +143,10 @@ namespace RobotControllerApp.Services
                         OnRosConnectionChanged?.Invoke(false);
                         OnInstanceConnectionChanged?.Invoke(false);
                     }
-                    // Do NOT abort relay here — relay has its own reconnect loop
+                    
+                    // Forcefully drop Relay connection if physical connection drops
+                    // This unblocks the pending ReceiveAsync on Relay and updates the Hub status 
+                    try { _relayWebSocket?.Abort(); } catch { }
                 }
 
                 if (!token.IsCancellationRequested)
@@ -162,6 +165,13 @@ namespace RobotControllerApp.Services
             {
                 if (token.IsCancellationRequested) break;
 
+                // Wait until the physical robot is actually connected before bridging to the Hub
+                if (!IsConnected)
+                {
+                    try { await Task.Delay(1000, token); } catch { break; }
+                    continue;
+                }
+
                 try
                 {
                     _relayWebSocket = new ClientWebSocket();
@@ -176,7 +186,7 @@ namespace RobotControllerApp.Services
                         timestamp = DateTime.UtcNow
                     }));
 
-                    while (_relayWebSocket.State == WebSocketState.Open && !token.IsCancellationRequested)
+                    while (_relayWebSocket.State == WebSocketState.Open && !token.IsCancellationRequested && IsConnected)
                     {
                         using var ms = new MemoryStream();
                         WebSocketReceiveResult result;
@@ -213,6 +223,11 @@ namespace RobotControllerApp.Services
                 {
                     _pingTimer?.Dispose();
                     _pingTimer = null;
+                    if (_relayWebSocket != null)
+                    {
+                        try { _relayWebSocket.Dispose(); } catch { }
+                        _relayWebSocket = null;
+                    }
                 }
 
                 if (!token.IsCancellationRequested)

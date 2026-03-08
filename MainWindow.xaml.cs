@@ -1003,9 +1003,14 @@ namespace RobotControllerApp
 
         // ─── Log state ─────────────────────────────────────────────────────────
 
-        private string _lastLogMessage = string.Empty;
-        private int _lastLogCount = 1;
-        private Run? _lastLogRun = null;   // The Run we update in-place for stacking
+        private class LogEntry
+        {
+            public string Message { get; set; } = string.Empty;
+            public int Count { get; set; } = 1;
+            public Run? RunNode { get; set; }
+            public Paragraph? ParagraphNode { get; set; }
+        }
+        private List<LogEntry> _recentLogs = new();
         private bool _isUserScrolledUp = false; // True when user has scrolled away from bottom
 
         private void Log(string message)
@@ -1027,33 +1032,50 @@ namespace RobotControllerApp
                 else if (message.Contains("[Bridge]"))
                     color = Microsoft.UI.Colors.Yellow;
 
-                // ── Stacking: identical consecutive messages update in-place ────
-                if (message == _lastLogMessage && _lastLogRun != null)
+                // ── Stacking: identical recent messages update in-place ────
+                var existing = _recentLogs.FirstOrDefault(l => l.Message == message);
+
+                if (existing != null && existing.RunNode != null && existing.ParagraphNode != null)
                 {
-                    _lastLogCount++;
-                    // Strip old counter suffix and re-apply
+                    existing.Count++;
                     string baseText = $"[{DateTime.Now:HH:mm:ss}] {message}";
-                    _lastLogRun.Text = $"{baseText}  ×{_lastLogCount}";
+                    existing.RunNode.Text = $"{baseText}  ×{existing.Count}";
+                    
+                    // Move it to the bottom so it's visible as the most recent activity
+                    if (ConsoleLog.Blocks.Contains(existing.ParagraphNode))
+                    {
+                        ConsoleLog.Blocks.Remove(existing.ParagraphNode);
+                        ConsoleLog.Blocks.Add(existing.ParagraphNode);
+                    }
+                    
+                    // Mark as most recently updated in tracking list
+                    _recentLogs.Remove(existing);
+                    _recentLogs.Add(existing);
                 }
                 else
                 {
-                    // New unique message — create a fresh paragraph
-                    _lastLogMessage = message;
-                    _lastLogCount = 1;
-
                     var run = new Run()
                     {
                         Text = $"[{DateTime.Now:HH:mm:ss}] {message}",
                         Foreground = new SolidColorBrush(color)
                     };
-                    _lastLogRun = run;
-
                     var p = new Paragraph();
                     p.Inlines.Add(run);
                     ConsoleLog.Blocks.Add(p);
 
                     // Keep buffer size manageable
                     if (ConsoleLog.Blocks.Count > 300) ConsoleLog.Blocks.RemoveAt(0);
+
+                    // Track new entry
+                    var newEntry = new LogEntry 
+                    {
+                        Message = message,
+                        Count = 1,
+                        RunNode = run,
+                        ParagraphNode = p
+                    };
+                    _recentLogs.Add(newEntry);
+                    if (_recentLogs.Count > 20) _recentLogs.RemoveAt(0);
                 }
 
                 // ── Auto-scroll: only scroll if user is already at the bottom ──
@@ -1815,6 +1837,11 @@ namespace RobotControllerApp
                     {
                         string imgPath = Path.Combine(LibraryPath, configData.ImageFileName);
                         if (File.Exists(imgPath)) File.Delete(imgPath);
+
+                        // Also delete the associated 3D model if it was generated
+                        string glbFileName = $"{item.Name.Replace(" ", "_")}_3DModel.glb";
+                        string glbPath = Path.Combine(LibraryPath, glbFileName);
+                        if (File.Exists(glbPath)) File.Delete(glbPath);
                     } catch { }
                 }
                 

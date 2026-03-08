@@ -809,7 +809,7 @@
                                     </Grid.RowDefinitions>
                                     <Grid>
                                         <TextBlock Text="Detected Object Library" Style="{StaticResource Text.Headline3}" Margin="0,0,0,16"/>
-                                        <Button Content="Open PNG Folder" HorizontalAlignment="Right" VerticalAlignment="Top" 
+                                        <Button Content="Open Asset Folder" HorizontalAlignment="Right" VerticalAlignment="Top" 
                                                 Background="Transparent" BorderBrush="#333333" BorderThickness="1" Foreground="#AAAAAA"
                                                 Click="OpenLibraryFolder_Click" Margin="0,0,0,16"/>
                                     </Grid>
