@@ -160,11 +160,8 @@ namespace RobotControllerApp
             GeminiApiKeyInput.Password = _settings.GeminiApiKey;
             TripoApiKeyInput.Password = _settings.TripoApiKey;
             Use3DApiModeToggle.IsOn = _settings.Use3DApiMode;
+            CameraFovSlider.Value = _settings.CameraFovScale;
             UpdateModelModeBadge(_settings.Use3DApiMode);
-
-            if (_settings.BananaModel == "gemini-3.1-flash-image-preview") BananaModelComboBox.SelectedIndex = 1;
-            else if (_settings.BananaModel == "gemini-3-pro-image-preview") BananaModelComboBox.SelectedIndex = 2;
-            else BananaModelComboBox.SelectedIndex = 0;
 
             // Update Hub Card Status (Initialize as Waiting for Hub to start or Unity to connect)
             RelayActiveText.Text = "WAITING";
@@ -507,6 +504,192 @@ namespace RobotControllerApp
         private readonly RobotControllerApp.Services.CameraCalibrationService _calibService = new();
         private RobotControllerApp.Services.CameraPose? _lastValidPose;
 
+        /// <summary>Start the selected camera safely using OpenCvSharp (DirectShow).</summary>
+        private async Task StartCameraByIndex(int index)
+        {
+            if (_videoDevices == null || index < 0 || index >= _videoDevices.Count) return;
+
+            // ── Cleanup existing session safely ─────────────────────────────────
+            _cvCaptureCts?.Cancel();
+
+            if (_cvCapture != null)
+            {
+                try
+                {
+                    _cvCapture.Release();
+                    _cvCapture.Dispose();
+                }
+                catch { }
+                _cvCapture = null;
+            }
+
+            LocalWebcamPreview.Source = null;
+            OperatorFeedBadgeText.Text = "OFFLINE";
+            OperatorFeedBadgeText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
+            OperatorFeedBadge.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 51, 51, 51));
+            OperatorFeedDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
+            TelemOperatorFps.Text = "0.0";
+            _operatorFpsCount = 0;
+
+            // ── Initialize new capture session ──────────────────────────────────
+            try
+            {
+                var selected = _videoDevices[index];
+
+                // DirectShow natively parses webcams (including MJPG Creative streams) without 
+                // WinUI 3 pipeline crashing. Index mapping matches DeviceInformation array.
+                _cvCapture = new OpenCvSharp.VideoCapture(index, OpenCvSharp.VideoCaptureAPIs.DSHOW);
+
+                if (!_cvCapture.IsOpened())
+                {
+                    Log($"[Webcam] Failed to open stream for '{selected.Name}' (DirectShow)");
+                    return;
+                }
+
+                // Force reliable fast definition for Operator feed
+                _cvCapture.Set(OpenCvSharp.VideoCaptureProperties.FrameWidth, 1280);
+                _cvCapture.Set(OpenCvSharp.VideoCaptureProperties.FrameHeight, 720);
+
+                Log($"[Webcam] Streaming: {selected.Name}");
+
+                _cvCaptureCts = new CancellationTokenSource();
+                var token = _cvCaptureCts.Token;
+
+                _operatorLastFpsReset = DateTime.Now;
+
+                _ = Task.Run(async () =>
+                {
+                    using var mat = new OpenCvSharp.Mat();
+                    while (!token.IsCancellationRequested && _cvCapture != null && _cvCapture.IsOpened())
+                    {
+                        if (_cvCapture.Read(mat) && !mat.Empty())
+                        {
+                            _operatorFramesTotal++;
+                            _operatorFpsCount++;
+                            int fps = 0;
+                            int total = _operatorFramesTotal;
+                            bool updateCounters = false;
+
+                            if ((DateTime.Now - _operatorLastFpsReset).TotalSeconds >= 1)
+                            {
+                                fps = _operatorFpsCount;
+                                _operatorFpsCount = 0;
+                                _operatorLastFpsReset = DateTime.Now;
+                                updateCounters = true;
+                            }
+
+                            byte[] frameBytes = mat.ToBytes(".jpg");
+
+                            // Send directly to the Hub's HTTP operator image endpoint cache
+                            RelayServerHost.CurrentManager?.UpdateLatestOperatorImage(frameBytes);
+
+                            DispatcherQueue?.TryEnqueue(async () =>
+                            {
+                                if (token.IsCancellationRequested) return;
+
+                                try
+                                {
+                                    if (OperatorFeedBadgeText.Text != "LIVE")
+                                    {
+                                        OperatorFeedBadgeText.Text = "LIVE";
+                                        OperatorFeedBadgeText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
+                                        OperatorFeedBadge.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 180, 0, 0)); // Red background
+                                        OperatorFeedDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 0, 0)); // Bright Red Dot
+                                    }
+
+                                    if (updateCounters)
+                                    {
+                                        TelemOperatorFps.Text = fps.ToString("0.0");
+                                        TelemOperatorTotalImages.Text = total.ToString();
+                                    }
+
+                                    var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+
+                                    if (DashboardView.Visibility == Visibility.Visible || ContextView.Visibility == Visibility.Visible)
+                                    {
+                                        using (var ms = new System.IO.MemoryStream(frameBytes))
+                                        {
+                                            await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
+                                        }
+                                        if (DashboardView.Visibility == Visibility.Visible) LocalWebcamPreview.Source = bitmap;
+                                        if (ContextView.Visibility == Visibility.Visible) ContextWebcamPreview.Source = bitmap;
+                                    }
+
+                                    _latestWebcamFrameBytes = frameBytes;
+                                }
+                                catch { }
+                            });
+                        }
+
+                        try
+                        {
+                            await Task.Delay(33, token).ConfigureAwait(false); // ~30 fps cap
+                        }
+                        catch (TaskCanceledException) { break; }
+                    }
+                }, token);
+            }
+            catch (Exception ex)
+            {
+                Log($"[Webcam] Failed to start '{(_videoDevices?[index].Name ?? "?")}': {ex.Message}");
+                if (_cvCapture != null)
+                {
+                    try { _cvCapture.Release(); _cvCapture.Dispose(); } catch { }
+                    _cvCapture = null;
+                }
+            }
+
+            await Task.CompletedTask;
+        }
+
+        /// <summary>Enumerate cameras and populate the ComboBox.</summary>
+        private async Task LoadCameraList()
+        {
+            try
+            {
+                _videoDevices = await Windows.Devices.Enumeration.DeviceInformation
+                    .FindAllAsync(Windows.Devices.Enumeration.DeviceClass.VideoCapture);
+
+                CameraComboBox.Items.Clear();
+
+                if (_videoDevices.Count == 0)
+                {
+                    Log("[Webcam] No cameras found.");
+                    return;
+                }
+
+                foreach (var device in _videoDevices)
+                    CameraComboBox.Items.Add(device.Name);
+
+                // Auto-select Creative camera if present, else first available
+                int defaultIdx = 0;
+                for (int i = 0; i < _videoDevices.Count; i++)
+                {
+                    if (_videoDevices[i].Name.Contains("Creative", StringComparison.OrdinalIgnoreCase))
+                    { defaultIdx = i; break; }
+                }
+
+                CameraComboBox.SelectedIndex = defaultIdx;
+                Log($"[Webcam] {_videoDevices.Count} camera(s) found. Selected: {_videoDevices[defaultIdx].Name}");
+            }
+            catch (Exception ex)
+            {
+                Log($"[Webcam] Failed to enumerate cameras: {ex.Message}");
+            }
+        }
+
+
+        private async void CameraComboBox_SelectionChanged(object sender, Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs e)
+        {
+            int idx = CameraComboBox.SelectedIndex;
+            if (idx >= 0) await StartCameraByIndex(idx);
+        }
+
+        private async void RefreshCamerasButton_Click(object sender, RoutedEventArgs e)
+        {
+            Log("[Webcam] Refreshing camera list...");
+            await LoadCameraList();
+        }
 
         private void UpdateRobotStatus(bool isConnected)
         {
@@ -803,10 +986,6 @@ namespace RobotControllerApp
                 _settings.GeminiApiKey = GeminiApiKeyInput.Password.Trim();
                 _settings.TripoApiKey = TripoApiKeyInput.Password.Trim();
                 _settings.Use3DApiMode = Use3DApiModeToggle.IsOn;
-
-                if (BananaModelComboBox.SelectedIndex == 1) _settings.BananaModel = "gemini-3.1-flash-image-preview";
-                else if (BananaModelComboBox.SelectedIndex == 2) _settings.BananaModel = "gemini-3-pro-image-preview";
-                else _settings.BananaModel = "gemini-2.5-flash-image";
                 _settings.Save();
                 _robotBridge.RosIp = SanitizeIp(_settings.RobotIp);
                 _robotBridge2.RosIp = SanitizeIp(_settings.Robot2Ip);
@@ -862,16 +1041,6 @@ namespace RobotControllerApp
             {
                 Log($"[Critical] Save Settings Error: {ex.Message}");
             }
-        }
-
-        private void BananaModelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_settings == null || BananaModelComboBox == null) return;
-            if (BananaModelComboBox.SelectedIndex == 1) _settings.BananaModel = "gemini-3.1-flash-image-preview";
-            else if (BananaModelComboBox.SelectedIndex == 2) _settings.BananaModel = "gemini-3-pro-image-preview";
-            else _settings.BananaModel = "gemini-2.5-flash-image";
-
-            UpdateBananaCost();
         }
 
         // ─── Log state ─────────────────────────────────────────────────────────
@@ -1043,7 +1212,7 @@ namespace RobotControllerApp
                 string assetsDir = System.IO.Path.Combine(
                     System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "",
                     "Assets");
-
+                
                 SceneWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
                     "app.local", assetsDir, Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
 
@@ -1108,63 +1277,63 @@ namespace RobotControllerApp
 
                 double safeCamZ = Math.Max(0.01, Math.Abs(camZ));
 
-                var items = _detectedObjects.Select(obj =>
-                {
-                    double uNorm = (obj.UvXmin + obj.UvXmax) / 2.0 / 1000.0;
-                    double vNorm = (obj.UvYmin + obj.UvYmax) / 2.0 / 1000.0;
-                    double pixU = uNorm * frameW;
-                    double pixV = vNorm * frameH;
-
-                    // 1. Cast a straight optical ray out of the Camera Lens
-                    double rayCamX = (pixU - cx) / fx;
-                    double rayCamY = (pixV - cy) / fy;
-                    double rayCamZ = 1.0;
-
-                    // 2. Rotate that ray into the Real World (Table Space) using R^T
-                    double rayObjX = r11 * rayCamX + r12 * rayCamY + r13 * rayCamZ;
-                    double rayObjY = r21 * rayCamX + r22 * rayCamY + r23 * rayCamZ;
-                    double rayObjZ = r31 * rayCamX + r32 * rayCamY + r33 * rayCamZ;
-
-                    // 3. Find exactly where the rotated ray hits the table surface (Z = 0)
-                    double t = 0;
-                    if (rayObjZ < -1e-4) // Ensure ray points downwards towards the table
+                    var items = _detectedObjects.Select(obj =>
                     {
-                        t = -safeCamZ / rayObjZ;
-                    }
+                        double uNorm = (obj.UvXmin + obj.UvXmax) / 2.0 / 1000.0;
+                        double vNorm = (obj.UvYmin + obj.UvYmax) / 2.0 / 1000.0;
+                        double pixU = uNorm * frameW;
+                        double pixV = vNorm * frameH;
 
-                    double worldX = camX;
-                    double worldY = camY;
-                    double sizeW = 0.05, sizeH = 0.05;
+                        // 1. Cast a straight optical ray out of the Camera Lens
+                        double rayCamX = (pixU - cx) / fx;
+                        double rayCamY = (pixV - cy) / fy;
+                        double rayCamZ = 1.0;
 
-                    // 4. Apply the physical intersection distance (t)
-                    if (t > 0)
-                    {
-                        worldX = camX + (t * rayObjX);
-                        worldY = camY + (t * rayObjY);
+                        // 2. Rotate that ray into the Real World (Table Space) using R^T
+                        double rayObjX = r11 * rayCamX + r12 * rayCamY + r13 * rayCamZ;
+                        double rayObjY = r21 * rayCamX + r22 * rayCamY + r23 * rayCamZ;
+                        double rayObjZ = r31 * rayCamX + r32 * rayCamY + r33 * rayCamZ;
 
-                        // Scale bounding box by the actual physical distance to the table
-                        double bboxWNorm = (obj.UvXmax - obj.UvXmin) / 1000.0;
-                        double bboxHNorm = (obj.UvYmax - obj.UvYmin) / 1000.0;
-                        sizeW = t * bboxWNorm * frameW / fx;
-                        sizeH = t * bboxHNorm * frameH / fy;
-                    }
+                        // 3. Find exactly where the rotated ray hits the table surface (Z = 0)
+                        double t = 0;
+                        if (rayObjZ < -1e-4) // Ensure ray points downwards towards the table
+                        {
+                            t = -safeCamZ / rayObjZ;
+                        }
 
-                    var libItem = _libraryConfig.FirstOrDefault(x => string.Equals(x.Name, obj.Name, StringComparison.OrdinalIgnoreCase));
-                    string modelUrl = libItem != null && !string.IsNullOrEmpty(libItem.ModelFileName)
-                        ? $"http://library.local/{libItem.ModelFileName}"
-                        : "";
+                        double worldX = camX;
+                        double worldY = camY;
+                        double sizeW = 0.05, sizeH = 0.05;
 
-                    return new
-                    {
-                        label = obj.Name,
-                        worldX,
-                        worldY,
-                        sizeW,
-                        sizeH,
-                        angleRad = obj.AngleDegrees * Math.PI / 180.0,
-                        modelUrl
-                    };
-                }).ToList();
+                        // 4. Apply the physical intersection distance (t)
+                        if (t > 0)
+                        {
+                            worldX = camX + (t * rayObjX);
+                            worldY = camY + (t * rayObjY);
+
+                            // Scale bounding box by the actual physical distance to the table
+                            double bboxWNorm = (obj.UvXmax - obj.UvXmin) / 1000.0;
+                            double bboxHNorm = (obj.UvYmax - obj.UvYmin) / 1000.0;
+                            sizeW = t * bboxWNorm * frameW / fx;
+                            sizeH = t * bboxHNorm * frameH / fy;
+                        }
+
+                        var libItem = _libraryConfig.FirstOrDefault(x => string.Equals(x.Name, obj.Name, StringComparison.OrdinalIgnoreCase));
+                        string modelUrl = libItem != null && !string.IsNullOrEmpty(libItem.ModelFileName) 
+                            ? $"http://library.local/{libItem.ModelFileName}" 
+                            : "";
+
+                        return new
+                        {
+                            label = obj.Name,
+                            worldX,
+                            worldY,
+                            sizeW,
+                            sizeH,
+                            angleRad = obj.AngleDegrees * Math.PI / 180.0,
+                            modelUrl
+                        };
+                    }).ToList();
 
                 string json = System.Text.Json.JsonSerializer.Serialize(items);
                 json = json.Replace("\\", "\\\\").Replace("'", "\\'");
@@ -1185,23 +1354,12 @@ namespace RobotControllerApp
             if (!_webViewReady) return;
             try
             {
-                var poseObj = new
-                {
-                    pose.X,
-                    pose.Y,
-                    pose.Z,
-                    pose.Rx,
-                    pose.Ry,
-                    pose.Rz,
-                    pose.R11,
-                    pose.R12,
-                    pose.R13,
-                    pose.R21,
-                    pose.R22,
-                    pose.R23,
-                    pose.R31,
-                    pose.R32,
-                    pose.R33
+                var poseObj = new { 
+                    pose.X, pose.Y, pose.Z, 
+                    pose.Rx, pose.Ry, pose.Rz,
+                    pose.R11, pose.R12, pose.R13,
+                    pose.R21, pose.R22, pose.R23,
+                    pose.R31, pose.R32, pose.R33
                 };
                 string json = System.Text.Json.JsonSerializer.Serialize(poseObj);
                 json = json.Replace("\\", "\\\\").Replace("'", "\\'");
@@ -1710,5 +1868,1205 @@ namespace RobotControllerApp
             DrawNetworkGraph();
         }
 
+        private Windows.UI.Color ColorFromLabel(string label)
+        {
+            string l = label.ToLower();
+            if (l.Contains("dark blue") || l.Contains("navy")) return Windows.UI.Color.FromArgb(255, 0, 0, 128);
+            if (l.Contains("blue")) return Microsoft.UI.Colors.Blue;
+            if (l.Contains("red")) return Microsoft.UI.Colors.Red;
+            if (l.Contains("lime")) return Microsoft.UI.Colors.Lime;
+            if (l.Contains("green")) return Windows.UI.Color.FromArgb(255, 0, 153, 0);
+            if (l.Contains("yellow")) return Microsoft.UI.Colors.Yellow;
+            if (l.Contains("orange")) return Microsoft.UI.Colors.Orange;
+            if (l.Contains("grey") || l.Contains("gray")) return Microsoft.UI.Colors.Gray;
+            if (l.Contains("black")) return Windows.UI.Color.FromArgb(255, 51, 51, 51);
+            if (l.Contains("pink")) return Microsoft.UI.Colors.Pink;
+            if (l.Contains("purple") || l.Contains("magenta")) return Microsoft.UI.Colors.Purple;
+            if (l.Contains("brown")) return Microsoft.UI.Colors.Brown;
+            return Microsoft.UI.Colors.White;
+        }
+
+        private async void GenerateObjectImagesBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(_settings.OrangeApiKey))
+            {
+                await new ContentDialog() { Title = "No API Key", Content = "Please define the Orange API Key in Settings.", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                return;
+            }
+
+            if (_latestWebcamFrameBytes == null)
+            {
+                await new ContentDialog() { Title = "No Camera Frame", Content = "Start the webcam first.", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                return;
+            }
+
+            await AnalyzeSceneAsync();
+        }
+
+        private async Task AnalyzeSceneAsync()
+        {
+            if (_latestWebcamFrameBytes == null || _latestWebcamFrameBytes.Length == 0) return;
+
+            GenerateObjectImagesBtn.IsEnabled = false;
+            GenerationProgress.Visibility = Visibility.Visible;
+            GenerationProgress.IsActive = true;
+
+            try
+            {
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromSeconds(15);
+                string url = "https://llmproxy.ai.orange/v1/chat/completions";
+
+                string base64Image = Convert.ToBase64String(_latestWebcamFrameBytes);
+
+                string prompt =
+                    "Identify all distinct physical objects (tools, parts, shapes) visible on the table. " +
+                    "IGNORE the chessboard/checkerboard calibration target. IGNORE any robot arms or parts of the robot. " +
+                    "For each, return normalised bounding box corners [ymin, xmin, ymax, xmax] in range 0–1000, " +
+                    "an estimated physical 'angle_degrees' (from 0 to 360, where 0 means pointing forward/away from the camera, 90 pointing to the right of the table) representing the object spatial orientation, " +
+                    "and a label starting with the object's colour. " +
+                    "RETURN JSON: { \"items\": [ { \"ymin\": 100, \"xmin\": 100, \"ymax\": 200, \"xmax\": 200, \"angle_degrees\": 45, \"label\": \"blue cube\" } ] }";
+
+                string safePrompt = prompt.Replace("\"", "\\\"").Replace("\n", "\\n");
+
+                string selectedModel = "vertex_ai/gemini-2.0-flash";
+
+                string body =
+                    $"{{\"model\": \"{selectedModel}\", \"temperature\": 0.0, " +
+                    $"\"response_format\": {{\"type\": \"json_object\"}}, " +
+                    $"\"messages\": [{{\"role\": \"user\", \"content\": [" +
+                    $"{{\"type\": \"text\", \"text\": \"{safePrompt}\"}}, " +
+                    $"{{\"type\": \"image_url\", \"image_url\": {{\"url\": \"data:image/jpeg;base64,{base64Image}\"}}}}]}}]}}";
+
+                var content = new StringContent(body, System.Text.Encoding.UTF8, "application/json");
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _settings.OrangeApiKey);
+
+                var response = await client.PostAsync(url, content);
+                var responseString = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    using var doc = System.Text.Json.JsonDocument.Parse(responseString);
+                    _detectedObjects.Clear();
+
+                    if (doc.RootElement.TryGetProperty("usage", out var usageProp))
+                    {
+                        double pTokens = usageProp.TryGetProperty("prompt_token_count", out var pt) ? pt.GetDouble() : 0.0;
+                        double cTokens = usageProp.TryGetProperty("candidates_token_count", out var ct) ? ct.GetDouble() : 0.0;
+
+                        // Fallback checking standard OpenAI-style properties if Google ones are empty
+                        if (pTokens == 0) pTokens = usageProp.TryGetProperty("prompt_tokens", out var pt2) ? pt2.GetDouble() : 0.0;
+                        if (cTokens == 0) cTokens = usageProp.TryGetProperty("completion_tokens", out var ct2) ? ct2.GetDouble() : 0.0;
+
+                        // Pricing per 1M tokens based on selected model
+                        double priceInX1M = 0;
+                        double priceOutX1M = 0;
+
+                        switch (selectedModel)
+                        {
+                            case "vertex_ai/gemini-2.0-flash":
+                                priceInX1M = 0.15; priceOutX1M = 0.60; break;
+                            case "vertex_ai/gemini-2.5-flash":
+                                priceInX1M = 0.30; priceOutX1M = 2.50; break;
+                            case "vertex_ai/gemini-2.5-flash-lite":
+                                priceInX1M = 0.10; priceOutX1M = 0.40; break;
+                            default:
+                                priceInX1M = 0.15; priceOutX1M = 0.60; break;
+                        }
+
+                        double costUsd = (pTokens / 1_000_000.0 * priceInX1M) + (cTokens / 1_000_000.0 * priceOutX1M);
+                        double costEur = costUsd * 0.94; // Approx USD -> EUR
+                        _totalGeminiCost += costEur;
+                        GeminiCostText.Text = $"Estimated Gemini Cost: {_totalGeminiCost:0.00000} €";
+                    }
+
+                    var choices = doc.RootElement.GetProperty("choices");
+                    if (choices.GetArrayLength() > 0)
+                    {
+                        var messageContent = choices[0].GetProperty("message").GetProperty("content").GetString();
+                        if (!string.IsNullOrEmpty(messageContent))
+                        {
+                            int s = messageContent.IndexOf('{');
+                            int eIdx = messageContent.LastIndexOf('}');
+                            if (s >= 0 && eIdx > s)
+                            {
+                                string jsonStr = messageContent.Substring(s, eIdx - s + 1);
+                                using var itemsDoc = System.Text.Json.JsonDocument.Parse(jsonStr);
+                                if (itemsDoc.RootElement.TryGetProperty("items", out var itemsArray))
+                                {
+                                    using var sourceMat = OpenCvSharp.Cv2.ImDecode(_latestWebcamFrameBytes, OpenCvSharp.ImreadModes.Color);
+                                    int imgW = sourceMat.Width;
+                                    int imgH = sourceMat.Height;
+
+                                    foreach (var item in itemsArray.EnumerateArray())
+                                    {
+                                        string label = item.TryGetProperty("label", out var labelProp) ? labelProp.GetString() ?? "Unknown" : "Unknown";
+
+                                        int ymin = 0, xmin = 0, ymax = 0, xmax = 0;
+                                        if (item.TryGetProperty("box_2d", out var box2d) && box2d.GetArrayLength() >= 4)
+                                        {
+                                            ymin = box2d[0].GetInt32();
+                                            xmin = box2d[1].GetInt32();
+                                            ymax = box2d[2].GetInt32();
+                                            xmax = box2d[3].GetInt32();
+                                        }
+                                        else
+                                        {
+                                            int.TryParse(item.GetProperty("ymin").ToString(), out ymin);
+                                            int.TryParse(item.GetProperty("xmin").ToString(), out xmin);
+                                            int.TryParse(item.GetProperty("ymax").ToString(), out ymax);
+                                            int.TryParse(item.GetProperty("xmax").ToString(), out xmax);
+                                        }
+
+                                        double angleDegrees = 0;
+                                        if (item.TryGetProperty("angle_degrees", out var angleProp))
+                                            angleProp.TryGetDouble(out angleDegrees);
+
+                                        // Ignore objects cut off by the edge of the camera
+                                        if (xmin < 10 || ymin < 10 || xmax > 990 || ymax > 990) continue;
+
+                                        int pixelXMin = (int)(xmin * imgW / 1000.0);
+                                        int pixelYMin = (int)(ymin * imgH / 1000.0);
+                                        int pixelXMax = (int)(xmax * imgW / 1000.0);
+                                        int pixelYMax = (int)(ymax * imgH / 1000.0);
+
+                                        int width = pixelXMax - pixelXMin;
+                                        int height = pixelYMax - pixelYMin;
+                                        int padX = (int)(width * 0.40);
+                                        int padY = (int)(height * 0.40);
+
+                                        pixelXMin = Math.Max(0, pixelXMin - padX);
+                                        pixelYMin = Math.Max(0, pixelYMin - padY);
+                                        pixelXMax = Math.Min(imgW, pixelXMax + padX);
+                                        pixelYMax = Math.Min(imgH, pixelYMax + padY);
+
+                                        var rect = new OpenCvSharp.Rect(pixelXMin, pixelYMin, pixelXMax - pixelXMin, pixelYMax - pixelYMin);
+                                        rect.Width = Math.Min(imgW - rect.X, rect.Width);
+                                        rect.Height = Math.Min(imgH - rect.Y, rect.Height);
+
+                                        if (rect.Width > 0 && rect.Height > 0)
+                                        {
+                                            using var cropMat = new OpenCvSharp.Mat(sourceMat, rect);
+                                            byte[] cropJpgBytes = cropMat.ImEncode(".jpg");
+
+                                            var bitmap = new BitmapImage();
+                                            using var ms = new System.IO.MemoryStream(cropJpgBytes);
+                                            await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
+
+                                            string objName = label.ToUpper();
+                                            bool isAlreadyInLibrary = _libraryConfig.Any(x => x.Name.Equals(objName, StringComparison.OrdinalIgnoreCase));
+
+                                            var uiColor = ColorFromLabel(label);
+
+
+                                            _detectedObjects.Add(new DetectedObjectViewModel
+                                            {
+                                                Name = objName,
+                                                ColorBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(uiColor),
+                                                CroppedImage = bitmap,
+                                                CropJpgBytes = cropJpgBytes,
+                                                IsAlreadyInLibrary = isAlreadyInLibrary,
+                                                UvXmin = xmin,
+                                                UvYmin = ymin,
+                                                UvXmax = xmax,
+                                                UvYmax = ymax,
+                                                AngleDegrees = angleDegrees
+                                            });
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                // Live-sync to 3D preview if open
+                if (_webViewReady) _ = PushObjectsToSceneAsync();
+                else
+                {
+                    if (AutoScanToggle.IsChecked != true)
+                        await new ContentDialog() { Title = "API Error", Content = $"Error from Orange API:\n{responseString}", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                }
+            }
+            catch (Exception ex)
+            {
+                if (AutoScanToggle.IsChecked != true)
+                    await new ContentDialog() { Title = "Execution Error", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+            }
+            finally
+            {
+                if (AutoScanToggle.IsChecked != true)
+                {
+                    GenerateObjectImagesBtn.IsEnabled = true;
+                    GenerateObjectImagesBtn.Content = "Analyze Scene Manually";
+                }
+                GenerationProgress.IsActive = false;
+                GenerationProgress.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        private void AutoScanToggle_Click(object sender, RoutedEventArgs e)
+        {
+            if (AutoScanToggle.IsChecked == true)
+            {
+                AutoScanToggle.Content = "■ Stop Auto-Scan";
+                AutoScanToggle.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 150, 0));
+
+                GenerateObjectImagesBtn.IsEnabled = false;
+                GenerateObjectImagesBtn.Content = "Auto-Scan Running...";
+
+                _autoScanTimer.Start();
+                _ = AnalyzeSceneAsync();
+            }
+            else
+            {
+                AutoScanToggle.Content = "Auto-Scan (8x/min)";
+                AutoScanToggle.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 51, 51, 51));
+
+                GenerateObjectImagesBtn.IsEnabled = true;
+                GenerateObjectImagesBtn.Content = "Analyze Scene Manually";
+
+                _autoScanTimer.Stop();
+            }
+        }
+
+        private void AddSelectedObject_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is DetectedObjectViewModel item)
+            {
+                if (!_selectedForBanana.Any(x => x.Name == item.Name))
+                {
+                    _selectedForBanana.Add(item);
+                    UpdateBananaCost();
+                }
+            }
+        }
+
+        private void RemoveSelectedObject_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is DetectedObjectViewModel item)
+            {
+                _selectedForBanana.Remove(item);
+                UpdateBananaCost();
+            }
+        }
+
+        private void UpdateBananaCost()
+        {
+            double newObjectsCount = _selectedForBanana.Count;
+            double costEuro = (newObjectsCount * 0.0672) * 0.94; // approx USD to EUR
+            BananaCostText.Text = $"Queue: {costEuro:0.00} € | Total Spent: {_totalBananaCost:0.00} €";
+        }
+
+        private void DeleteLibraryObject_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is LibraryItemViewModel item)
+            {
+                _libraryItems.Remove(item);
+                string name = item.Name;
+
+                var configData = _libraryConfig.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
+                if (configData != null)
+                {
+                    _libraryConfig.Remove(configData);
+                    SaveLibrary();
+
+                    try
+                    {
+                        string imgPath = Path.Combine(LibraryPath, configData.ImageFileName);
+                        if (File.Exists(imgPath)) File.Delete(imgPath);
+
+                        // Delete the explicitly linked 3D model if present
+                        if (!string.IsNullOrEmpty(configData.ModelFileName))
+                        {
+                            string linkedGlbPath = Path.Combine(LibraryPath, configData.ModelFileName);
+                            if (File.Exists(linkedGlbPath)) File.Delete(linkedGlbPath);
+                        }
+
+                        // Fallback: Also delete the associated 3D model if it was generated before the JSON link fix
+                        string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
+                        string glbFileNameFallback = $"{safeName}_3DModel.glb";
+                        string glbPath = Path.Combine(LibraryPath, glbFileNameFallback);
+                        if (File.Exists(glbPath)) File.Delete(glbPath);
+                        
+                        // Clean up the incorrectly spaced one just in case they have it from before
+                        string oldBrokenGlbPath = Path.Combine(LibraryPath, $"{item.Name.Replace(" ", "_")}_3DModel.glb");
+                        if (File.Exists(oldBrokenGlbPath)) File.Delete(oldBrokenGlbPath);
+                    }
+                    catch { }
+                }
+
+                // Re-enable scene detection item if it exists in the current session
+                var sceneItems = _detectedObjects.Where(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
+                foreach (var sceneItem in sceneItems)
+                {
+                    sceneItem.IsAlreadyInLibrary = false;
+                    var idx = _detectedObjects.IndexOf(sceneItem);
+                    if (idx >= 0) _detectedObjects[idx] = sceneItem; // trigger redraw
+                }
+            }
+        }
+
+        private void OpenLibraryFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (Directory.Exists(LibraryPath))
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo()
+                    {
+                        FileName = "explorer.exe",
+                        Arguments = $"\"{LibraryPath}\"",
+                        UseShellExecute = true
+                    });
+                }
+            }
+            catch (Exception)
+            {
+                // Ignore silent failure or log if necessary
+            }
+        }
+
+        private void Generate3DModel_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is LibraryItemViewModel item)
+            {
+                string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
+                string glbPath = Path.Combine(LibraryPath, $"{safeName}_3DModel.glb");
+
+                var configData = _libraryConfig.FirstOrDefault(c => string.Equals(c.Name, item.Name, StringComparison.OrdinalIgnoreCase));
+                
+                if (configData != null && !string.IsNullOrEmpty(configData.ModelFileName))
+                {
+                    glbPath = Path.Combine(LibraryPath, configData.ModelFileName);
+                }
+
+                if (File.Exists(glbPath))
+                {
+                    btn.Content = "Generated";
+                    btn.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.SeaGreen);
+                    btn.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+                    btn.IsEnabled = false;
+                }
+                else
+                {
+                    btn.Content = "To 3D Model";
+                    btn.ClearValue(Button.BackgroundProperty);
+                    btn.ClearValue(Button.ForegroundProperty);
+                    btn.IsEnabled = true;
+                }
+            }
+        }
+
+        // ── Tripo mode badge helper ───────────────────────────────────────────
+        private void UpdateModelModeBadge(bool apiMode)
+        {
+            if (ModelModeBadge == null || ModelModeBadgeText == null) return;
+            if (apiMode)
+            {
+                ModelModeBadgeText.Text = "CLOUD API";
+                ModelModeBadgeText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
+                ModelModeBadge.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(40, 0, 204, 106));
+            }
+            else
+            {
+                ModelModeBadgeText.Text = "LOCAL";
+                ModelModeBadgeText.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 85, 153, 255));
+                ModelModeBadge.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(40, 0, 64, 128));
+            }
+        }
+
+        private void Use3DApiModeToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            bool isOn = Use3DApiModeToggle.IsOn;
+            _settings.Use3DApiMode = isOn;
+            _settings.Save();
+            UpdateModelModeBadge(isOn);
+        }
+
+        private async void Generate3DModel_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button btn && btn.DataContext is LibraryItemViewModel item)
+            {
+                var configData = _libraryConfig.FirstOrDefault(x => x.Name == item.Name);
+                if (configData == null) return;
+
+                if (_settings.Use3DApiMode)
+                    await Generate3DModel_ApiAsync(btn, item, configData);
+                else
+                    await Generate3DModel_LocalAsync(btn, item, configData);
+            }
+        }
+
+        // ── LOCAL TripoSR mode ────────────────────────────────────────────────
+        private async Task Generate3DModel_LocalAsync(Button btn, LibraryItemViewModel item, LibraryItemConfig configData)
+        {
+            btn.IsEnabled = false;
+            string originalContent = btn.Content?.ToString() ?? "To 3D Model";
+            btn.Content = "Starting TripoSR...";
+
+            bool serverWasAlreadyRunning = false;
+            System.Diagnostics.Process? tripoProcess = null;
+            bool generationSuccess = false;
+
+            try
+            {
+                // Check if server is already running
+                try
+                {
+                    using var testClient = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+                    var res = await testClient.GetAsync("http://127.0.0.1:7860/");
+                    serverWasAlreadyRunning = true;
+                }
+                catch { }
+
+                if (!serverWasAlreadyRunning)
+                {
+                    tripoProcess = new System.Diagnostics.Process();
+                    tripoProcess.StartInfo.FileName = @"C:\Users\QYTH4815\TripoSR-windows\run.bat";
+                    tripoProcess.StartInfo.WorkingDirectory = @"C:\Users\QYTH4815\TripoSR-windows";
+                    tripoProcess.StartInfo.UseShellExecute = true;
+                    tripoProcess.StartInfo.CreateNoWindow = false;
+                    tripoProcess.Start();
+                }
+
+                btn.Content = "Generating 3D...";
+
+                string imgPath = Path.Combine(LibraryPath, configData.ImageFileName);
+                byte[] pngImageData = await File.ReadAllBytesAsync(imgPath);
+                string base64Image = Convert.ToBase64String(pngImageData);
+                string dataUri = $"data:image/png;base64,{base64Image}";
+
+                var requestBody = new
+                {
+                    data = new object[]
+                    {
+                        new { path = imgPath, url = dataUri }
+                    }
+                };
+
+                var json = System.Text.Json.JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
+
+                using var client = new HttpClient();
+                client.Timeout = TimeSpan.FromMinutes(10);
+
+                HttpResponseMessage? response = null;
+                int maxRetries = 90;
+                for (int i = 0; i < maxRetries; i++)
+                {
+                    try
+                    {
+                        response = await client.PostAsync("http://127.0.0.1:7860/api/predict", content);
+                        break;
+                    }
+                    catch
+                    {
+                        if (i == maxRetries - 1) throw;
+                        await Task.Delay(2000);
+                    }
+                }
+
+                if (response == null || !response.IsSuccessStatusCode)
+                    throw new Exception("Le serveur TripoSR n'a pas répondu. Vérifiez que run.bat fonctionne correctement.");
+
+                var responseString = await response.Content.ReadAsStringAsync();
+
+                using (System.Text.Json.JsonDocument doc = System.Text.Json.JsonDocument.Parse(responseString))
+                {
+                    var resultData = doc.RootElement.GetProperty("data")[0];
+                    string? fileNameStr = null;
+
+                    if (resultData.ValueKind == System.Text.Json.JsonValueKind.String)
+                    {
+                        fileNameStr = resultData.GetString();
+                    }
+                    else if (resultData.ValueKind == System.Text.Json.JsonValueKind.Object)
+                    {
+                        if (resultData.TryGetProperty("path", out var pathProp) && pathProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                            fileNameStr = pathProp.GetString();
+                        else if (resultData.TryGetProperty("name", out var nameProp) && nameProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                            fileNameStr = nameProp.GetString();
+                        else if (resultData.TryGetProperty("url", out var urlProp) && urlProp.ValueKind == System.Text.Json.JsonValueKind.String)
+                            fileNameStr = urlProp.GetString();
+                    }
+
+                    if (!string.IsNullOrEmpty(fileNameStr))
+                    {
+                        string fileUrl = fileNameStr.StartsWith("http")
+                            ? fileNameStr
+                            : $"http://127.0.0.1:7860/file={fileNameStr}";
+
+                        byte[] glbBytes = await client.GetByteArrayAsync(fileUrl);
+
+                        string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
+                        string glbFileName = $"{safeName}_3DModel.glb";
+                        string glbPath = Path.Combine(LibraryPath, glbFileName);
+                        await File.WriteAllBytesAsync(glbPath, glbBytes);
+
+                        configData.ModelFileName = glbFileName;
+                        SaveLibrary();
+
+                        generationSuccess = true;
+                    }
+                    else
+                    {
+                        throw new Exception("Format de réponse inattendu. Json reçu :\n" + responseString.Substring(0, Math.Min(responseString.Length, 500)));
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                await new ContentDialog() { Title = "Erreur TripoSR", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+            }
+            finally
+            {
+                if (!serverWasAlreadyRunning && tripoProcess != null && !tripoProcess.HasExited)
+                {
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("taskkill", $"/F /T /PID {tripoProcess.Id}")
+                        {
+                            WindowStyle = System.Diagnostics.ProcessWindowStyle.Hidden,
+                            CreateNoWindow = true
+                        })?.WaitForExit();
+                    }
+                    catch { }
+                }
+                if (generationSuccess)
+                {
+                    btn.Content = "Generated";
+                    btn.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.SeaGreen);
+                    btn.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+                }
+                else
+                {
+                    btn.Content = "To 3D Model";
+                    btn.IsEnabled = true;
+                }
+            }
+        }
+
+        // ── CLOUD API Tripo3D mode ────────────────────────────────────────────
+        private async Task Generate3DModel_ApiAsync(Button btn, LibraryItemViewModel item, LibraryItemConfig configData)
+        {
+            if (string.IsNullOrWhiteSpace(_settings.TripoApiKey))
+            {
+                await new ContentDialog() { Title = "Clé API manquante", Content = "Veuillez définir la clé Tripo3D API dans les paramètres.", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                return;
+            }
+
+            btn.IsEnabled = false;
+            string originalContent = btn.Content?.ToString() ?? "To 3D Model";
+            bool generationSuccess = false;
+
+            try
+            {
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _settings.TripoApiKey);
+                client.Timeout = TimeSpan.FromMinutes(10);
+
+                // ── 1. Upload image ──────────────────────────────────────────
+                btn.Content = "Uploading image...";
+                string imgPath = Path.Combine(LibraryPath, configData.ImageFileName);
+                byte[] imgBytes = await File.ReadAllBytesAsync(imgPath);
+
+                string uploadTaskId;
+                using (var formData = new MultipartFormDataContent())
+                {
+                    var imageContent = new ByteArrayContent(imgBytes);
+                    imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+                    formData.Add(imageContent, "file", "image.png");
+
+                    var uploadRes = await client.PostAsync("https://api.tripo3d.ai/v2/openapi/upload", formData);
+                    var uploadStr = await uploadRes.Content.ReadAsStringAsync();
+                    if (!uploadRes.IsSuccessStatusCode)
+                        throw new Exception($"Erreur upload Tripo3D ({uploadRes.StatusCode}):\n{uploadStr}");
+
+                    using var uploadDoc = System.Text.Json.JsonDocument.Parse(uploadStr);
+                    var uploadData = uploadDoc.RootElement.GetProperty("data");
+                    string fileToken = uploadData.GetProperty("image_token").GetString()
+                        ?? throw new Exception("Tripo3D: image_token non reçu.");
+
+                    // ── 2. Create image-to-model task ────────────────────────
+                    btn.Content = "Creating task...";
+                    var taskPayload = new
+                    {
+                        type = "image_to_model",
+                        file = new { type = "png", file_token = fileToken },
+                        // Turbo is blazing fast and generates lightweight low-fidelity models perfect for our 3D tabletop preview
+                        model_version = "Turbo-v1.0-20250506", 
+                        texture = true
+                    };
+                    var taskJson = System.Text.Json.JsonSerializer.Serialize(taskPayload);
+                    var taskContent = new StringContent(taskJson, System.Text.Encoding.UTF8, "application/json");
+
+                    var taskRes = await client.PostAsync("https://api.tripo3d.ai/v2/openapi/task", taskContent);
+                    var taskStr = await taskRes.Content.ReadAsStringAsync();
+                    if (!taskRes.IsSuccessStatusCode)
+                        throw new Exception($"Erreur création task Tripo3D ({taskRes.StatusCode}):\n{taskStr}");
+
+                    using var taskDoc = System.Text.Json.JsonDocument.Parse(taskStr);
+                    uploadTaskId = taskDoc.RootElement.GetProperty("data").GetProperty("task_id").GetString()
+                        ?? throw new Exception("Tripo3D: task_id non reçu.");
+                }
+
+                // ── 3. Poll status ───────────────────────────────────────────
+                btn.Content = "Generating 3D (API)...";
+                string? glbUrl = null;
+                for (int attempt = 0; attempt < 120; attempt++) // max ~4 min
+                {
+                    await Task.Delay(2000);
+                    var pollRes = await client.GetAsync($"https://api.tripo3d.ai/v2/openapi/task/{uploadTaskId}");
+                    var pollStr = await pollRes.Content.ReadAsStringAsync();
+                    if (!pollRes.IsSuccessStatusCode)
+                        throw new Exception($"Erreur poll Tripo3D ({pollRes.StatusCode}):\n{pollStr}");
+
+                    using var pollDoc = System.Text.Json.JsonDocument.Parse(pollStr);
+                    var pollData = pollDoc.RootElement.GetProperty("data");
+                    string status = pollData.GetProperty("status").GetString() ?? "";
+                    int progress = pollData.TryGetProperty("progress", out var prog) ? prog.GetInt32() : 0;
+
+                    btn.Content = $"Generating 3D (API) {progress}%...";
+
+                    if (status == "success")
+                    {
+                        var output = pollData.GetProperty("output");
+                        glbUrl = output.TryGetProperty("model", out var modelProp) ? modelProp.GetString() : null;
+                        glbUrl ??= output.TryGetProperty("pbr_model", out var pbrProp) ? pbrProp.GetString() : null;
+                        glbUrl ??= output.TryGetProperty("base_model", out var baseProp) ? baseProp.GetString() : null;
+                        break;
+                    }
+                    else if (status is "failed" or "cancelled" or "banned" or "expired")
+                    {
+                        throw new Exception($"Tripo3D task terminée avec statut : {status}");
+                    }
+                }
+
+                if (string.IsNullOrEmpty(glbUrl))
+                    throw new Exception("Tripo3D: timeout dépassé ou URL du modèle introuvable.");
+
+                // ── 4. Download GLB ──────────────────────────────────────────
+                btn.Content = "Downloading GLB...";
+                byte[] glbBytes = await client.GetByteArrayAsync(glbUrl);
+
+                string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
+                string glbFileName = $"{safeName}_3DModel.glb";
+                string glbPath = Path.Combine(LibraryPath, glbFileName);
+                await File.WriteAllBytesAsync(glbPath, glbBytes);
+
+                configData.ModelFileName = glbFileName;
+                SaveLibrary();
+
+                generationSuccess = true;
+            }
+            catch (Exception ex)
+            {
+                await new ContentDialog() { Title = "Erreur Tripo3D API", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+            }
+            finally
+            {
+                if (generationSuccess)
+                {
+                    btn.Content = "Generated";
+                    btn.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.SeaGreen);
+                    btn.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+                }
+                else
+                {
+                    btn.Content = "To 3D Model";
+                    btn.IsEnabled = true;
+                }
+            }
+        }
+
+        private async void GenerateBananaProImagesBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (string.IsNullOrWhiteSpace(_settings.GeminiApiKey))
+            {
+                await new ContentDialog() { Title = "No API Key", Content = "Please define the Google Gemini API Key in Settings.", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                return;
+            }
+
+            if (_selectedForBanana.Count == 0)
+            {
+                await new ContentDialog() { Title = "No Detected Objects", Content = "Analyze the scene first and select objects to get cropped images.", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                return;
+            }
+
+            GenerateBananaProImagesBtn.IsEnabled = false;
+            BananaProgress.IsActive = true;
+            BananaProgress.Visibility = Visibility.Visible;
+
+            try
+            {
+                _bananaImages.Clear();
+                using var client = new HttpClient();
+                string url = $"https://generativelanguage.googleapis.com/v1alpha/models/gemini-3.1-flash-image-preview:generateContent?key={_settings.GeminiApiKey}";
+
+                foreach (var obj in _selectedForBanana.ToList())
+                {
+                    if (obj.IsAlreadyInLibrary) continue;
+
+                    if (obj.CropJpgBytes == null || obj.CropJpgBytes.Length == 0) continue;
+
+                    string base64Image = Convert.ToBase64String(obj.CropJpgBytes);
+
+                    bool isGreenish = obj.Name.Contains("GREEN", StringComparison.OrdinalIgnoreCase) || obj.Name.Contains("LIME", StringComparison.OrdinalIgnoreCase) || obj.Name.Contains("TEAL", StringComparison.OrdinalIgnoreCase);
+                    string chromaColorName = isGreenish ? "MAGENTA (#FF00FF)" : "NEON GREEN (#00FF00)";
+
+                    string promptText = $"Extract the physical {obj.Name} shown in this image preserving 100% of its original shape, text, labels, proportions, and perspective. Subtly enhance the object's colors so they look natural and realistic, but slightly cleaner than the raw camera photo. Keep it completely faithful to the original photo input visually, geometrically, and texturally. Your job is to extract this specific {obj.Name} and place it on a pure, solid {chromaColorName} chroma key background. Completely ERASE any other objects (like hands, tools, overlapping items, furniture, floors). IMPORTANT: The {chromaColorName} background must be completely flat, unshaded, with ABSOLUTELY NO SHADOWS, no ambient occlusion, and no reflections under or around the object. Provide a 1:1 square output where the {obj.Name} occupies about 60% of the canvas.";
+
+                    var payload = new
+                    {
+                        contents = new[] {
+                            new {
+                                role = "user",
+                                parts = new object[] {
+                                    new { text = promptText },
+                                    new { inlineData = new { mimeType = "image/jpeg", data = base64Image } }
+                                }
+                            }
+                        }
+                    };
+
+                    var content = new StringContent(System.Text.Json.JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json");
+
+                    var response = await client.PostAsync(url, content);
+                    var responseString = await response.Content.ReadAsStringAsync();
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(responseString);
+                        var candidates = doc.RootElement.GetProperty("candidates");
+                        foreach (var candidate in candidates.EnumerateArray())
+                        {
+                            var parts = candidate.GetProperty("content").GetProperty("parts");
+                            foreach (var part in parts.EnumerateArray())
+                            {
+                                if (part.TryGetProperty("inlineData", out var inlineData))
+                                {
+                                    string? b64 = inlineData.GetProperty("data").GetString();
+                                    if (!string.IsNullOrEmpty(b64))
+                                    {
+                                        byte[] bytes = Convert.FromBase64String(b64);
+                                        byte[] pngBytes;
+
+                                        try
+                                        {
+                                            // Process the Gemini output through OpenCV to remove chroma key background
+                                            using var src = OpenCvSharp.Mat.FromImageData(bytes, OpenCvSharp.ImreadModes.Color);
+                                            using var argb = new OpenCvSharp.Mat();
+                                            OpenCvSharp.Cv2.CvtColor(src, argb, OpenCvSharp.ColorConversionCodes.BGR2BGRA);
+
+                                            using var mask = new OpenCvSharp.Mat();
+
+                                            if (isGreenish)
+                                            {
+                                                // Magenta is high Red and Blue, low Green (OpenCV is BGR)
+                                                OpenCvSharp.Cv2.InRange(src, new OpenCvSharp.Scalar(150, 0, 150), new OpenCvSharp.Scalar(255, 120, 255), mask);
+                                            }
+                                            else
+                                            {
+                                                // Neon Green is high Green, low Red and Blue
+                                                OpenCvSharp.Cv2.InRange(src, new OpenCvSharp.Scalar(0, 150, 0), new OpenCvSharp.Scalar(120, 255, 120), mask);
+                                            }
+
+                                            // Slightly expand the mask and soften it to remove fringing artifacts cleanly
+                                            using var kernel = OpenCvSharp.Cv2.GetStructuringElement(OpenCvSharp.MorphShapes.Ellipse, new OpenCvSharp.Size(3, 3));
+                                            OpenCvSharp.Cv2.Dilate(mask, mask, kernel);
+                                            OpenCvSharp.Cv2.GaussianBlur(mask, mask, new OpenCvSharp.Size(3, 3), 0);
+
+                                            using var maskInv = new OpenCvSharp.Mat();
+                                            OpenCvSharp.Cv2.BitwiseNot(mask, maskInv);
+
+                                            // Apply mask to alpha channel
+                                            var channels = OpenCvSharp.Cv2.Split(argb);
+                                            maskInv.CopyTo(channels[3]); // Transparent where mask was chroma color
+                                            OpenCvSharp.Cv2.Merge(channels, argb);
+
+                                            pngBytes = argb.ImEncode(".png");
+                                            foreach (var c in channels) c.Dispose();
+                                        }
+                                        catch
+                                        {
+                                            pngBytes = bytes; // Fallback
+                                        }
+
+                                        var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                                        using (var ms = new System.IO.MemoryStream(pngBytes))
+                                        {
+                                            await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
+                                        }
+
+                                        _bananaImages.Add(new GeneratedBananaImageModel { Name = obj.Name, ColorBrush = obj.ColorBrush, ImageSource = bitmap });
+
+                                        // Now that we have the 3D render with transparent bg, we add it to persistent Library
+                                        string fileName = Guid.NewGuid().ToString() + ".png";
+                                        string filePath = Path.Combine(LibraryPath, fileName);
+                                        File.WriteAllBytes(filePath, pngBytes);
+
+                                        var uiColor = obj.ColorBrush.Color;
+                                        var hexColor = $"#{uiColor.R:X2}{uiColor.G:X2}{uiColor.B:X2}";
+                                        var newConfig = new LibraryItemConfig
+                                        {
+                                            Name = obj.Name,
+                                            ColorHex = hexColor,
+                                            ImageFileName = fileName,
+                                            DateAdded = DateTime.Now.ToString("g")
+                                        };
+                                        _libraryConfig.Insert(0, newConfig);
+                                        SaveLibrary();
+
+                                        var newVm = new LibraryItemViewModel
+                                        {
+                                            Name = obj.Name,
+                                            ColorBrush = obj.ColorBrush,
+                                            DateAdded = newConfig.DateAdded,
+                                            ImageSource = bitmap
+                                        };
+                                        _libraryItems.Insert(0, newVm);
+                                        _totalBananaCost += (0.0672 * 0.94); // Approx USD -> EUR
+
+
+                                        obj.IsAlreadyInLibrary = true;
+                                        // Update UI opacity immediately
+                                        int objIdx = _detectedObjects.IndexOf(obj);
+                                        if (objIdx >= 0) _detectedObjects[objIdx] = obj;
+
+                                        // Remove from the selection queue since it was successfully processed
+                                        _selectedForBanana.Remove(obj);
+                                        UpdateBananaCost();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    else
+                    {
+                        await new ContentDialog() { Title = $"API Error for {obj.Name}", Content = $"Error from Gemini:\n{responseString}", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                await new ContentDialog() { Title = "Execution Error", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+            }
+            finally
+            {
+                GenerateBananaProImagesBtn.IsEnabled = true;
+                BananaProgress.IsActive = false;
+                BananaProgress.Visibility = Visibility.Collapsed;
+            }
+        }
+        // ════════════════════════════════════════════════════════════════════════
+        // CAMERA CALIBRATION HANDLERS
+        // ════════════════════════════════════════════════════════════════════════
+
+        /// <summary>Fill the calibration camera ComboBox from the already-enumerated _videoDevices.</summary>
+        private void PopulateCalibCameraList()
+        {
+            if (_videoDevices == null) return;
+            CalibCameraComboBox.Items.Clear();
+            foreach (var d in _videoDevices)
+                CalibCameraComboBox.Items.Add(d.Name);
+
+            // Auto-select XiaoMi (over-the-board camera) if present
+            for (int i = 0; i < _videoDevices.Count; i++)
+            {
+                if (_videoDevices[i].Name.Contains("XiaoMi", StringComparison.OrdinalIgnoreCase) ||
+                    _videoDevices[i].Name.Contains("Xiaomi", StringComparison.OrdinalIgnoreCase))
+                { CalibCameraComboBox.SelectedIndex = i; return; }
+            }
+            if (_videoDevices.Count > 1) CalibCameraComboBox.SelectedIndex = 1;
+            else if (_videoDevices.Count > 0) CalibCameraComboBox.SelectedIndex = 0;
+        }
+
+        /// <summary>Camera selection changed — enable the Start button.</summary>
+        private void CalibCameraComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            // Stop any running detection before user switches camera
+            if (_calibService != null)
+            {
+                _calibService.Stop();
+                SetCalibStopped();
+            }
+            StartCalibDetectionBtn.IsEnabled = CalibCameraComboBox.SelectedIndex >= 0;
+
+            // Restore toggle logic if a pose is loaded
+            if (_lastValidPose != null && _isCalibFrozen)
+            {
+                FreezeCalibToggle.IsOn = true;
+                FreezeCalibToggle.IsEnabled = true;
+            }
+        }
+
+        private void ShowCalibrationPlaneToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_webViewReady)
+            {
+                bool show = ShowCalibrationPlaneToggle.IsOn;
+                _ = SceneWebView.ExecuteScriptAsync($"if (window.toggleCalibrationPlane) window.toggleCalibrationPlane({(show ? "true" : "false")});");
+            }
+        }
+
+        private void CameraFeedOpacitySlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            if (_webViewReady)
+            {
+                string js = $"if (window.setCameraFeedOpacity) window.setCameraFeedOpacity({e.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)});";
+                _ = SceneWebView.ExecuteScriptAsync(js);
+            }
+        }
+
+        private void CameraFovSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            if (_settings != null && Math.Abs(_settings.CameraFovScale - e.NewValue) > 0.001)
+            {
+                _settings.CameraFovScale = e.NewValue;
+                _settings.Save();
+            }
+
+            if (_webViewReady)
+            {
+                string js = $"if (window.setCameraFovScale) window.setCameraFovScale({e.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)});";
+                _ = SceneWebView.ExecuteScriptAsync(js);
+            }
+        }
+
+        /// <summary>Toggle detection on/off.</summary>
+        private void StartCalibDetectionBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_calibService == null) return;
+
+            bool running = StartCalibDetectionBtn.Content?.ToString()?.StartsWith("■") == true;
+            if (running)
+            {
+                _calibService.Stop();
+                SetCalibStopped();
+            }
+            else
+            {
+                int idx = CalibCameraComboBox.SelectedIndex;
+                if (idx < 0) return;
+                try
+                {
+                    _calibService.OnFrame -= OnCalibFrame;
+                    _calibService.OnPose -= OnCalibPose;
+                    _calibService.OnPose -= LivePosePusher;
+
+                    _calibService.OnFrame += OnCalibFrame;
+                    _calibService.OnPose += OnCalibPose;
+                    _calibService.OnPose += LivePosePusher;
+
+                    _calibService.StartDetection(idx);
+
+                    _isCalibFrozen = false;
+                    FreezeCalibToggle.IsOn = false;
+                    FreezeCalibToggle.IsEnabled = false;
+
+                    CalibOfflineState.Visibility = Visibility.Collapsed;
+                    CalibDetectionBanner.Visibility = Visibility.Visible;
+                    StartCalibDetectionBtn.Content = "■  Stop Detection";
+                    Log($"[Calib] Detection started (camera index {idx})");
+                }
+                catch (Exception ex)
+                {
+                    Log($"[Calib] Failed to start detection: {ex.Message}");
+                }
+            }
+        }
+
+        // ── Event callbacks from CameraCalibrationService (background thread) ──
+
+        private void OnCalibFrame(byte[] jpeg)
+        {
+            _latestWebcamFrameBytes = jpeg; // Always update memory state
+
+            DispatcherQueue?.TryEnqueue(async () =>
+            {
+                try
+                {
+                    if (Preview3DView.Visibility == Visibility.Visible)
+                    {
+                        var bmp = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                        using var ms = new System.IO.MemoryStream(jpeg);
+                        await bmp.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
+                        CalibCameraPreview.Source = bmp;
+
+                        if (_webViewReady && !_isCalibFrozen)
+                        {
+                            string b64 = Convert.ToBase64String(jpeg);
+                            string js = $"if (window.updateCameraFeed) window.updateCameraFeed('data:image/jpeg;base64,{b64}');";
+                            _ = SceneWebView.ExecuteScriptAsync(js);
+                        }
+                    }
+
+                    if (ContextView.Visibility == Visibility.Visible)
+                    {
+                        var bmp2 = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                        using var ms2 = new System.IO.MemoryStream(jpeg);
+                        await bmp2.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms2));
+                        ContextWebcamPreview.Source = bmp2;
+                    }
+                }
+                catch { }
+            });
+        }
+
+        private void OnCalibPose(RobotControllerApp.Services.CameraPose pose)
+        {
+            DispatcherQueue?.TryEnqueue(() =>
+            {
+                if (_isCalibFrozen) return;
+
+                if (pose.IsValid)
+                {
+                    _lastValidPose = pose;
+
+                    CalibDetectionIcon.Glyph = "\uE73E";  // Checkmark
+                    CalibDetectionStatus.Text = "Grid detected — pose estimated";
+                    CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
+                    CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
+                    FreezeCalibToggle.IsEnabled = true;
+                }
+                else
+                {
+                    CalibDetectionIcon.Glyph = "\uE783";  // Warning
+                    CalibDetectionStatus.Text = "Grid not detected";
+                    CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 68, 68));
+                    CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 68, 68));
+                    if (_lastValidPose == null) FreezeCalibToggle.IsEnabled = false;
+                }
+            });
+        }
+
+        /// <summary>Copy pose to clipboard.</summary>
+        private void CalibCopyBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_lastValidPose == null) return;
+            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dp.SetText($"tvec: X={_lastValidPose.X:0.000} Y={_lastValidPose.Y:0.000} Z={_lastValidPose.Z:0.000}\n" +
+                       $"rvec: Rx={_lastValidPose.Rx:0.000} Ry={_lastValidPose.Ry:0.000} Rz={_lastValidPose.Rz:0.000}");
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+            Log("[Calib] Pose copied to clipboard.");
+        }
+
+        /// <summary>Save pose to a text file next to the grid PNG.</summary>
+        private void FreezeCalibToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (FreezeCalibToggle.IsOn != true)
+            {
+                // UNFREEZE Logic
+                _isCalibFrozen = false;
+                FreezeCalibToggle.IsEnabled = _lastValidPose != null;
+                
+                CalibDetectionIcon.Glyph = "\uE783"; 
+                CalibDetectionStatus.Text = "Grid not detected (Refreshing...)";
+                CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 68, 68));
+                
+                if (_calibService != null)
+                {
+                    _calibService.OnPose -= LivePosePusher;
+                    _calibService.OnPose += LivePosePusher;
+                }
+                return;
+            }
+
+            if (_lastValidPose == null)
+            {
+                FreezeCalibToggle.IsOn = false;
+                return;
+            }
+            try
+            {
+                string dir = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string path = Path.Combine(dir, "camera_pose.txt");
+                string text = $"[Camera Calibration \u2014 {DateTime.Now:yyyy-MM-dd HH:mm:ss}]\r\n" +
+                              $"[Camera World Position (cam_world = -R^T * tvec)]\r\n" +
+                              $"X = {_lastValidPose.X:0.000000} m  (right of board)\r\n" +
+                              $"Y = {_lastValidPose.Y:0.000000} m  (forward of board)\r\n" +
+                              $"Z = {_lastValidPose.Z:0.000000} m  (height above board)\r\n\r\n" +
+                              $"[Raw tvec (board-in-camera)]\r\n" +
+                              $"Tx = {_lastValidPose.TvecX:0.000000}\r\n" +
+                              $"Ty = {_lastValidPose.TvecY:0.000000}\r\n" +
+                              $"Tz = {_lastValidPose.TvecZ:0.000000}  (≈ height when cam looks down)\r\n\r\n" +
+                              $"[Rotation Vector - rvec]\r\n" +
+                              $"Rx = {_lastValidPose.Rx:0.000000}\r\n" +
+                              $"Ry = {_lastValidPose.Ry:0.000000}\r\n" +
+                              $"Rz = {_lastValidPose.Rz:0.000000}\r\n\r\n" +
+                              $"Grid: {RobotControllerApp.Services.CameraCalibrationService.GridCols}x" +
+                              $"{RobotControllerApp.Services.CameraCalibrationService.GridRows} ArUco markers  " +
+                              $"MarkerSize={RobotControllerApp.Services.CameraCalibrationService.MarkerLength * 100:0.0}cm\r\n";
+
+                // Save JSON for 3D preview (camera fixed, single calibration session)
+                string jsonPath = RobotControllerApp.Services.CameraCalibrationService.SavedPosePath;
+                string json = System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    _lastValidPose.X,
+                    _lastValidPose.Y,
+                    _lastValidPose.Z,
+                    _lastValidPose.Rx,
+                    _lastValidPose.Ry,
+                    _lastValidPose.Rz,
+                    _lastValidPose.TvecX,
+                    _lastValidPose.TvecY,
+                    _lastValidPose.TvecZ,
+                    _lastValidPose.R11,
+                    _lastValidPose.R12,
+                    _lastValidPose.R13,
+                    _lastValidPose.R21,
+                    _lastValidPose.R22,
+                    _lastValidPose.R23,
+                    _lastValidPose.R31,
+                    _lastValidPose.R32,
+                    _lastValidPose.R33
+                });
+
+                // Write synchronously on UI thread so it doesn't freeze or lock
+                File.WriteAllText(jsonPath, json);
+
+                // Live update the 3D scene ONLY if visible to prevent WebView2 deadlock
+                if (_webViewReady && Preview3DView.Visibility == Visibility.Visible)
+                {
+                    string poseJsonStr = json.Replace("\\", "\\\\").Replace("'", "\\'");
+                    _ = SceneWebView.ExecuteScriptAsync($"setCameraPose('{poseJsonStr}');");
+                }
+
+                _isCalibFrozen = true;
+                if (_calibService != null) _calibService.OnPose -= LivePosePusher;
+                
+                FreezeCalibToggle.IsEnabled = true;
+
+                Log($"[Calib] Pose saved to {jsonPath}");
+            }
+            catch (Exception ex)
+            {
+                FreezeCalibToggle.IsOn = false;
+                Log($"[Calib] Save failed: {ex.Message}");
+            }
+        }
+
+
+        /// <summary>Reset calibration UI to stopped state.</summary>
+        private void SetCalibStopped()
+        {
+            if (_calibService != null)
+            {
+                _calibService.OnPose -= LivePosePusher;
+            }
+            
+            // Do not unfreeze the saved pose just because we stopped detection manually!
+            // Start Detection button is independent of Freeze toggle.
+            if (!_isCalibFrozen)
+            {
+                FreezeCalibToggle.IsOn = false;
+                FreezeCalibToggle.IsEnabled = _lastValidPose != null;
+            }
+
+            StartCalibDetectionBtn.Content = "▶  Start Detection";
+            CalibDetectionBanner.Visibility = Visibility.Collapsed;
+            Log("[Calib] Detection stopped.");
+        }
     }
 }
