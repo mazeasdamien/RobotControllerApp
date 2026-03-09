@@ -1235,8 +1235,7 @@ namespace RobotControllerApp
 
                     _lastValidPose = _savedPose;
                     _isCalibFrozen = true;
-                    FreezeCalibToggle.IsChecked = true;
-                    FreezeCalibToggle.Content = "Unfreeze Calib";
+                    FreezeCalibToggle.IsOn = true;
                     FreezeCalibToggle.IsEnabled = true;
                     CalibDetectionIcon.Glyph = "\uE73E";
                     CalibDetectionStatus.Text = "Grid detected — Loaded from saved calibration";
@@ -2797,8 +2796,7 @@ namespace RobotControllerApp
             // Restore toggle logic if a pose is loaded
             if (_lastValidPose != null && _isCalibFrozen)
             {
-                FreezeCalibToggle.IsChecked = true;
-                FreezeCalibToggle.Content = "Unfreeze Calib";
+                FreezeCalibToggle.IsOn = true;
                 FreezeCalibToggle.IsEnabled = true;
             }
         }
@@ -2864,8 +2862,7 @@ namespace RobotControllerApp
                     _calibService.StartDetection(idx);
 
                     _isCalibFrozen = false;
-                    FreezeCalibToggle.IsChecked = false;
-                    FreezeCalibToggle.Content = "Freeze Calib";
+                    FreezeCalibToggle.IsOn = false;
                     FreezeCalibToggle.IsEnabled = false;
 
                     CalibOfflineState.Visibility = Visibility.Collapsed;
@@ -2956,12 +2953,11 @@ namespace RobotControllerApp
         }
 
         /// <summary>Save pose to a text file next to the grid PNG.</summary>
-        private void FreezeCalibToggle_Click(object sender, RoutedEventArgs e)
+        private void FreezeCalibToggle_Toggled(object sender, RoutedEventArgs e)
         {
-            if (FreezeCalibToggle.IsChecked != true)
+            if (FreezeCalibToggle.IsOn != true)
             {
                 // UNFREEZE Logic
-                FreezeCalibToggle.Content = "Freeze Calib";
                 _isCalibFrozen = false;
                 FreezeCalibToggle.IsEnabled = _lastValidPose != null;
                 
@@ -2979,7 +2975,7 @@ namespace RobotControllerApp
 
             if (_lastValidPose == null)
             {
-                FreezeCalibToggle.IsChecked = false;
+                FreezeCalibToggle.IsOn = false;
                 return;
             }
             try
@@ -3040,14 +3036,13 @@ namespace RobotControllerApp
                 _isCalibFrozen = true;
                 if (_calibService != null) _calibService.OnPose -= LivePosePusher;
                 
-                FreezeCalibToggle.Content = "Unfreeze Calib";
                 FreezeCalibToggle.IsEnabled = true;
 
                 Log($"[Calib] Pose saved to {jsonPath}");
             }
             catch (Exception ex)
             {
-                FreezeCalibToggle.IsChecked = false;
+                FreezeCalibToggle.IsOn = false;
                 Log($"[Calib] Save failed: {ex.Message}");
             }
         }
@@ -3065,8 +3060,7 @@ namespace RobotControllerApp
             // Start Detection button is independent of Freeze toggle.
             if (!_isCalibFrozen)
             {
-                FreezeCalibToggle.IsChecked = false;
-                FreezeCalibToggle.Content = "Freeze Calib";
+                FreezeCalibToggle.IsOn = false;
                 FreezeCalibToggle.IsEnabled = _lastValidPose != null;
             }
 

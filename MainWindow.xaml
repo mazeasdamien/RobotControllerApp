@@ -1261,9 +1261,9 @@
                                 </Grid>
                             </Border>
 
-                            <ToggleButton x:Name="FreezeCalibToggle" Content="Freeze Calib"
+                            <ToggleSwitch x:Name="FreezeCalibToggle" OnContent="Unfreeze Calib" OffContent="Freeze Calib"
                                     HorizontalAlignment="Stretch" IsEnabled="False"
-                                    Click="FreezeCalibToggle_Click"/>
+                                    Toggled="FreezeCalibToggle_Toggled"/>
                         </StackPanel>
                     </Expander>
                 </Grid>
