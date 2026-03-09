@@ -36,6 +36,7 @@ namespace RobotControllerApp
         public double UvXmin { get; set; }
         public double UvYmax { get; set; }
         public double UvXmax { get; set; }
+        public double AngleDegrees { get; set; }
     }
 
     public class GeneratedBananaImageModel
@@ -49,6 +50,7 @@ namespace RobotControllerApp
         public string Name { get; set; } = "";
         public string ColorHex { get; set; } = "#FFFFFF";
         public string ImageFileName { get; set; } = "";
+        public string ModelFileName { get; set; } = "";
         public string DateAdded { get; set; } = "";
     }
 
@@ -91,9 +93,12 @@ namespace RobotControllerApp
         private readonly System.Collections.ObjectModel.ObservableCollection<GeneratedBananaImageModel> _bananaImages = new();
 
         private double _totalGeminiCost = 0.0;
+        private double _totalBananaCost = 0.0;
 
         private System.Collections.ObjectModel.ObservableCollection<LibraryItemViewModel> _libraryItems = new();
         private List<LibraryItemConfig> _libraryConfig = new();
+
+        private bool _isCalibFrozen = false;
 
         private DispatcherTimer _autoScanTimer;
 
@@ -155,6 +160,7 @@ namespace RobotControllerApp
             GeminiApiKeyInput.Password = _settings.GeminiApiKey;
             TripoApiKeyInput.Password = _settings.TripoApiKey;
             Use3DApiModeToggle.IsOn = _settings.Use3DApiMode;
+            CameraFovSlider.Value = _settings.CameraFovScale;
             UpdateModelModeBadge(_settings.Use3DApiMode);
 
             // Update Hub Card Status (Initialize as Waiting for Hub to start or Unity to connect)
@@ -1151,7 +1157,6 @@ namespace RobotControllerApp
             SettingsView.Visibility = Visibility.Collapsed;
             NetworkView.Visibility = Visibility.Collapsed;
             ContextView.Visibility = Visibility.Collapsed;
-            CalibrationView.Visibility = Visibility.Collapsed;
             Preview3DView.Visibility = Visibility.Collapsed;
 
             // Show selected view
@@ -1178,12 +1183,10 @@ namespace RobotControllerApp
                     case "context":
                         ContextView.Visibility = Visibility.Visible;
                         break;
-                    case "calibration":
-                        CalibrationView.Visibility = Visibility.Visible;
-                        PopulateCalibCameraList();
-                        break;
                     case "preview3d":
                         Preview3DView.Visibility = Visibility.Visible;
+                        if (CalibCameraComboBox.Items.Count == 0)
+                            PopulateCalibCameraList();
                         var initTask = InitSceneWebViewAsync();
                         break;
                 }
@@ -1206,10 +1209,17 @@ namespace RobotControllerApp
                 SceneWebView.CoreWebView2.Settings.AreDevToolsEnabled = false;
                 SceneWebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
 
-                string htmlPath = System.IO.Path.Combine(
+                string assetsDir = System.IO.Path.Combine(
                     System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "",
-                    "Assets", "scene3d.html");
-                SceneWebView.Source = new Uri(htmlPath);
+                    "Assets");
+                
+                SceneWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    "app.local", assetsDir, Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+
+                SceneWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
+                    "library.local", LibraryPath, Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
+
+                SceneWebView.Source = new Uri("http://app.local/scene3d.html");
                 await Task.Delay(800);
                 _webViewReady = true;
 
@@ -1222,6 +1232,16 @@ namespace RobotControllerApp
 
                     poseJson = poseJson.Replace("\\", "\\\\").Replace("'", "\\'");
                     await SceneWebView.ExecuteScriptAsync($"setCameraPose('{poseJson}');");
+
+                    _lastValidPose = _savedPose;
+                    _isCalibFrozen = true;
+                    FreezeCalibToggle.IsChecked = true;
+                    FreezeCalibToggle.Content = "Unfreeze Calib";
+                    FreezeCalibToggle.IsEnabled = true;
+                    CalibDetectionIcon.Glyph = "\uE73E";
+                    CalibDetectionStatus.Text = "Grid detected — Loaded from saved calibration";
+                    CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
+                    CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                 }
 
                 await PushObjectsToSceneAsync();
@@ -1256,52 +1276,65 @@ namespace RobotControllerApp
                 double r21 = pose?.R21 ?? 0.0, r22 = pose?.R22 ?? 1.0, r23 = pose?.R23 ?? 0.0;
                 double r31 = pose?.R31 ?? 0.0, r32 = pose?.R32 ?? 0.0, r33 = pose?.R33 ?? 1.0;
 
-                // Use absolute height to guard against planar ambiguity flips
-                double safeCamZ = Math.Abs(camZ);
+                double safeCamZ = Math.Max(0.01, Math.Abs(camZ));
 
-                var items = _detectedObjects.Select(obj =>
-                {
-                    double uNorm = (obj.UvXmin + obj.UvXmax) / 2.0 / 1000.0;
-                    double vNorm = (obj.UvYmin + obj.UvYmax) / 2.0 / 1000.0;
-                    double pixU = uNorm * frameW;
-                    double pixV = vNorm * frameH;
-
-                    // 1. Back-project pixel to optical ray vector (Camera Space)
-                    double rayCamX = (pixU - cx) / fx;
-                    double rayCamY = (pixV - cy) / fy;
-                    double rayCamZ = 1.0;
-
-                    // 2. Rotate ray into Object (Table) Space using R^T
-                    double rayObjX = r11 * rayCamX + r12 * rayCamY + r13 * rayCamZ;
-                    double rayObjY = r21 * rayCamX + r22 * rayCamY + r23 * rayCamZ;
-                    double rayObjZ = r31 * rayCamX + r32 * rayCamY + r33 * rayCamZ;
-
-                    // 3. Intersect Ray with Z=0 Table Plane
-                    double t = 0;
-                    if (Math.Abs(rayObjZ) > 1e-6)
+                    var items = _detectedObjects.Select(obj =>
                     {
-                        // Calculate physical distance along the optical ray to hit the table
-                        t = Math.Abs(safeCamZ / rayObjZ);
-                    }
+                        double uNorm = (obj.UvXmin + obj.UvXmax) / 2.0 / 1000.0;
+                        double vNorm = (obj.UvYmin + obj.UvYmax) / 2.0 / 1000.0;
+                        double pixU = uNorm * frameW;
+                        double pixV = vNorm * frameH;
 
-                    double worldX = camX + (t * rayObjX);
-                    double worldY = camY + (t * rayObjY);
+                        // 1. Cast a straight optical ray out of the Camera Lens
+                        double rayCamX = (pixU - cx) / fx;
+                        double rayCamY = (pixV - cy) / fy;
+                        double rayCamZ = 1.0;
 
-                    // Scale bounding box based on the true physical distance to the table
-                    double bboxWNorm = (obj.UvXmax - obj.UvXmin) / 1000.0;
-                    double bboxHNorm = (obj.UvYmax - obj.UvYmin) / 1000.0;
-                    double sizeW = t * bboxWNorm * frameW / fx;
-                    double sizeH = t * bboxHNorm * frameH / fy;
+                        // 2. Rotate that ray into the Real World (Table Space) using R^T
+                        double rayObjX = r11 * rayCamX + r12 * rayCamY + r13 * rayCamZ;
+                        double rayObjY = r21 * rayCamX + r22 * rayCamY + r23 * rayCamZ;
+                        double rayObjZ = r31 * rayCamX + r32 * rayCamY + r33 * rayCamZ;
 
-                    return new
-                    {
-                        label = obj.Name,
-                        worldX,
-                        worldY,
-                        sizeW,
-                        sizeH
-                    };
-                }).ToList();
+                        // 3. Find exactly where the rotated ray hits the table surface (Z = 0)
+                        double t = 0;
+                        if (rayObjZ < -1e-4) // Ensure ray points downwards towards the table
+                        {
+                            t = -safeCamZ / rayObjZ;
+                        }
+
+                        double worldX = camX;
+                        double worldY = camY;
+                        double sizeW = 0.05, sizeH = 0.05;
+
+                        // 4. Apply the physical intersection distance (t)
+                        if (t > 0)
+                        {
+                            worldX = camX + (t * rayObjX);
+                            worldY = camY + (t * rayObjY);
+
+                            // Scale bounding box by the actual physical distance to the table
+                            double bboxWNorm = (obj.UvXmax - obj.UvXmin) / 1000.0;
+                            double bboxHNorm = (obj.UvYmax - obj.UvYmin) / 1000.0;
+                            sizeW = t * bboxWNorm * frameW / fx;
+                            sizeH = t * bboxHNorm * frameH / fy;
+                        }
+
+                        var libItem = _libraryConfig.FirstOrDefault(x => string.Equals(x.Name, obj.Name, StringComparison.OrdinalIgnoreCase));
+                        string modelUrl = libItem != null && !string.IsNullOrEmpty(libItem.ModelFileName) 
+                            ? $"http://library.local/{libItem.ModelFileName}" 
+                            : "";
+
+                        return new
+                        {
+                            label = obj.Name,
+                            worldX,
+                            worldY,
+                            sizeW,
+                            sizeH,
+                            angleRad = obj.AngleDegrees * Math.PI / 180.0,
+                            modelUrl
+                        };
+                    }).ToList();
 
                 string json = System.Text.Json.JsonSerializer.Serialize(items);
                 json = json.Replace("\\", "\\\\").Replace("'", "\\'");
@@ -1322,7 +1355,13 @@ namespace RobotControllerApp
             if (!_webViewReady) return;
             try
             {
-                var poseObj = new { pose.X, pose.Y, pose.Z, pose.Rx, pose.Ry, pose.Rz };
+                var poseObj = new { 
+                    pose.X, pose.Y, pose.Z, 
+                    pose.Rx, pose.Ry, pose.Rz,
+                    pose.R11, pose.R12, pose.R13,
+                    pose.R21, pose.R22, pose.R23,
+                    pose.R31, pose.R32, pose.R33
+                };
                 string json = System.Text.Json.JsonSerializer.Serialize(poseObj);
                 json = json.Replace("\\", "\\\\").Replace("'", "\\'");
                 await SceneWebView.ExecuteScriptAsync($"setCameraPose('{json}');");
@@ -1330,7 +1369,20 @@ namespace RobotControllerApp
             catch { /* WebView not ready yet */ }
         }
 
-
+        private async void LivePosePusher(RobotControllerApp.Services.CameraPose pose)
+        {
+            if (pose.IsValid)
+            {
+                DispatcherQueue?.TryEnqueue(async () =>
+                {
+                    await PushCameraPoseAsync(pose);
+                    if (_detectedObjects.Count > 0)
+                    {
+                        await PushObjectsToSceneAsync();
+                    }
+                });
+            }
+        }
 
         private void RefreshFeed_Click(object sender, RoutedEventArgs e)
         {
@@ -1870,9 +1922,11 @@ namespace RobotControllerApp
 
                 string prompt =
                     "Identify all distinct physical objects (tools, parts, shapes) visible on the table. " +
-                    "For each, return normalised bounding box corners [ymin, xmin, ymax, xmax] in range 0–1000 " +
+                    "IGNORE the chessboard/checkerboard calibration target. IGNORE any robot arms or parts of the robot. " +
+                    "For each, return normalised bounding box corners [ymin, xmin, ymax, xmax] in range 0–1000, " +
+                    "an estimated physical 'angle_degrees' (from 0 to 360, where 0 means pointing forward/away from the camera, 90 pointing to the right of the table) representing the object spatial orientation, " +
                     "and a label starting with the object's colour. " +
-                    "RETURN JSON: { \"items\": [ { \"ymin\": 100, \"xmin\": 100, \"ymax\": 200, \"xmax\": 200, \"label\": \"blue cube\" } ] }";
+                    "RETURN JSON: { \"items\": [ { \"ymin\": 100, \"xmin\": 100, \"ymax\": 200, \"xmax\": 200, \"angle_degrees\": 45, \"label\": \"blue cube\" } ] }";
 
                 string safePrompt = prompt.Replace("\"", "\\\"").Replace("\n", "\\n");
 
@@ -1965,6 +2019,10 @@ namespace RobotControllerApp
                                             int.TryParse(item.GetProperty("xmax").ToString(), out xmax);
                                         }
 
+                                        double angleDegrees = 0;
+                                        if (item.TryGetProperty("angle_degrees", out var angleProp))
+                                            angleProp.TryGetDouble(out angleDegrees);
+
                                         // Ignore objects cut off by the edge of the camera
                                         if (xmin < 10 || ymin < 10 || xmax > 990 || ymax > 990) continue;
 
@@ -2012,7 +2070,8 @@ namespace RobotControllerApp
                                                 UvXmin = xmin,
                                                 UvYmin = ymin,
                                                 UvXmax = xmax,
-                                                UvYmax = ymax
+                                                UvYmax = ymax,
+                                                AngleDegrees = angleDegrees
                                             });
                                         }
                                     }
@@ -2096,7 +2155,7 @@ namespace RobotControllerApp
         {
             double newObjectsCount = _selectedForBanana.Count;
             double costEuro = (newObjectsCount * 0.0672) * 0.94; // approx USD to EUR
-            BananaCostText.Text = $"Estimated Banana Pro Cost: {costEuro:0.000} €";
+            BananaCostText.Text = $"Queue: {costEuro:0.00} € | Total Spent: {_totalBananaCost:0.00} €";
         }
 
         private void DeleteLibraryObject_Click(object sender, RoutedEventArgs e)
@@ -2106,7 +2165,7 @@ namespace RobotControllerApp
                 _libraryItems.Remove(item);
                 string name = item.Name;
 
-                var configData = _libraryConfig.FirstOrDefault(x => x.Name == name);
+                var configData = _libraryConfig.FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
                 if (configData != null)
                 {
                     _libraryConfig.Remove(configData);
@@ -2117,16 +2176,28 @@ namespace RobotControllerApp
                         string imgPath = Path.Combine(LibraryPath, configData.ImageFileName);
                         if (File.Exists(imgPath)) File.Delete(imgPath);
 
-                        // Also delete the associated 3D model if it was generated
-                        string glbFileName = $"{item.Name.Replace(" ", "_")}_3DModel.glb";
-                        string glbPath = Path.Combine(LibraryPath, glbFileName);
+                        // Delete the explicitly linked 3D model if present
+                        if (!string.IsNullOrEmpty(configData.ModelFileName))
+                        {
+                            string linkedGlbPath = Path.Combine(LibraryPath, configData.ModelFileName);
+                            if (File.Exists(linkedGlbPath)) File.Delete(linkedGlbPath);
+                        }
+
+                        // Fallback: Also delete the associated 3D model if it was generated before the JSON link fix
+                        string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
+                        string glbFileNameFallback = $"{safeName}_3DModel.glb";
+                        string glbPath = Path.Combine(LibraryPath, glbFileNameFallback);
                         if (File.Exists(glbPath)) File.Delete(glbPath);
+                        
+                        // Clean up the incorrectly spaced one just in case they have it from before
+                        string oldBrokenGlbPath = Path.Combine(LibraryPath, $"{item.Name.Replace(" ", "_")}_3DModel.glb");
+                        if (File.Exists(oldBrokenGlbPath)) File.Delete(oldBrokenGlbPath);
                     }
                     catch { }
                 }
 
                 // Re-enable scene detection item if it exists in the current session
-                var sceneItems = _detectedObjects.Where(x => x.Name == name).ToList();
+                var sceneItems = _detectedObjects.Where(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
                 foreach (var sceneItem in sceneItems)
                 {
                     sceneItem.IsAlreadyInLibrary = false;
@@ -2163,12 +2234,26 @@ namespace RobotControllerApp
                 string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
                 string glbPath = Path.Combine(LibraryPath, $"{safeName}_3DModel.glb");
 
+                var configData = _libraryConfig.FirstOrDefault(c => string.Equals(c.Name, item.Name, StringComparison.OrdinalIgnoreCase));
+                
+                if (configData != null && !string.IsNullOrEmpty(configData.ModelFileName))
+                {
+                    glbPath = Path.Combine(LibraryPath, configData.ModelFileName);
+                }
+
                 if (File.Exists(glbPath))
                 {
                     btn.Content = "Generated";
                     btn.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.SeaGreen);
                     btn.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
                     btn.IsEnabled = false;
+                }
+                else
+                {
+                    btn.Content = "To 3D Model";
+                    btn.ClearValue(Button.BackgroundProperty);
+                    btn.ClearValue(Button.ForegroundProperty);
+                    btn.IsEnabled = true;
                 }
             }
         }
@@ -2315,8 +2400,12 @@ namespace RobotControllerApp
                         byte[] glbBytes = await client.GetByteArrayAsync(fileUrl);
 
                         string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
-                        string glbPath = Path.Combine(LibraryPath, $"{safeName}_3DModel.glb");
+                        string glbFileName = $"{safeName}_3DModel.glb";
+                        string glbPath = Path.Combine(LibraryPath, glbFileName);
                         await File.WriteAllBytesAsync(glbPath, glbBytes);
+
+                        configData.ModelFileName = glbFileName;
+                        SaveLibrary();
 
                         generationSuccess = true;
                     }
@@ -2405,7 +2494,10 @@ namespace RobotControllerApp
                     var taskPayload = new
                     {
                         type = "image_to_model",
-                        file = new { type = "png", file_token = fileToken }
+                        file = new { type = "png", file_token = fileToken },
+                        // Turbo is blazing fast and generates lightweight low-fidelity models perfect for our 3D tabletop preview
+                        model_version = "Turbo-v1.0-20250506", 
+                        texture = true
                     };
                     var taskJson = System.Text.Json.JsonSerializer.Serialize(taskPayload);
                     var taskContent = new StringContent(taskJson, System.Text.Encoding.UTF8, "application/json");
@@ -2460,8 +2552,12 @@ namespace RobotControllerApp
                 byte[] glbBytes = await client.GetByteArrayAsync(glbUrl);
 
                 string safeName = string.Join("_", item.Name.Split(Path.GetInvalidFileNameChars()));
-                string glbPath = Path.Combine(LibraryPath, $"{safeName}_3DModel.glb");
+                string glbFileName = $"{safeName}_3DModel.glb";
+                string glbPath = Path.Combine(LibraryPath, glbFileName);
                 await File.WriteAllBytesAsync(glbPath, glbBytes);
+
+                configData.ModelFileName = glbFileName;
+                SaveLibrary();
 
                 generationSuccess = true;
             }
@@ -2520,7 +2616,7 @@ namespace RobotControllerApp
                     bool isGreenish = obj.Name.Contains("GREEN", StringComparison.OrdinalIgnoreCase) || obj.Name.Contains("LIME", StringComparison.OrdinalIgnoreCase) || obj.Name.Contains("TEAL", StringComparison.OrdinalIgnoreCase);
                     string chromaColorName = isGreenish ? "MAGENTA (#FF00FF)" : "NEON GREEN (#00FF00)";
 
-                    string promptText = $"Analyze the {obj.Name} and transform it into a hyper-realistic, 8k resolution, perfectly lit macro studio photograph. Completely ERASE any other objects (like phones, furniture, pieces of sofas, floors, or background elements) that are not the {obj.Name}. The final output must be exactly a perfectly square 1:1 ratio image entirely containing ONLY the {obj.Name} placed on a pure, solid {chromaColorName} chroma key background. IMPORTANT: There must be ABSOLUTELY NO SHADOWS, no ambient occlusion, and no reflections under or around the object. The background should be a completely flat, unshaded solid color. The object must be perfectly centered and occupy about 60% of the space. strictly maintain the original {obj.Name}'s form, color, and orientation.";
+                    string promptText = $"Extract the physical {obj.Name} shown in this image preserving 100% of its original shape, text, labels, proportions, and perspective. Subtly enhance the object's colors so they look natural and realistic, but slightly cleaner than the raw camera photo. Keep it completely faithful to the original photo input visually, geometrically, and texturally. Your job is to extract this specific {obj.Name} and place it on a pure, solid {chromaColorName} chroma key background. Completely ERASE any other objects (like hands, tools, overlapping items, furniture, floors). IMPORTANT: The {chromaColorName} background must be completely flat, unshaded, with ABSOLUTELY NO SHADOWS, no ambient occlusion, and no reflections under or around the object. Provide a 1:1 square output where the {obj.Name} occupies about 60% of the canvas.";
 
                     var payload = new
                     {
@@ -2631,6 +2727,8 @@ namespace RobotControllerApp
                                             ImageSource = bitmap
                                         };
                                         _libraryItems.Insert(0, newVm);
+                                        _totalBananaCost += (0.0672 * 0.94); // Approx USD -> EUR
+
 
                                         obj.IsAlreadyInLibrary = true;
                                         // Update UI opacity immediately
@@ -2681,7 +2779,8 @@ namespace RobotControllerApp
                     _videoDevices[i].Name.Contains("Xiaomi", StringComparison.OrdinalIgnoreCase))
                 { CalibCameraComboBox.SelectedIndex = i; return; }
             }
-            if (_videoDevices.Count > 0) CalibCameraComboBox.SelectedIndex = 0;
+            if (_videoDevices.Count > 1) CalibCameraComboBox.SelectedIndex = 1;
+            else if (_videoDevices.Count > 0) CalibCameraComboBox.SelectedIndex = 0;
         }
 
         /// <summary>Camera selection changed — enable the Start button.</summary>
@@ -2694,6 +2793,47 @@ namespace RobotControllerApp
                 SetCalibStopped();
             }
             StartCalibDetectionBtn.IsEnabled = CalibCameraComboBox.SelectedIndex >= 0;
+
+            // Restore toggle logic if a pose is loaded
+            if (_lastValidPose != null && _isCalibFrozen)
+            {
+                FreezeCalibToggle.IsChecked = true;
+                FreezeCalibToggle.Content = "Unfreeze Calib";
+                FreezeCalibToggle.IsEnabled = true;
+            }
+        }
+
+        private void ShowCalibrationPlaneToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_webViewReady)
+            {
+                bool show = ShowCalibrationPlaneToggle.IsOn;
+                _ = SceneWebView.ExecuteScriptAsync($"if (window.toggleCalibrationPlane) window.toggleCalibrationPlane({(show ? "true" : "false")});");
+            }
+        }
+
+        private void CameraFeedOpacitySlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            if (_webViewReady)
+            {
+                string js = $"if (window.setCameraFeedOpacity) window.setCameraFeedOpacity({e.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)});";
+                _ = SceneWebView.ExecuteScriptAsync(js);
+            }
+        }
+
+        private void CameraFovSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            if (_settings != null && Math.Abs(_settings.CameraFovScale - e.NewValue) > 0.001)
+            {
+                _settings.CameraFovScale = e.NewValue;
+                _settings.Save();
+            }
+
+            if (_webViewReady)
+            {
+                string js = $"if (window.setCameraFovScale) window.setCameraFovScale({e.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)});";
+                _ = SceneWebView.ExecuteScriptAsync(js);
+            }
         }
 
         /// <summary>Toggle detection on/off.</summary>
@@ -2715,17 +2855,22 @@ namespace RobotControllerApp
                 {
                     _calibService.OnFrame -= OnCalibFrame;
                     _calibService.OnPose -= OnCalibPose;
+                    _calibService.OnPose -= LivePosePusher;
+
                     _calibService.OnFrame += OnCalibFrame;
                     _calibService.OnPose += OnCalibPose;
+                    _calibService.OnPose += LivePosePusher;
+
                     _calibService.StartDetection(idx);
+
+                    _isCalibFrozen = false;
+                    FreezeCalibToggle.IsChecked = false;
+                    FreezeCalibToggle.Content = "Freeze Calib";
+                    FreezeCalibToggle.IsEnabled = false;
 
                     CalibOfflineState.Visibility = Visibility.Collapsed;
                     CalibDetectionBanner.Visibility = Visibility.Visible;
                     StartCalibDetectionBtn.Content = "■  Stop Detection";
-                    CalibLiveBadgeText.Text = "LIVE";
-                    CalibLiveBadgeText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
-                    CalibLiveBadge.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 180, 0, 0));
-                    CalibLiveDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 0, 0));
                     Log($"[Calib] Detection started (camera index {idx})");
                 }
                 catch (Exception ex)
@@ -2739,16 +2884,33 @@ namespace RobotControllerApp
 
         private void OnCalibFrame(byte[] jpeg)
         {
+            _latestWebcamFrameBytes = jpeg; // Always update memory state
+
             DispatcherQueue?.TryEnqueue(async () =>
             {
                 try
                 {
-                    if (CalibrationView.Visibility == Visibility.Visible)
+                    if (Preview3DView.Visibility == Visibility.Visible)
                     {
                         var bmp = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
                         using var ms = new System.IO.MemoryStream(jpeg);
                         await bmp.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
                         CalibCameraPreview.Source = bmp;
+
+                        if (_webViewReady && !_isCalibFrozen)
+                        {
+                            string b64 = Convert.ToBase64String(jpeg);
+                            string js = $"if (window.updateCameraFeed) window.updateCameraFeed('data:image/jpeg;base64,{b64}');";
+                            _ = SceneWebView.ExecuteScriptAsync(js);
+                        }
+                    }
+
+                    if (ContextView.Visibility == Visibility.Visible)
+                    {
+                        var bmp2 = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                        using var ms2 = new System.IO.MemoryStream(jpeg);
+                        await bmp2.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms2));
+                        ContextWebcamPreview.Source = bmp2;
                     }
                 }
                 catch { }
@@ -2759,23 +2921,17 @@ namespace RobotControllerApp
         {
             DispatcherQueue?.TryEnqueue(() =>
             {
+                if (_isCalibFrozen) return;
+
                 if (pose.IsValid)
                 {
                     _lastValidPose = pose;
-                    CalibPoseX.Text = $"{pose.X:+0.000;-0.000}";
-                    CalibPoseY.Text = $"{pose.Y:+0.000;-0.000}";
-                    CalibPoseZ.Text = $"{pose.Z:0.000}";
-
-                    CalibPoseRx.Text = $"{pose.Rx:+0.000;-0.000}";
-                    CalibPoseRy.Text = $"{pose.Ry:+0.000;-0.000}";
-                    CalibPoseRz.Text = $"{pose.Rz:+0.000;-0.000}";
 
                     CalibDetectionIcon.Glyph = "\uE73E";  // Checkmark
                     CalibDetectionStatus.Text = "Grid detected — pose estimated";
                     CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
-                    CalibCopyBtn.IsEnabled = true;
-                    SaveCalibResultBtn.IsEnabled = true;
+                    FreezeCalibToggle.IsEnabled = true;
                 }
                 else
                 {
@@ -2783,6 +2939,7 @@ namespace RobotControllerApp
                     CalibDetectionStatus.Text = "Grid not detected";
                     CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 68, 68));
                     CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 68, 68));
+                    if (_lastValidPose == null) FreezeCalibToggle.IsEnabled = false;
                 }
             });
         }
@@ -2799,9 +2956,32 @@ namespace RobotControllerApp
         }
 
         /// <summary>Save pose to a text file next to the grid PNG.</summary>
-        private async void SaveCalibResultBtn_Click(object sender, RoutedEventArgs e)
+        private void FreezeCalibToggle_Click(object sender, RoutedEventArgs e)
         {
-            if (_lastValidPose == null) return;
+            if (FreezeCalibToggle.IsChecked != true)
+            {
+                // UNFREEZE Logic
+                FreezeCalibToggle.Content = "Freeze Calib";
+                _isCalibFrozen = false;
+                FreezeCalibToggle.IsEnabled = _lastValidPose != null;
+                
+                CalibDetectionIcon.Glyph = "\uE783"; 
+                CalibDetectionStatus.Text = "Grid not detected (Refreshing...)";
+                CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 68, 68));
+                
+                if (_calibService != null)
+                {
+                    _calibService.OnPose -= LivePosePusher;
+                    _calibService.OnPose += LivePosePusher;
+                }
+                return;
+            }
+
+            if (_lastValidPose == null)
+            {
+                FreezeCalibToggle.IsChecked = false;
+                return;
+            }
             try
             {
                 string dir = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
@@ -2848,7 +3028,6 @@ namespace RobotControllerApp
                 });
 
                 // Write synchronously on UI thread so it doesn't freeze or lock
-                File.WriteAllText(path, text);
                 File.WriteAllText(jsonPath, json);
 
                 // Live update the 3D scene ONLY if visible to prevent WebView2 deadlock
@@ -2858,11 +3037,17 @@ namespace RobotControllerApp
                     _ = SceneWebView.ExecuteScriptAsync($"setCameraPose('{poseJsonStr}');");
                 }
 
-                CalibSavedResult.Text = text;
-                Log($"[Calib] Pose saved to {path} + {jsonPath}");
+                _isCalibFrozen = true;
+                if (_calibService != null) _calibService.OnPose -= LivePosePusher;
+                
+                FreezeCalibToggle.Content = "Unfreeze Calib";
+                FreezeCalibToggle.IsEnabled = true;
+
+                Log($"[Calib] Pose saved to {jsonPath}");
             }
             catch (Exception ex)
             {
+                FreezeCalibToggle.IsChecked = false;
                 Log($"[Calib] Save failed: {ex.Message}");
             }
         }
@@ -2871,11 +3056,21 @@ namespace RobotControllerApp
         /// <summary>Reset calibration UI to stopped state.</summary>
         private void SetCalibStopped()
         {
+            if (_calibService != null)
+            {
+                _calibService.OnPose -= LivePosePusher;
+            }
+            
+            // Do not unfreeze the saved pose just because we stopped detection manually!
+            // Start Detection button is independent of Freeze toggle.
+            if (!_isCalibFrozen)
+            {
+                FreezeCalibToggle.IsChecked = false;
+                FreezeCalibToggle.Content = "Freeze Calib";
+                FreezeCalibToggle.IsEnabled = _lastValidPose != null;
+            }
+
             StartCalibDetectionBtn.Content = "▶  Start Detection";
-            CalibLiveBadgeText.Text = "STOPPED";
-            CalibLiveBadgeText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
-            CalibLiveBadge.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 51, 51, 51));
-            CalibLiveDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
             CalibDetectionBanner.Visibility = Visibility.Collapsed;
             Log("[Calib] Detection stopped.");
         }

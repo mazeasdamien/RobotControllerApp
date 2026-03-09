@@ -36,6 +36,9 @@ namespace RobotControllerApp.Services
         /// <summary>If true, use the Tripo3D cloud API instead of the local TripoSR server.</summary>
         public bool Use3DApiMode { get; set; } = false;
 
+        /// <summary>The scale factor of the 3D Projection.</summary>
+        public double CameraFovScale { get; set; } = 0.40;
+
         private static string SettingsPath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "RobotOrange", "settings.json");

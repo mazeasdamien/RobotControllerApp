@@ -42,11 +42,6 @@
                     </NavigationViewItem.Icon>
                 </NavigationViewItem>
 
-                <NavigationViewItem Content="Cam Calibration" Tag="calibration">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE722;"/>
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
 
                 <NavigationViewItem Content="3D Preview" Tag="preview3d">
                     <NavigationViewItem.Icon>
@@ -1214,177 +1209,63 @@
                 <!-- 7. 3D SCENE PREVIEW VIEW -->
                 <Grid x:Name="Preview3DView" Visibility="Collapsed">
                     <WebView2 x:Name="SceneWebView" />
-                </Grid>
+                    
+                    <!-- Floating Calibration Panel -->
+                    <Expander HorizontalAlignment="Right" VerticalAlignment="Top" Margin="20,64,20,20" Padding="15" Width="280"
+                            Background="#D01A1A1A" CornerRadius="8" BorderBrush="#333333" BorderThickness="1" IsExpanded="True">
+                        <Expander.Header>
+                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,0">
+                                <FontIcon Glyph="&#xE722;" FontSize="16" Foreground="{StaticResource Brush.Primary}" VerticalAlignment="Center"/>
+                                <TextBlock Text="Camera Calibration" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Expander.Header>
 
-                 <!-- 6. CAMERA CALIBRATION VIEW -->
-                <Grid x:Name="CalibrationView" Visibility="Collapsed">
-                    <Border Padding="{StaticResource Padding.Page}">
-                        <Grid>
-
-                            <Grid Grid.Row="1" ColumnSpacing="16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="3*"/>
-                                    <ColumnDefinition Width="2*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <!-- LEFT: Camera preview + XYZ -->
-                                <Border Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="16">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <!-- Header row -->
-                                        <Grid Margin="0,0,0,12">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE722;" FontSize="16" Foreground="{StaticResource Brush.Primary}"/>
-                                                <TextBlock Text="CAMERA PREVIEW" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                            <Border HorizontalAlignment="Right" CornerRadius="4" Padding="6,2"
-                                                    x:Name="CalibLiveBadge" Background="#333333">
-                                                <StackPanel Orientation="Horizontal" Spacing="5">
-                                                    <Ellipse Width="6" Height="6" Fill="#888888" x:Name="CalibLiveDot"/>
-                                                    <TextBlock x:Name="CalibLiveBadgeText" Text="STOPPED" FontSize="10" Foreground="#888888" FontWeight="SemiBold"/>
-                                                </StackPanel>
-                                            </Border>
-                                        </Grid>
-
-                                        <!-- Preview -->
-                                        <Border Grid.Row="1" Background="#0A0A0A" CornerRadius="10" BorderBrush="#1E1E1E" BorderThickness="1">
-                                            <Grid>
-                                                <Image x:Name="CalibCameraPreview" Stretch="Uniform"/>
-                                                <StackPanel x:Name="CalibOfflineState" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="10">
-                                                    <FontIcon Glyph="&#xE722;" FontSize="48" Foreground="#333333"/>
-                                                    <TextBlock Text="Start detection to begin camera preview" Foreground="#444444" FontSize="12" HorizontalAlignment="Center"/>
-                                                </StackPanel>
-                                                <!-- Detection status overlay -->
-                                                <Border x:Name="CalibDetectionBanner" VerticalAlignment="Top" HorizontalAlignment="Stretch"
-                                                        Background="#CC000000" Padding="12,8" Visibility="Collapsed">
-                                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                                        <FontIcon x:Name="CalibDetectionIcon" Glyph="&#xE783;" FontSize="14" Foreground="#FF4444"/>
-                                                        <TextBlock x:Name="CalibDetectionStatus" Text="Grid not detected" FontSize="13" FontWeight="SemiBold" Foreground="#FF4444"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </Grid>
-                                        </Border>
-
-                                        <!-- XYZ Pose Display -->
-                                        <Border Grid.Row="2" Background="Black" CornerRadius="8" Padding="16,12" Margin="0,12,0,0">
-                                            <Grid ColumnSpacing="24" RowSpacing="12">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="Auto"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="Auto"/>
-                                                </Grid.RowDefinitions>
-                                                <StackPanel Grid.Row="0" Grid.Column="0">
-                                                    <TextBlock Text="tvec X" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
-                                                    <TextBlock x:Name="CalibPoseX" Text="—" FontFamily="Consolas" FontSize="20" FontWeight="Bold" Foreground="#00E5FF"/>
-                                                    <TextBlock Text="metres" FontSize="10" Opacity="0.4"/>
-                                                </StackPanel>
-                                                <StackPanel Grid.Row="0" Grid.Column="1">
-                                                    <TextBlock Text="tvec Y" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
-                                                    <TextBlock x:Name="CalibPoseY" Text="—" FontFamily="Consolas" FontSize="20" FontWeight="Bold" Foreground="#00CC6A"/>
-                                                    <TextBlock Text="metres" FontSize="10" Opacity="0.4"/>
-                                                </StackPanel>
-                                                <StackPanel Grid.Row="0" Grid.Column="2">
-                                                    <TextBlock Text="tvec Z" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
-                                                    <TextBlock x:Name="CalibPoseZ" Text="—" FontFamily="Consolas" FontSize="20" FontWeight="Bold" Foreground="#FFD279"/>
-                                                    <TextBlock Text="metres" FontSize="10" Opacity="0.4"/>
-                                                </StackPanel>
-
-                                                <StackPanel Grid.Row="1" Grid.Column="0">
-                                                    <TextBlock Text="rvec X" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
-                                                    <TextBlock x:Name="CalibPoseRx" Text="—" FontFamily="Consolas" FontSize="18" FontWeight="SemiBold" Foreground="#888888"/>
-                                                </StackPanel>
-                                                <StackPanel Grid.Row="1" Grid.Column="1">
-                                                    <TextBlock Text="rvec Y" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
-                                                    <TextBlock x:Name="CalibPoseRy" Text="—" FontFamily="Consolas" FontSize="18" FontWeight="SemiBold" Foreground="#888888"/>
-                                                </StackPanel>
-                                                <StackPanel Grid.Row="1" Grid.Column="2">
-                                                    <TextBlock Text="rvec Z" FontSize="10" Opacity="0.5" CharacterSpacing="60"/>
-                                                    <TextBlock x:Name="CalibPoseRz" Text="—" FontFamily="Consolas" FontSize="18" FontWeight="SemiBold" Foreground="#888888"/>
-                                                </StackPanel>
-
-                                                <Button Grid.Row="0" Grid.RowSpan="2" Grid.Column="3" x:Name="CalibCopyBtn"
-                                                        Content="&#xE8C8;" FontFamily="Segoe MDL2 Assets"
-                                                        Background="Transparent" BorderBrush="#333333" Padding="8"
-                                                        Click="CalibCopyBtn_Click"
-                                                        ToolTipService.ToolTip="Copy pose to clipboard"
-                                                        IsEnabled="False" VerticalAlignment="Center"/>
-                                            </Grid>
-                                        </Border>
-                                    </Grid>
-                                </Border>
-
-                                <!-- RIGHT: Steps -->
-                                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto">
-                                    <StackPanel Spacing="12">
-
-                                        <!-- Step 1: Camera Selection -->
-                                        <Border Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="20">
-                                            <StackPanel Spacing="12">
-                                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                                    <Border Background="#00CC6A" CornerRadius="12" Width="24" Height="24">
-                                                        <TextBlock Text="1" FontSize="12" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                    <TextBlock Text="Select Camera" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                                <TextBlock Text="Choose the camera positioned above the board, pointing downward." Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
-                                                <ComboBox x:Name="CalibCameraComboBox" HorizontalAlignment="Stretch"
-                                                          PlaceholderText="Select camera..." FontSize="11"
-                                                          Height="32" CornerRadius="6"
-                                                          SelectionChanged="CalibCameraComboBox_SelectionChanged"/>
-                                            </StackPanel>
-                                        </Border>
-
-                                        <!-- Step 2: Start Detection -->
-                                        <Border Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="20">
-                                            <StackPanel Spacing="12">
-                                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                                    <Border Background="#FFD279" CornerRadius="12" Width="24" Height="24">
-                                                        <TextBlock Text="2" FontSize="12" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                                    </Border>
-                                                    <TextBlock Text="Start Detection" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                                <TextBlock Text="Keep the board visible in the camera frame and press Start." Opacity="0.6" FontSize="12" TextWrapping="Wrap"/>
-                                                <Button x:Name="StartCalibDetectionBtn" Content="▶  Start Detection"
-                                                        HorizontalAlignment="Stretch" IsEnabled="False"
-                                                        Style="{StaticResource Button.Filled}"
-                                                        Click="StartCalibDetectionBtn_Click"/>
-                                            </StackPanel>
-                                        </Border>
-
-                                        <!-- Results -->
-                                        <Border Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="20">
-                                            <StackPanel Spacing="12">
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <FontIcon Glyph="&#xE9D2;" FontSize="16" Foreground="{StaticResource Brush.Primary}"/>
-                                                    <TextBlock Text="Saved Result" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                                <Border Background="Black" CornerRadius="8" Padding="12">
-                                                    <TextBlock x:Name="CalibSavedResult"
-                                                               Text="No calibration saved yet."
-                                                               FontFamily="Consolas" FontSize="12"
-                                                               Foreground="#00E5FF" TextWrapping="Wrap"/>
-                                                </Border>
-                                                <Button x:Name="SaveCalibResultBtn" Content="Save Current Pose"
-                                                        HorizontalAlignment="Stretch" IsEnabled="False"
-                                                        Click="SaveCalibResultBtn_Click"/>
-                                            </StackPanel>
-                                        </Border>
-
+                        <StackPanel Spacing="12">
+                            <ComboBox x:Name="CalibCameraComboBox" HorizontalAlignment="Stretch"
+                                      PlaceholderText="Select camera..." FontSize="12"
+                                      SelectionChanged="CalibCameraComboBox_SelectionChanged"/>
+                            
+                            <Button x:Name="StartCalibDetectionBtn" Content="Start Detection"
+                                    HorizontalAlignment="Stretch" IsEnabled="False"
+                                    Click="StartCalibDetectionBtn_Click"/>
+                                          
+                            <ToggleSwitch x:Name="ShowCalibrationPlaneToggle" 
+                                          Header="Show Target Plane" 
+                                          IsOn="True"
+                                          OnContent="ON" OffContent="OFF"
+                                          Toggled="ShowCalibrationPlaneToggle_Toggled" />
+                                          
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Feed Projection Opacity" FontSize="12" Foreground="#888"/>
+                                <Slider x:Name="CameraFeedOpacitySlider" Minimum="0" Maximum="1" Value="0.85" SmallChange="0.05" LargeChange="0.1" StepFrequency="0.05" ValueChanged="CameraFeedOpacitySlider_ValueChanged"/>
+                            </StackPanel>
+                            
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Camera FOV Scale" FontSize="12" Foreground="#888"/>
+                                <Slider x:Name="CameraFovSlider" Minimum="0.1" Maximum="1.5" Value="0.40" SmallChange="0.01" LargeChange="0.1" StepFrequency="0.01" ValueChanged="CameraFovSlider_ValueChanged"/>
+                            </StackPanel>
+                                          
+                                          
+                            <Border Background="#0A0A0A" CornerRadius="4" BorderBrush="#111" BorderThickness="1">
+                                <Grid>
+                                    <Image x:Name="CalibCameraPreview" Height="140" Stretch="Uniform"/>
+                                    <StackPanel x:Name="CalibOfflineState" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
+                                        <TextBlock Text="Offline" Foreground="#666" FontSize="11" HorizontalAlignment="Center"/>
                                     </StackPanel>
-                                </ScrollViewer>
-                            </Grid>
-                        </Grid>
-                    </Border>
+                                    <Border x:Name="CalibDetectionBanner" VerticalAlignment="Top" HorizontalAlignment="Stretch" Background="#CC000000" Padding="4" Visibility="Collapsed">
+                                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                            <FontIcon x:Name="CalibDetectionIcon" Glyph="&#xE783;" FontSize="12" Foreground="#FF4444"/>
+                                            <TextBlock x:Name="CalibDetectionStatus" Text="Grid not detected" FontSize="11" Foreground="#FF4444"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Border>
+
+                            <ToggleButton x:Name="FreezeCalibToggle" Content="Freeze Calib"
+                                    HorizontalAlignment="Stretch" IsEnabled="False"
+                                    Click="FreezeCalibToggle_Click"/>
+                        </StackPanel>
+                    </Expander>
                 </Grid>
 
                 <!-- 7. SETTINGS VIEW -->
@@ -1411,6 +1292,7 @@
 
                                 <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
                                     <ToggleSwitch x:Name="Use3DApiModeToggle" Header="" IsOn="False" MinWidth="0"
+                                                  OnContent="ON" OffContent="OFF"
                                                   Toggled="Use3DApiModeToggle_Toggled"/>
                                     <StackPanel VerticalAlignment="Center">
                                         <TextBlock Text="Use Cloud API (Tripo3D)" Style="{StaticResource Text.Body1}" VerticalAlignment="Center"/>
@@ -1441,7 +1323,7 @@
 
 
                             
-                            <Button x:Name="SaveSettingsButton" Content="SAVE &amp; RESTART HUB" Style="{StaticResource Button.Filled}" HorizontalAlignment="Left" Click="SaveSettingsButton_Click" Margin="0,16,0,0"/>
+                            <Button x:Name="SaveSettingsButton" Content="SAVE" Style="{StaticResource Button.Filled}" HorizontalAlignment="Left" Click="SaveSettingsButton_Click" Margin="0,16,0,0"/>
                         </StackPanel>
                     </Border>
                 </Grid>

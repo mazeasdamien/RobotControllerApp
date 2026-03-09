@@ -51,8 +51,12 @@ namespace RobotControllerApp.Services
         // ── Board / marker parameters ───────────────────────────────────────────
         public const int GridCols = 4;           // columns of markers on the sheet
         public const int GridRows = 3;           // rows of markers on the sheet
-        public const float MarkerLength = 0.03f;       // physical marker side  (3 cm)
-        public const float MarkerGap = 0.01f;       // physical gap between markers (1 cm)
+        
+        // Measured physical dimensions
+        public const float SquareLength = 0.04f;       // 4.0 cm square side
+        public const float MarkerLength = 0.03f;       // ~3.0 cm marker side
+        public const float MarkerGap = 0.01f;          // maintained for compatibility
+        
         public const int MarkerCount = GridCols * GridRows;    // 12 markers (0–11)
 
         private const int MarkerPx = 150;
@@ -68,10 +72,18 @@ namespace RobotControllerApp.Services
         public const int FrameH = 720;
 
         // ── Saved calibration file path (JSON) — written by Save Pose ───────
-        public static string SavedPosePath =>
-            System.IO.Path.Combine(
-                System.IO.Path.GetTempPath(),
-                "robot_camera_pose.json");
+        public static string SavedPosePath
+        {
+            get
+            {
+                string dir = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 
+                    "RobotControllerApp");
+                if (!System.IO.Directory.Exists(dir))
+                    System.IO.Directory.CreateDirectory(dir);
+                return System.IO.Path.Combine(dir, "robot_camera_pose.json");
+            }
+        }
 
         // ── Runtime state ───────────────────────────────────────────────────────
         private VideoCapture? _capture;
@@ -83,6 +95,8 @@ namespace RobotControllerApp.Services
         public event Action<byte[]>? OnFrame;
         /// <summary>Fired after each detection attempt (valid or not).</summary>
         public event Action<CameraPose>? OnPose;
+
+        public bool IsRunning => _capture != null && _capture.IsOpened();
 
         // ════════════════════════════════════════════════════════════════════════
         // PUBLIC API
@@ -131,7 +145,14 @@ namespace RobotControllerApp.Services
             using var distCoeffs = Mat.FromArray(new double[] { 0, 0, 0, 0, 0 });
 
             using var dict = CvAruco.GetPredefinedDictionary(PredefinedDictionaryName.Dict4X4_50);
-            var detParams = new DetectorParameters();     // no IDisposable in 4.10
+            var detParams = new DetectorParameters();
+            
+            // Enable Charuco-like subpixel precision directly on our ArUco markers 
+            // since OpenCvSharp 4.10 lacks the CharucoBoard wrapper!
+            detParams.CornerRefinementMethod = CornerRefineMethod.Subpix;
+            detParams.CornerRefinementWinSize = 5;
+            detParams.CornerRefinementMaxIterations = 40;
+            detParams.CornerRefinementMinAccuracy = 0.02;
 
             using var frame = new Mat();
             using var gray = new Mat();
@@ -169,28 +190,69 @@ namespace RobotControllerApp.Services
                         for (int i = 0; i < ids.Length; i++)
                         {
                             int id = ids[i];
-                            int col = id % GridCols;
-                            int row = id / GridCols;
+                            int u = 0, v = 0;
+                            bool valid = true;
 
-                            // X goes right, Y goes DOWN (forward on table, matching the physical printed ArUco board).
-                            float cx = (float)((col - (GridCols - 1) / 2.0f) * (MarkerLength + MarkerGap));
+                            // The Niryo Vision Workspace is a 7x5 grid of alternating Charuco squares.
+                            // We define (0,0) as the center marker (id=8).
+                            // Rows go from 2 (Top) to -2 (Bottom).
+                            // Columns go from -3 (Left) to 3 (Right).
+                            switch (id)
+                            {
+                                // Top Row: Y=2
+                                case 0: u = -2; v = 2; break;
+                                case 1: u = 0; v = 2; break;
+                                case 2: u = 2; v = 2; break;
 
-                            // FIXED: 'row' is now positive-going so Y goes DOWN.
-                            float cy = (float)((row - (GridRows - 1) / 2.0f) * (MarkerLength + MarkerGap));
+                                // Row Y=1
+                                case 3: u = -3; v = 1; break;
+                                case 4: u = -1; v = 1; break;
+                                case 5: u = 1; v = 1; break;
+                                case 6: u = 3; v = 1; break;
 
-                            float half = MarkerLength / 2.0f;
+                                // Center Row: Y=0
+                                case 7: u = -2; v = 0; break;
+                                case 8: u = 0; v = 0; break;
+                                case 9: u = 2; v = 0; break;
 
-                            // Corners: TL, TR, BR, BL 
-                            // Because Y now goes down, Top-Left is (-half, -half)
-                            objPtsList.Add(new Point3f(cx - half, cy - half, 0f)); // TL
-                            objPtsList.Add(new Point3f(cx + half, cy - half, 0f)); // TR
-                            objPtsList.Add(new Point3f(cx + half, cy + half, 0f)); // BR
-                            objPtsList.Add(new Point3f(cx - half, cy + half, 0f)); // BL
+                                // Row Y=-1
+                                case 10: u = -3; v = -1; break;
+                                case 11: u = -1; v = -1; break;
+                                case 12: u = 1; v = -1; break;
+                                case 13: u = 3; v = -1; break;
 
-                            imgPtsList.Add(corners[i][0]);
-                            imgPtsList.Add(corners[i][1]);
-                            imgPtsList.Add(corners[i][2]);
-                            imgPtsList.Add(corners[i][3]);
+                                // Bottom Row: Y=-2
+                                case 14: u = -2; v = -2; break;
+                                case 15: u = 0; v = -2; break;
+                                case 16: u = 2; v = -2; break;
+
+                                default: valid = false; break;
+                            }
+
+                            if (valid)
+                            {
+                                float step = SquareLength;
+                                float half = MarkerLength / 2.0f;
+
+                                // X goes Right, Y goes FORWARD (Up on the image)
+                                float cx = u * step;
+                                float cy = v * step;
+
+                                // OpenCV corner order: TL, TR, BR, BL  (Clockwise starting from top-left)
+                                // In the physical 3D world:
+                                // +X points RIGHT.
+                                // +Y points FORWARD (UP on the image).
+                                // Right-Hand Rule: X(right) cross Y(forward) = Z(UP, away from table).
+                                objPtsList.Add(new Point3f(cx - half, cy + half, 0f)); // Top-Left
+                                objPtsList.Add(new Point3f(cx + half, cy + half, 0f)); // Top-Right
+                                objPtsList.Add(new Point3f(cx + half, cy - half, 0f)); // Bottom-Right
+                                objPtsList.Add(new Point3f(cx - half, cy - half, 0f)); // Bottom-Left
+
+                                imgPtsList.Add(corners[i][0]);
+                                imgPtsList.Add(corners[i][1]);
+                                imgPtsList.Add(corners[i][2]);
+                                imgPtsList.Add(corners[i][3]);
+                            }
                         }
 
                         // Convert to standard arrays so OpenCvSharp implicitly converts to InputArray
@@ -201,7 +263,7 @@ namespace RobotControllerApp.Services
                         using var tvec = new Mat(3, 1, MatType.CV_64FC1);
 
                         // Solve for the entire board at once -> Rock stable Gizmo & Pose!
-                        Cv2.SolvePnP(InputArray.Create(objPts), InputArray.Create(imgPts), cameraMatrix, distCoeffs, avgRvec, tvec, false, SolvePnPFlags.Ippe);
+                        Cv2.SolvePnP(InputArray.Create(objPts), InputArray.Create(imgPts), cameraMatrix, distCoeffs, avgRvec, tvec);
 
                         double avgTx = tvec.At<double>(0), avgTy = tvec.At<double>(1), avgTz = tvec.At<double>(2);
                         double avgRx = avgRvec.At<double>(0), avgRy = avgRvec.At<double>(1), avgRz = avgRvec.At<double>(2);
