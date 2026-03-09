@@ -524,14 +524,19 @@
     };
 
     window.updateCameraFeed = function (base64Url) {
+      let isFirstTime = false;
       if (!camVideoTexture) {
         camVideoTexture = new THREE.Texture();
         camVideoTexture.colorSpace = THREE.SRGBColorSpace;
+        isFirstTime = true;
       }
       const img = new Image();
       img.onload = () => {
         camVideoTexture.image = img;
         camVideoTexture.needsUpdate = true;
+        if (isFirstTime && window.lastPoseObj && !camVideoPlane) {
+          window.setCameraPose(JSON.stringify(window.lastPoseObj));
+        }
       };
       img.src = base64Url;
     };
@@ -543,6 +548,7 @@
     window.setCameraPose = function (jsonStr) {
       try {
         const p = JSON.parse(jsonStr);
+        window.lastPoseObj = p;
         // The raw UI panel was removed to favor the native WPF overlay
         // Update 3D camera cone
         buildCameraViz(p.X, p.Y, p.Z, p);
@@ -610,6 +616,14 @@
           const mesh = new THREE.Mesh(geo, mat);
           mesh.castShadow = true; mesh.receiveShadow = true;
           mesh.position.set(px, radius, pz);
+
+          if (item.angleRad !== undefined) {
+            mesh.rotation.y = -item.angleRad;
+          }
+
+          const pivotAxes = new THREE.AxesHelper(0.08); // 8cm axes visual length
+          mesh.add(pivotAxes);
+
           objGroup.add(mesh);
 
           labelSprite.position.set(px, radius * 2 + 0.03, pz);
@@ -646,6 +660,9 @@
 
             const boxScaled = new THREE.Box3().setFromObject(wrapper);
             labelSprite.position.set(px, boxScaled.max.y + 0.03, pz);
+
+            const pivotAxes = new THREE.AxesHelper(0.08 / s); // 8cm axes visual length
+            wrapper.add(pivotAxes);
 
             objGroup.add(wrapper);
             objGroup.add(labelSprite);

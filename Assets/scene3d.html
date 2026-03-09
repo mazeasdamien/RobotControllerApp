@@ -616,6 +616,14 @@
           const mesh = new THREE.Mesh(geo, mat);
           mesh.castShadow = true; mesh.receiveShadow = true;
           mesh.position.set(px, radius, pz);
+
+          if (item.angleRad !== undefined) {
+            mesh.rotation.y = -item.angleRad;
+          }
+
+          const pivotAxes = new THREE.AxesHelper(0.08); // 8cm axes visual length
+          mesh.add(pivotAxes);
+
           objGroup.add(mesh);
 
           labelSprite.position.set(px, radius * 2 + 0.03, pz);
@@ -652,6 +660,9 @@
 
             const boxScaled = new THREE.Box3().setFromObject(wrapper);
             labelSprite.position.set(px, boxScaled.max.y + 0.03, pz);
+
+            const pivotAxes = new THREE.AxesHelper(0.08 / s); // 8cm axes visual length
+            wrapper.add(pivotAxes);
 
             objGroup.add(wrapper);
             objGroup.add(labelSprite);

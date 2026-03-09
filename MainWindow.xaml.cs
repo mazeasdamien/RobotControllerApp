@@ -2079,8 +2079,12 @@ namespace RobotControllerApp
                         }
                     }
                 }
-                // Live-sync to 3D preview if open
-                if (_webViewReady) _ = PushObjectsToSceneAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    // Live-sync to 3D preview if open
+                    if (_webViewReady) _ = PushObjectsToSceneAsync();
+                }
                 else
                 {
                     if (AutoScanToggle.IsChecked != true)
