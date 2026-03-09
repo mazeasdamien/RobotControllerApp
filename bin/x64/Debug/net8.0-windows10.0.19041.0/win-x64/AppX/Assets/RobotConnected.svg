@@ -1,0 +1,199 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
+    <defs>
+        <!-- Glow Effects -->
+        <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur1" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2" result="blur2" />
+            <feMerge>
+                <feMergeNode in="blur1" />
+                <feMergeNode in="blur2" />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+
+        <filter id="softGlow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="blur" />
+            <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+            </feMerge>
+        </filter>
+
+        <!-- UI Panel Gradient -->
+        <linearGradient id="uiFade" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#00CC6A" stop-opacity="0.15" />
+            <stop offset="100%" stop-color="#00CC6A" stop-opacity="0" />
+        </linearGradient>
+    </defs>
+
+    <!-- 1. PLAIN SOLID BACKGROUND -->
+    <rect width="100%" height="100%" fill="#1F1F1F" />
+
+    <!-- 2. ENVIRONMENT & WAITING PERIMETER -->
+    <g id="environment">
+        <!-- Floor Shadow -->
+        <polygon points="400,510 490,465 400,420 310,465" fill="#131313" />
+
+        <!-- Radiating Connection Scan Rings (Isometric) -->
+        <g stroke="#00CC6A" fill="none" opacity="0.4" filter="url(#softGlow)">
+            <ellipse cx="400" cy="465" rx="140" ry="70" stroke-width="1.5" stroke-dasharray="15 30">
+                <animateTransform attributeName="transform" type="rotate" from="0 400 465" to="360 400 465" dur="12s" repeatCount="indefinite" />
+            </ellipse>
+            <ellipse cx="400" cy="465" rx="190" ry="95" stroke-width="1" stroke-dasharray="5 15">
+                <animateTransform attributeName="transform" type="rotate" from="360 400 465" to="0 400 465" dur="18s" repeatCount="indefinite" />
+            </ellipse>
+        </g>
+    </g>
+
+    <!-- 3. AWAITING CONNECTION HOLOGRAPHIC UI -->
+    <!-- Floating to the left of the robot, scanning for a signal -->
+    <g id="hologram-ui">
+        <animateTransform attributeName="transform" type="translate" values="0,-8; 0,8; 0,-8" dur="4s" ease="ease-in-out" repeatCount="indefinite" />
+
+        <!-- Abstract Isometric UI Panel -->
+        <polygon points="180,210 280,160 280,290 180,340" fill="url(#uiFade)" stroke="#00CC6A" stroke-width="1" stroke-dasharray="2 4" opacity="0.6" />
+        <polygon points="185,215 275,170 275,185 185,230" fill="#00CC6A" opacity="0.1" />
+
+        <!-- Scanning Data Bars inside Panel -->
+        <line x1="200" y1="230" x2="260" y2="200" stroke="#00CC6A" stroke-width="2" opacity="0.8">
+            <animate attributeName="opacity" values="0.2; 1; 0.2" dur="1.5s" repeatCount="indefinite" />
+        </line>
+        <line x1="200" y1="245" x2="240" y2="225" stroke="#00CC6A" stroke-width="2" opacity="0.5">
+            <animate attributeName="opacity" values="0.1; 0.8; 0.1" dur="2s" repeatCount="indefinite" />
+        </line>
+        <line x1="200" y1="260" x2="250" y2="235" stroke="#00CC6A" stroke-width="2" opacity="0.3">
+            <animate attributeName="opacity" values="0.3; 1; 0.3" dur="1.2s" repeatCount="indefinite" />
+        </line>
+
+        <!-- Floating Central Node (Digital Twin Placeholder) -->
+        <g transform="translate(230, 160)">
+            <circle cx="0" cy="0" r="6" fill="#FFFFFF" filter="url(#glow)" />
+            <circle cx="0" cy="0" r="15" fill="none" stroke="#00CC6A" stroke-width="2">
+                <animate attributeName="r" values="6; 35" dur="2s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="1; 0" dur="2s" repeatCount="indefinite" />
+            </circle>
+            <circle cx="0" cy="0" r="15" fill="none" stroke="#00CC6A" stroke-width="1">
+                <animate attributeName="r" values="6; 35" dur="2s" begin="1s" repeatCount="indefinite" />
+                <animate attributeName="opacity" values="1; 0" dur="2s" begin="1s" repeatCount="indefinite" />
+            </circle>
+        </g>
+    </g>
+
+    <!-- Data Stream from UI Panel to Robot Base -->
+    <path d="M 230 160 C 230 350, 310 440, 370 435" fill="none" stroke="#66FFAA" stroke-width="2.5" stroke-dasharray="8 8" filter="url(#glow)" opacity="0.8">
+        <animate attributeName="stroke-dashoffset" from="32" to="0" dur="1s" repeatCount="indefinite" />
+    </path>
+
+    <!-- 4. NIRYO NED 1 ROBOTIC ARM (Resting / Waiting Pose) -->
+    <g id="robot-arm">
+        <!-- BASE BLOCK -->
+        <g id="base">
+            <polygon points="400,455 460,425 400,395 340,425" fill="#424854" />
+            <polygon points="340,425 400,455 400,485 340,455" fill="#2A2E35" />
+            <polygon points="400,455 460,425 460,455 400,485" fill="#1A1D24" />
+
+            <!-- Base Status LED (Breathing Green) -->
+            <polygon points="360,445 380,455 380,465 360,455" fill="#00CC6A" filter="url(#glow)">
+                <animate attributeName="opacity" values="0.2; 1; 0.2" dur="2.5s" repeatCount="indefinite" />
+            </polygon>
+            <polygon points="420,455 440,445 440,455 420,465" fill="#00CC6A" opacity="0.3" />
+        </g>
+
+        <!-- SWIVEL JOINT (Axis 1) -->
+        <g id="swivel">
+            <polygon points="400,435 435,417.5 400,400 365,417.5" fill="#353A43" />
+            <polygon points="365,417.5 400,435 400,455 365,437.5" fill="#1A1D24" />
+            <polygon points="400,435 435,417.5 435,437.5 400,455" fill="#2A2E35" />
+        </g>
+
+        <!-- TRUNK / SHOULDER PILLAR -->
+        <g id="trunk">
+            <!-- Top Face -->
+            <polygon points="400,340 420,330 400,320 380,330" fill="#424854" />
+            <!-- Left Face -->
+            <polygon points="380,330 400,340 400,435 380,425" fill="#2A2E35" />
+            <!-- Right Face -->
+            <polygon points="400,340 420,330 420,425 400,435" fill="#1A1D24" />
+
+            <!-- Trunk Stepper Motor Detail (Right Side) -->
+            <polygon points="405,355 415,350 415,380 405,385" fill="#14171D" />
+            <polygon points="407,360 413,357 413,377 407,380" fill="#00CC6A" opacity="0.4" />
+        </g>
+
+        <!-- UPPER ARM (Connects to Left face of Trunk, reaches up and left/back) -->
+        <!-- In this isometric view, drawn in front of Trunk to overlap properly -->
+        <g id="upper-arm">
+            <!-- Solid Body Left Face -->
+            <polygon points="360,355 430,235 450,245 380,365" fill="#424854" />
+            <!-- Solid Body Bottom/Front Face -->
+            <polygon points="380,365 450,245 450,265 380,385" fill="#2A2E35" />
+
+            <!-- Structural Indent / Rail (Dark charcoal inset) -->
+            <polygon points="370,355 425,260 435,265 380,360" fill="#353A43" />
+            <polygon points="385,365 440,270 440,275 385,370" fill="#14171D" />
+
+            <!-- Joint 2 (Shoulder Pivot) glowing motor ring on Lower Arm -->
+            <polygon points="365,365 385,355 385,375 365,385" fill="#1A1D24" />
+            <polygon points="370,367.5 380,362.5 380,372.5 370,377.5" fill="none" stroke="#00CC6A" stroke-width="2" filter="url(#glow)">
+                <animate attributeName="opacity" values="0.5; 1; 0.5" dur="3s" repeatCount="indefinite" />
+            </polygon>
+        </g>
+
+        <!-- ELBOW JOINT (Axis 3) -->
+        <g id="elbow">
+            <!-- Top Face -->
+            <polygon points="440,230 460,220 480,230 460,240" fill="#424854" />
+            <!-- Left Face (Connecting to Upper Arm) -->
+            <polygon points="440,230 460,240 460,260 440,250" fill="#353A43" />
+            <!-- Right Face -->
+            <polygon points="460,240 480,230 480,250 460,260" fill="#1A1D24" />
+
+            <!-- Data Node / Motor Housing Cap -->
+            <polygon points="465,240 475,235 475,245 465,250" fill="#14171D" />
+            <circle cx="470" cy="242.5" r="2" fill="#66FFAA" filter="url(#glow)" />
+        </g>
+
+        <!-- FOREARM (Reaches down and right into a folded "waiting" posture) -->
+        <g id="forearm">
+            <!-- Top Face -->
+            <polygon points="460,240 480,230 530,305 510,315" fill="#424854" />
+            <!-- Left Face -->
+            <polygon points="460,240 510,315 510,330 460,255" fill="#353A43" />
+            <!-- Right Face -->
+            <polygon points="480,230 530,305 530,320 480,245" fill="#2A2E35" />
+
+            <!-- Forearm Data Stripe (Glowing) -->
+            <polyline points="470,250 515,317" fill="none" stroke="#00CC6A" stroke-width="2" stroke-dasharray="6 4" filter="url(#softGlow)">
+                <animate attributeName="stroke-dashoffset" from="10" to="0" dur="0.8s" repeatCount="indefinite" />
+            </polyline>
+        </g>
+
+        <!-- WRIST & GRIPPER (Axis 4, 5, 6) -->
+        <g id="wrist-gripper">
+            <!-- Wrist Base Joint -->
+            <polygon points="510,315 530,305 550,315 530,325" fill="#424854" />
+            <polygon points="510,315 530,325 530,345 510,335" fill="#2A2E35" />
+            <polygon points="530,325 550,315 550,335 530,345" fill="#1A1D24" />
+
+            <!-- Green Indicator Ring above Gripper -->
+            <polygon points="510,335 530,345 550,335 530,325" fill="none" stroke="#00CC6A" stroke-width="1.5" filter="url(#glow)" opacity="0.8" />
+
+            <!-- Left Pincer (Front) -->
+            <polygon points="515,345 525,350 525,385 515,380" fill="#66FFAA" filter="url(#softGlow)" />
+            <polygon points="515,345 520,342 520,377 515,380" fill="#00CC6A" />
+
+            <!-- Right Pincer (Back) -->
+            <polygon points="535,335 545,340 545,375 535,370" fill="#44E88A" />
+            <polygon points="535,335 540,332 540,367 535,370" fill="#00CC6A" filter="url(#softGlow)" />
+
+            <!-- Central Gripper Sensor / Laser Node (Awaiting Object) -->
+            <circle cx="530" cy="355" r="4" fill="#FFFFFF" filter="url(#glow)">
+                <animate attributeName="opacity" values="0.4; 1; 0.4" dur="1s" repeatCount="indefinite" />
+            </circle>
+            <!-- Downward scanning laser -->
+            <polygon points="530,355 520,410 540,410" fill="url(#uiFade)" opacity="0.6">
+                <animate attributeName="opacity" values="0.2; 0.8; 0.2" dur="2s" repeatCount="indefinite" />
+            </polygon>
+        </g>
+    </g>
+</svg>

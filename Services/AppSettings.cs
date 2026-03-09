@@ -26,9 +26,12 @@ namespace RobotControllerApp.Services
 
         /// <summary>The Orange API Key.</summary>
         public string OrangeApiKey { get; set; } = "";
-        
+
         /// <summary>The Google Gemini API Key.</summary>
         public string GeminiApiKey { get; set; } = "";
+
+        /// <summary>The Banana image generation model.</summary>
+        public string BananaModel { get; set; } = "gemini-2.5-flash-image";
 
         /// <summary>The Tripo3D API Key for cloud-based 3D model generation.</summary>
         public string TripoApiKey { get; set; } = "";
