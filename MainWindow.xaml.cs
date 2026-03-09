@@ -160,7 +160,6 @@ namespace RobotControllerApp
             GeminiApiKeyInput.Password = _settings.GeminiApiKey;
             TripoApiKeyInput.Password = _settings.TripoApiKey;
             Use3DApiModeToggle.IsOn = _settings.Use3DApiMode;
-            CameraFovSlider.Value = _settings.CameraFovScale;
             UpdateModelModeBadge(_settings.Use3DApiMode);
 
             // Update Hub Card Status (Initialize as Waiting for Hub to start or Unity to connect)
@@ -2819,21 +2818,6 @@ namespace RobotControllerApp
             if (_webViewReady)
             {
                 string js = $"if (window.setCameraFeedOpacity) window.setCameraFeedOpacity({e.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)});";
-                _ = SceneWebView.ExecuteScriptAsync(js);
-            }
-        }
-
-        private void CameraFovSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (_settings != null && Math.Abs(_settings.CameraFovScale - e.NewValue) > 0.001)
-            {
-                _settings.CameraFovScale = e.NewValue;
-                _settings.Save();
-            }
-
-            if (_webViewReady)
-            {
-                string js = $"if (window.setCameraFovScale) window.setCameraFovScale({e.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)});";
                 _ = SceneWebView.ExecuteScriptAsync(js);
             }
         }

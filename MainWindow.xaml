@@ -1239,12 +1239,6 @@
                                 <TextBlock Text="Feed Projection Opacity" FontSize="12" Foreground="#888"/>
                                 <Slider x:Name="CameraFeedOpacitySlider" Minimum="0" Maximum="1" Value="0.85" SmallChange="0.05" LargeChange="0.1" StepFrequency="0.05" ValueChanged="CameraFeedOpacitySlider_ValueChanged"/>
                             </StackPanel>
-                            
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Camera FOV Scale" FontSize="12" Foreground="#888"/>
-                                <Slider x:Name="CameraFovSlider" Minimum="0.1" Maximum="1.5" Value="0.40" SmallChange="0.01" LargeChange="0.1" StepFrequency="0.01" ValueChanged="CameraFovSlider_ValueChanged"/>
-                            </StackPanel>
-                                          
                                           
                             <Border Background="#0A0A0A" CornerRadius="4" BorderBrush="#111" BorderThickness="1">
                                 <Grid>

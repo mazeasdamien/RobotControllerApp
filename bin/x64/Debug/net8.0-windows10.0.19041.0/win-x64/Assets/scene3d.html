@@ -225,17 +225,17 @@
     // ── Table (Real world size 81cm x 81cm) ──
     const TABLE_W = 0.81, TABLE_D = 0.81;
 
-    // We want the ArUco board (Real scale ~ 28cm x 20cm) to rest EXCACTLY in the top-left corner of the table.
+    // We want the ArUco board (Real scale ~ 28cm x 20cm) to rest on the NEAR edge (-X direction) and centered horizontally (Z direction).
     // The ArUco board's center is at OpenCV's (0,0).
     // In Three.js space, origin (0,0,0) is therefore the center of the board.
-    // To align the Table's top-left corner with the board's top-left edge:
-    // Board Top-Left from center is: (-0.14 in X, -0.10 in Z)
-    // We want the Table's Top-Left edge (-TABLE_W/2, -TABLE_D/2 from surface center) to sit exactly at that (-0.14, -0.10).
-    // So Table Center = (-0.14, -0.10) - (-TABLE_W/2, -TABLE_D/2);
-    // Which means: Table Center = (TABLE_W/2 - 0.14, TABLE_D/2 - 0.10)
+    // To align the Table's near edge with the board's near edge:
+    // Board Near edge from center is: (-0.14 in X)
+    // Table Near edge from center is: (-TABLE_W/2)
+    // So Table Center X = (TABLE_W/2) - 0.14;
+    // For Z (horizontal), since we want it centered, Table Center Z = 0;
 
     const TABLE_CX = (TABLE_W / 2) - 0.14;
-    const TABLE_CZ = (TABLE_D / 2) - 0.10;
+    const TABLE_CZ = 0;
 
     const tableMat = new THREE.MeshStandardMaterial({ color: 0x14142a, roughness: 0.55, metalness: 0.1 });
     const tableMesh = new THREE.Mesh(new THREE.BoxGeometry(TABLE_W, 0.012, TABLE_D), tableMat);
@@ -313,13 +313,6 @@
     boardMesh.position.set(0, 0.002, 0);
     scene.add(boardMesh);
 
-    // Add tiny fake marker checkerboard pattern
-    const boardGridMat = new THREE.MeshBasicMaterial({ color: 0x222222, side: THREE.DoubleSide });
-    const boardGridMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.25, 0.17), boardGridMat);
-    boardGridMesh.rotation.x = -Math.PI / 2;
-    boardGridMesh.position.set(0, 0.003, 0);
-    scene.add(boardGridMesh);
-
     // World axes precisely at the center of the Niryo paper
     const axesHelper = new THREE.AxesHelper(0.10);
     axesHelper.position.y = 0.005; scene.add(axesHelper);
@@ -327,7 +320,6 @@
     // Toggle for calibration guides
     window.toggleCalibrationPlane = function (show) {
       boardMesh.visible = show;
-      boardGridMesh.visible = show;
       axesHelper.visible = show;
     };
 
@@ -416,7 +408,7 @@
             ? (camVideoTexture.image.width / camVideoTexture.image.height)
             : (16 / 9); // Default HD webcam ratio
 
-          const fovScale = window.currentFovScale !== undefined ? window.currentFovScale : 0.40;
+          const fovScale = window.currentFovScale !== undefined ? window.currentFovScale : 0.45;
           const halfH = dist * fovScale;
           const halfW = halfH * aspect;
 
