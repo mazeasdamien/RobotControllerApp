@@ -39,6 +39,15 @@ namespace RobotControllerApp.Services
         /// <summary>If true, use the Tripo3D cloud API instead of the local TripoSR server.</summary>
         public bool Use3DApiMode { get; set; } = false;
 
+        /// <summary>Scale of the extracted object (0.0 to 1.0) in the generation prompt.</summary>
+        public double BananaFramingScale { get; set; } = 0.6;
+
+        /// <summary>Custom prompt string for extracting object.</summary>
+        public string BananaPromptTemplate { get; set; } = "";
+
+        /// <summary>The Tripo3D Model Quality Version.</summary>
+        public string TripoModelQuality { get; set; } = "Turbo-v1.0-20250506";
+
         /// <summary>The scale factor of the 3D Projection.</summary>
         public double CameraFovScale { get; set; } = 0.40;
 

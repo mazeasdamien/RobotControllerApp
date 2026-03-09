@@ -51,12 +51,12 @@ namespace RobotControllerApp.Services
         // ── Board / marker parameters ───────────────────────────────────────────
         public const int GridCols = 4;           // columns of markers on the sheet
         public const int GridRows = 3;           // rows of markers on the sheet
-        
+
         // Measured physical dimensions
-        public const float SquareLength = 0.04f;       // 4.0 cm square side
-        public const float MarkerLength = 0.03f;       // ~3.0 cm marker side
+        public const float SquareLength = 0.0375f;       // 3.75 cm square side
+        public const float MarkerLength = 0.0275f;       // 2.75 cm marker side
         public const float MarkerGap = 0.01f;          // maintained for compatibility
-        
+
         public const int MarkerCount = GridCols * GridRows;    // 12 markers (0–11)
 
         private const int MarkerPx = 150;
@@ -77,7 +77,7 @@ namespace RobotControllerApp.Services
             get
             {
                 string dir = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "RobotControllerApp");
                 if (!System.IO.Directory.Exists(dir))
                     System.IO.Directory.CreateDirectory(dir);
@@ -146,10 +146,10 @@ namespace RobotControllerApp.Services
 
             using var dict = CvAruco.GetPredefinedDictionary(PredefinedDictionaryName.Dict4X4_50);
             var detParams = new DetectorParameters();
-            
+
+
             // Enable Charuco-like subpixel precision directly on our ArUco markers 
-            // since OpenCvSharp 4.10 lacks the CharucoBoard wrapper!
-            detParams.CornerRefinementMethod = CornerRefineMethod.Subpix;
+            // since OpenCvSharp 4.10 lacks the CharucoBoard wrapper!ix;
             detParams.CornerRefinementWinSize = 5;
             detParams.CornerRefinementMaxIterations = 40;
             detParams.CornerRefinementMinAccuracy = 0.02;

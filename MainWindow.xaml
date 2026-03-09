@@ -749,17 +749,14 @@
                                                         <Grid>
                                                             <StackPanel Margin="8" Opacity="{Binding PreviewOpacity}">
                                                                 <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="18" Foreground="{Binding ColorBrush}" Margin="0,0,0,8" HorizontalAlignment="Center"/>
-                                                                <Border CornerRadius="8" BorderBrush="{Binding ColorBrush}" BorderThickness="3" Background="#0A0A0A" Width="200" Height="200">
-                                                                    <Image Source="{Binding CroppedImage}" Stretch="Uniform"/>
-                                                                </Border>
+                                                                <Button Click="AddSelectedObject_Click" Tag="{Binding Name}"
+                                                                        Padding="0" Background="Transparent" BorderThickness="0"
+                                                                        ToolTipService.ToolTip="Click to add to Banana queue">
+                                                                    <Border CornerRadius="8" BorderBrush="{Binding ColorBrush}" BorderThickness="3" Background="#0A0A0A" Width="200" Height="200">
+                                                                        <Image Source="{Binding CroppedImage}" Stretch="Uniform"/>
+                                                                    </Border>
+                                                                </Button>
                                                             </StackPanel>
-                                                                <Button Content="&#xE710;" FontFamily="Segoe MDL2 Assets" FontSize="12"
-                                                                    HorizontalAlignment="Right" VerticalAlignment="Top" 
-                                                                    Margin="0,4,4,0" Width="28" Height="28" CornerRadius="14" Padding="0"
-                                                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                                                    Background="#CC000000" Foreground="White" BorderThickness="0"
-                                                                    Click="AddSelectedObject_Click" Tag="{Binding Name}"
-                                                                    ToolTipService.ToolTip="Select this object for 3D Render (Banana)"/>
                                                         </Grid>
                                                     </DataTemplate>
                                                 </GridView.ItemTemplate>
@@ -867,18 +864,20 @@
                                         
                                         <!-- Header Table -->
                                         <Grid Margin="0,0,0,8" Padding="12,0,12,8" BorderBrush="#333333" BorderThickness="0,0,0,1">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="100"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="200"/>
-                                                <ColumnDefinition Width="150"/>
-                                                <ColumnDefinition Width="60"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="PREVIEW" FontWeight="SemiBold" Foreground="#888"/>
-                                            <TextBlock Grid.Column="1" Text="OBJECT TYPE (LLM NAME)" FontWeight="SemiBold" Foreground="#888"/>
-                                            <TextBlock Grid.Column="2" Text="DATE DISCOVERED" FontWeight="SemiBold" Foreground="#888"/>
-                                             <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"><TextBlock Text="GENERATE" FontWeight="SemiBold" Foreground="#888" VerticalAlignment="Center"/><Border x:Name="ModelModeBadge" CornerRadius="4" Padding="5,2" Background="#1A4080"><TextBlock x:Name="ModelModeBadgeText" Text="LOCAL" FontSize="10" FontWeight="Bold" Foreground="#5599FF"/></Border></StackPanel>
-                                        </Grid>
+                                             <Grid.ColumnDefinitions>
+                                                 <ColumnDefinition Width="100"/>
+                                                 <ColumnDefinition Width="*"/>
+                                                 <ColumnDefinition Width="200"/>
+                                                 <ColumnDefinition Width="150"/>
+                                                 <ColumnDefinition Width="80"/>
+                                                 <ColumnDefinition Width="60"/>
+                                             </Grid.ColumnDefinitions>
+                                             <TextBlock Grid.Column="0" Text="PREVIEW" FontWeight="SemiBold" Foreground="#888"/>
+                                             <TextBlock Grid.Column="1" Text="OBJECT TYPE (LLM NAME)" FontWeight="SemiBold" Foreground="#888"/>
+                                             <TextBlock Grid.Column="2" Text="DATE DISCOVERED" FontWeight="SemiBold" Foreground="#888"/>
+                                             <TextBlock Grid.Column="3" Text="GENERATE" FontWeight="SemiBold" Foreground="#888" VerticalAlignment="Center"/>
+                                             <TextBlock Grid.Column="4" Text="3D VIEW" FontWeight="SemiBold" Foreground="#888" VerticalAlignment="Center"/>
+                                         </Grid>
                                         
                                         <!-- Rows -->
                                         <ListView x:Name="LibraryList" Grid.Row="1" SelectionMode="None">
@@ -889,38 +888,49 @@
                                             </ListView.ItemContainerStyle>
                                             <ListView.ItemTemplate>
                                                 <DataTemplate>
-                                                    <Grid Padding="0,8">
-                                                        <Grid.ColumnDefinitions>
-                                                            <ColumnDefinition Width="100"/>
-                                                            <ColumnDefinition Width="*"/>
-                                                            <ColumnDefinition Width="200"/>
-                                                            <ColumnDefinition Width="150"/>
-                                                            <ColumnDefinition Width="60"/>
-                                                        </Grid.ColumnDefinitions>
-                                                        
-                                                        <Button Grid.Column="0" Width="60" Height="60" Padding="0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Click to View Image">
-                                                            <Border CornerRadius="6" BorderBrush="{Binding ColorBrush}" BorderThickness="2" Background="#0A0A0A" Width="60" Height="60">
-                                                                <Image Source="{Binding ImageSource}" Stretch="Uniform"/>
-                                                            </Border>
-                                                            <Button.Flyout>
-                                                                <Flyout Placement="BottomEdgeAlignedLeft">
-                                                                    <Image Source="{Binding ImageSource}" Stretch="Uniform" MaxWidth="400" MaxHeight="400" Margin="0"/>
-                                                                </Flyout>
-                                                            </Button.Flyout>
-                                                        </Button>
-                                                        
-                                                        <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="16" Foreground="{Binding ColorBrush}"/>
-                                                        <TextBlock Grid.Column="2" Text="{Binding DateAdded}" VerticalAlignment="Center" Foreground="#888"/>
-                                                        
-                                                        <Button Grid.Column="3" Content="To 3D Model" VerticalAlignment="Center" HorizontalAlignment="Center"
-                                                                Style="{StaticResource Button.Filled}" Click="Generate3DModel_Click" Loaded="Generate3DModel_Loaded"/>
+                                                     <Grid Padding="0,8">
+                                                         <Grid.ColumnDefinitions>
+                                                             <ColumnDefinition Width="100"/>
+                                                             <ColumnDefinition Width="*"/>
+                                                             <ColumnDefinition Width="200"/>
+                                                             <ColumnDefinition Width="150"/>
+                                                             <ColumnDefinition Width="80"/>
+                                                             <ColumnDefinition Width="60"/>
+                                                         </Grid.ColumnDefinitions>
 
-                                                        <Button Grid.Column="4" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets" 
-                                                                VerticalAlignment="Center" HorizontalAlignment="Center" Background="Transparent" Foreground="#888" BorderThickness="0"
-                                                                Click="DeleteLibraryObject_Click" Tag="{Binding Name}"
-                                                                ToolTipService.ToolTip="Delete from Library"/>
-                                                    </Grid>
-                                                </DataTemplate>
+                                                         <!-- PNG thumbnail -->
+                                                         <Button Grid.Column="0" Width="60" Height="60" Padding="0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Click to View Image">
+                                                             <Border CornerRadius="6" BorderBrush="{Binding ColorBrush}" BorderThickness="2" Background="#0A0A0A" Width="60" Height="60">
+                                                                 <Image Source="{Binding ImageSource}" Stretch="Uniform"/>
+                                                             </Border>
+                                                             <Button.Flyout>
+                                                                 <Flyout Placement="BottomEdgeAlignedLeft">
+                                                                     <Image Source="{Binding ImageSource}" Stretch="Uniform" MaxWidth="400" MaxHeight="400" Margin="0"/>
+                                                                 </Flyout>
+                                                             </Button.Flyout>
+                                                         </Button>
+
+                                                         <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="16" Foreground="{Binding ColorBrush}"/>
+                                                         <TextBlock Grid.Column="2" Text="{Binding DateAdded}" VerticalAlignment="Center" Foreground="#888"/>
+
+                                                         <Button Grid.Column="3" Content="To 3D Model" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                                 Style="{StaticResource Button.Filled}" Click="Generate3DModel_Click" Loaded="Generate3DModel_Loaded"/>
+
+                                                         <!-- 3D preview button -->
+                                                         <Button Grid.Column="4" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                                 Background="Transparent" BorderThickness="0" Padding="4"
+                                                                 Click="Preview3DModel_Click"
+                                                                 ToolTipService.ToolTip="View 3D Model (Three.js)">
+                                                             <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="22" Foreground="#5599FF"
+                                                                        Loaded="Preview3DBtn_Loaded"/>
+                                                         </Button>
+
+                                                         <Button Grid.Column="5" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets"
+                                                                 VerticalAlignment="Center" HorizontalAlignment="Center" Background="Transparent" Foreground="#888" BorderThickness="0"
+                                                                 Click="DeleteLibraryObject_Click" Tag="{Binding Name}"
+                                                                 ToolTipService.ToolTip="Delete from Library"/>
+                                                     </Grid>
+                                                 </DataTemplate>
                                             </ListView.ItemTemplate>
                                         </ListView>
                                     </Grid>
@@ -1268,6 +1278,7 @@
 
                 <Grid x:Name="SettingsView" Visibility="Collapsed">
                     <Border Padding="{StaticResource Padding.Page}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Spacing="{StaticResource Space.24}" MaxWidth="600" HorizontalAlignment="Left">
 
                             <!-- AI Settings -->
@@ -1280,19 +1291,29 @@
                                 <PasswordBox x:Name="GeminiApiKeyInput" PlaceholderText="AIza..." Width="400" HorizontalAlignment="Left"/>
                                 <TextBlock Text="Required for Banana Pro 2 Generation." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,16"/>
 
+                                <TextBlock Text="Advanced Banana AI Config" Style="{StaticResource Text.Body1}" FontWeight="SemiBold" Margin="0,8,0,0"/>
+
+                                <TextBlock Text="Google Gemini Model" Style="{StaticResource Text.Caption}" FontWeight="SemiBold"/>
+                                <ComboBox x:Name="BananaModelComboBox" Width="400" HorizontalAlignment="Left" SelectionChanged="BananaModelComboBox_SelectionChanged">
+                                    <ComboBoxItem Content="Gemini 2.5 Flash Image ($0.039/img)"/>
+                                    <ComboBoxItem Content="Gemini 3.1 Flash Image Preview ($0.067/img)"/>
+                                    <ComboBoxItem Content="Gemini 3 Pro Image Preview ($0.134/img)"/>
+                                </ComboBox>
+                                
+                                <TextBlock Text="Asset Canvas Framing (%)" Style="{StaticResource Text.Caption}" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Slider x:Name="BananaScaleSlider" Width="300" Minimum="0.1" Maximum="1.0" StepFrequency="0.05" Value="{Binding CameraFovScale}"/>
+                                    <TextBlock x:Name="BananaScaleText" Text="60%" VerticalAlignment="Center"/>
+                                </StackPanel>
+
+                                <TextBlock Text="Custom Extraction Prompt" Style="{StaticResource Text.Caption}" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                <TextBox x:Name="BananaPromptTextBox" Width="600" Height="120" TextWrapping="Wrap" AcceptsReturn="True" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Customize how Gemini extracts the object. Supports {Object} and {Color} overrides." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,16"/>
+
                                 <TextBlock Text="Tripo3D Cloud API Key" Style="{StaticResource Text.Body1}"/>
                                 <PasswordBox x:Name="TripoApiKeyInput" PlaceholderText="tsk_..." Width="400" HorizontalAlignment="Left"/>
                                 <TextBlock Text="Required for 3D Model generation via Tripo3D cloud API." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,8"/>
 
-                                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
-                                    <ToggleSwitch x:Name="Use3DApiModeToggle" Header="" IsOn="False" MinWidth="0"
-                                                  OnContent="ON" OffContent="OFF"
-                                                  Toggled="Use3DApiModeToggle_Toggled"/>
-                                    <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Text="Use Cloud API (Tripo3D)" Style="{StaticResource Text.Body1}" VerticalAlignment="Center"/>
-                                        <TextBlock Text="OFF = local TripoSR server · ON = Tripo3D cloud API" Style="{StaticResource Text.Caption}" Opacity="0.55"/>
-                                    </StackPanel>
-                                </StackPanel>
                             </StackPanel>
 
                             <!-- Relay Settings -->
@@ -1317,8 +1338,9 @@
 
 
                             
-                            <Button x:Name="SaveSettingsButton" Content="SAVE" Style="{StaticResource Button.Filled}" HorizontalAlignment="Left" Click="SaveSettingsButton_Click" Margin="0,16,0,0"/>
+                            <Button x:Name="SaveSettingsButton" Content="SAVE" Style="{StaticResource Button.Filled}" HorizontalAlignment="Left" Click="SaveSettingsButton_Click" Margin="0,16,0,32"/>
                         </StackPanel>
+                        </ScrollViewer>
                     </Border>
                 </Grid>
             </Grid>
