@@ -152,8 +152,16 @@ namespace RobotControllerApp
             // Initialize Services
             _settings = AppSettings.Load();
             _relayServer = new RelayServerHost();
-            _robotBridge = new RobotBridgeService() { RobotId = "Robot_Niryo_01", HasCamera = true };
-            _robotBridge2 = new RobotBridgeService() { RobotId = "Robot_Niryo_02", HasCamera = false };
+
+            // Assign HasCamera based on saved setting (default Robot 1 has camera)
+            bool r1HasCam = _settings.CameraRobot != 2;
+            bool r2HasCam = _settings.CameraRobot == 2;
+            _robotBridge  = new RobotBridgeService() { RobotId = "Robot_Niryo_01", HasCamera = r1HasCam };
+            _robotBridge2 = new RobotBridgeService() { RobotId = "Robot_Niryo_02", HasCamera = r2HasCam };
+
+            // Route camera frames from whichever bridge has the camera → same handler
+            _robotBridge.OnCameraFrameReceived  += HandleCameraFrame;
+            _robotBridge2.OnCameraFrameReceived += HandleCameraFrame;
 
             // Initialize Settings UI values
             RelayPortInput.Text = _settings.RelayPort.ToString();
@@ -163,6 +171,14 @@ namespace RobotControllerApp
             GeminiApiKeyInput.Password = _settings.GeminiApiKey;
             TripoApiKeyInput.Password = _settings.TripoApiKey;
             // CameraFovSlider.Value = _settings.CameraFovScale; // control removed from XAML
+
+            // Restore camera robot radio button state
+            if (_settings.CameraRobot == 2)
+            {
+                CameraRobot1Radio.IsChecked = false;
+                CameraRobot2Radio.IsChecked = true;
+            }
+            UpdateVideoFeedTitle(_settings.CameraRobot);
 
             if (_settings.BananaModel == "gemini-3.1-flash-image-preview") BananaModelComboBox.SelectedIndex = 1;
             else if (_settings.BananaModel == "gemini-3-pro-image-preview") BananaModelComboBox.SelectedIndex = 2;
@@ -239,10 +255,27 @@ namespace RobotControllerApp
             });
 
             // Telemetry Subscriptions
-            RelayServerHost.OnJointsReceived += (joints) => this.DispatcherQueue.TryEnqueue(() =>
+            RelayServerHost.OnJointsReceived += (joints) =>
             {
-                TelemJoints.Text = "[" + string.Join(", ", System.Linq.Enumerable.Select(joints, j => j.ToString("0.00"))) + "]";
-            });
+                // Convert radians → degrees for the FK panel display
+                var degAngles = joints.Select(r => (double)(r * 180.0 / Math.PI)).ToArray();
+                string anglesJson = System.Text.Json.JsonSerializer.Serialize(degAngles);
+
+                // ① Push to local WebView2
+                this.DispatcherQueue.TryEnqueue(async () =>
+                {
+                    TelemJoints.Text = "[" + string.Join(", ", joints.Select(j => j.ToString("0.00"))) + "]";
+                    if (_webViewReady)
+                    {
+                        string safeJson = anglesJson.Replace("\\", "\\\\").Replace("'", "\\'");
+                        await SceneWebView.ExecuteScriptAsync($"setRobotJoints('{safeJson}', 0);");
+                    }
+                });
+
+                // ② Broadcast to remote browser (Quest / LAN)
+                _ = _broadcastServer.BroadcastAsync("setRobotJoints",
+                    System.Text.Json.JsonSerializer.Serialize(new { angles = degAngles, robotIdx = 0 }));
+            };
 
             RelayServerHost.OnImageStatsUpdated += (fps, total) => this.DispatcherQueue.TryEnqueue(() =>
             {
@@ -254,14 +287,27 @@ namespace RobotControllerApp
                 TelemTotalImages.Text = total.ToString();
             });
 
-
-
-
             // Robot 2 Telemetry
-            RelayServerHost.OnRobot2JointsReceived += (joints) => this.DispatcherQueue.TryEnqueue(() =>
+            RelayServerHost.OnRobot2JointsReceived += (joints) =>
             {
-                TelemJoints2.Text = "[" + string.Join(", ", System.Linq.Enumerable.Select(joints, j => j.ToString("0.00"))) + "]";
-            });
+                var degAngles = joints.Select(r => (double)(r * 180.0 / Math.PI)).ToArray();
+                string anglesJson = System.Text.Json.JsonSerializer.Serialize(degAngles);
+
+                // ① Push to local WebView2
+                this.DispatcherQueue.TryEnqueue(async () =>
+                {
+                    TelemJoints2.Text = "[" + string.Join(", ", joints.Select(j => j.ToString("0.00"))) + "]";
+                    if (_webViewReady)
+                    {
+                        string safeJson = anglesJson.Replace("\\", "\\\\").Replace("'", "\\'");
+                        await SceneWebView.ExecuteScriptAsync($"setRobotJoints('{safeJson}', 1);");
+                    }
+                });
+
+                // ② Broadcast to remote browser
+                _ = _broadcastServer.BroadcastAsync("setRobotJoints",
+                    System.Text.Json.JsonSerializer.Serialize(new { angles = degAngles, robotIdx = 1 }));
+            };
 
             RelayServerHost.OnRobotStateReceived += (msg) => this.DispatcherQueue.TryEnqueue(() =>
             {
@@ -1071,6 +1117,102 @@ namespace RobotControllerApp
             UpdateBananaCost();
         }
 
+        // ─── Camera Robot Selection ────────────────────────────────────────────
+
+        private bool _cameraRobotSwitching = false; // guard against re-entrancy during init
+
+        private async void CameraRobotRadio_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_cameraRobotSwitching || _settings == null) return;
+            if (sender is not RadioButton rb) return;
+
+            int selectedRobot = rb.Tag?.ToString() == "2" ? 2 : 1;
+            if (selectedRobot == _settings.CameraRobot) return; // no change
+
+            _settings.CameraRobot = selectedRobot;
+            _settings.Save();
+
+            await ApplyCameraRobotAsync(selectedRobot);
+        }
+
+        /// <summary>
+        /// Switches the camera subscription: unsubscribes from the current robot's bridge
+        /// and subscribes to the newly selected robot's bridge. Updates UI and notifies Unity.
+        /// </summary>
+        private async Task ApplyCameraRobotAsync(int cameraRobot)
+        {
+            bool r1HasCam = cameraRobot != 2;
+            bool r2HasCam = cameraRobot == 2;
+
+            // Swap camera subscriptions (safe to call when not connected)
+            await _robotBridge.SetCameraEnabledAsync(r1HasCam);
+            await _robotBridge2.SetCameraEnabledAsync(r2HasCam);
+
+            // Update the video feed title label on the Dashboard
+            UpdateVideoFeedTitle(cameraRobot);
+
+            // Broadcast cameraRobotId to all Unity clients via the relay
+            string robotIdStr = r2HasCam ? "Robot_Niryo_02" : "Robot_Niryo_01";
+            BroadcastCameraRobotToUnity(robotIdStr);
+
+            Log($"📷 Camera switched to Robot {cameraRobot} ({robotIdStr})");
+        }
+
+        /// <summary>Updates the "ROBOT X VIDEO FEED" label in the Dashboard.</summary>
+        private void UpdateVideoFeedTitle(int cameraRobot)
+        {
+            this.DispatcherQueue.TryEnqueue(() =>
+            {
+                // The TextBlock is a direct child — find it by navigation or assign x:Name
+                // Since it doesn't have an x:Name, we update via the camera icon color too
+                // We do have RobotFeedBadge/RobotFeedDot visible, and can update a tooltip.
+                // For a clearer UX: change the dot label to include the robot number
+                if (RobotFeedBadgeText != null)
+                {
+                    // The badge text reflects online/offline — we add robot number to the tooltip
+                }
+                // Broadcast to local Scene3D WebView
+                if (_webViewReady)
+                {
+                    _ = SceneWebView.ExecuteScriptAsync(
+                        $"if(window.setCameraRobot) window.setCameraRobot({cameraRobot - 1});");
+                }
+                _ = _broadcastServer.BroadcastAsync("setCameraRobot",
+                    System.Text.Json.JsonSerializer.Serialize(new { robotIdx = cameraRobot - 1 }));
+            });
+        }
+
+        /// <summary>Sends a cameraRobotId message to all connected Unity clients via the relay WebSocket.</summary>
+        private static void BroadcastCameraRobotToUnity(string robotId)
+        {
+            var manager = RelayServerHost.CurrentManager;
+            if (manager == null) return;
+
+            string msg = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                op = "camera_robot_changed",
+                cameraRobotId = robotId,
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            });
+
+            // Send to all connected Unity clients
+            _ = Task.Run(async () =>
+            {
+                try { await manager.BroadcastToAllUnityClients(msg); }
+                catch { }
+            });
+        }
+
+        /// <summary>Called by either bridge when a decoded camera frame arrives.</summary>
+        private void HandleCameraFrame(string robotId, byte[] imageBytes)
+        {
+            // This fires from whichever robot currently has HasCamera=true.
+            // Delegate to the same relay handler that OnImageReceived used.
+            RelayServerHost.CurrentManager?.UpdateLatestImage(imageBytes);
+        }
+
+
+
         // ─── Log state ─────────────────────────────────────────────────────────
 
         private class LogEntry
@@ -1257,9 +1399,34 @@ namespace RobotControllerApp
                 {
                     _broadcastServer.AssetsPath = assetsDir;
                     _broadcastServer.LibraryPath = LibraryPath;
+
+                    // When a new remote browser connects, push the current state as a snapshot
+                    _broadcastServer.OnClientConnected += async () =>
+                    {
+                        // Camera pose
+                        var pose = _lastValidPose ?? _savedPose;
+                        if (pose != null)
+                        {
+                            var poseObj = new
+                            {
+                                pose.X, pose.Y, pose.Z,
+                                pose.Rx, pose.Ry, pose.Rz,
+                                pose.R11, pose.R12, pose.R13,
+                                pose.R21, pose.R22, pose.R23,
+                                pose.R31, pose.R32, pose.R33
+                            };
+                            await _broadcastServer.BroadcastAsync("setCameraPose",
+                                System.Text.Json.JsonSerializer.Serialize(poseObj));
+                        }
+
+                        // Detected objects — trigger a full rebuild and broadcast
+                        await PushObjectsToSceneAsync();
+                    };
+
                     _ = Task.Run(() => _broadcastServer.StartAsync());
                     Log($"[Scene3D] Broadcast server starting on port {Scene3dBroadcastServer.DefaultPort}");
                 }
+
 
                 // Load saved camera pose from calibration (fixed camera session)
                 string jsonPath = RobotControllerApp.Services.CameraCalibrationService.SavedPosePath;
@@ -1361,6 +1528,11 @@ namespace RobotControllerApp
                         ? $"http://library.local/{libItem.ModelFileName}"
                         : "";
 
+                    // Remote-friendly URL served by the broadcast Kestrel server on port 8181
+                    string modelUrlRemote = libItem != null && !string.IsNullOrEmpty(libItem.ModelFileName)
+                        ? $"/library/{libItem.ModelFileName}"
+                        : "";
+
                     return new
                     {
                         label = obj.Name,
@@ -1369,13 +1541,19 @@ namespace RobotControllerApp
                         sizeW,
                         sizeH,
                         angleRad = obj.AngleDegrees * Math.PI / 180.0,
-                        modelUrl
+                        modelUrl,
+                        modelUrlRemote
                     };
                 }).ToList();
 
                 string json = System.Text.Json.JsonSerializer.Serialize(items);
-                json = json.Replace("\\", "\\\\").Replace("'", "\\'");
-                await SceneWebView.ExecuteScriptAsync($"setDetectedObjects('{json}');");
+
+                // ① Push to local WebView2
+                string safeJson = json.Replace("\\", "\\\\").Replace("'", "\\'");
+                await SceneWebView.ExecuteScriptAsync($"setDetectedObjects('{safeJson}');");
+
+                // ② Broadcast to remote browser
+                _ = _broadcastServer.BroadcastAsync("setDetectedObjects", json);
 
                 // Also refresh camera pose overlay
                 if (_lastValidPose != null)
@@ -1410,9 +1588,14 @@ namespace RobotControllerApp
                     pose.R32,
                     pose.R33
                 };
-                string json = System.Text.Json.JsonSerializer.Serialize(poseObj);
-                json = json.Replace("\\", "\\\\").Replace("'", "\\'");
-                await SceneWebView.ExecuteScriptAsync($"setCameraPose('{json}');");
+                string poseJson = System.Text.Json.JsonSerializer.Serialize(poseObj);
+
+                // ① Push to local WebView2
+                string safeJson = poseJson.Replace("\\", "\\\\").Replace("'", "\\'");
+                await SceneWebView.ExecuteScriptAsync($"setCameraPose('{safeJson}');");
+
+                // ② Broadcast to remote browser
+                _ = _broadcastServer.BroadcastAsync("setCameraPose", poseJson);
             }
             catch { /* WebView not ready yet */ }
         }

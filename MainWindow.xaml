@@ -1337,8 +1337,28 @@
                             </StackPanel>
 
 
-                            
+
+                            <!-- Camera Robot Selection -->
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Camera-Equipped Robot" Style="{StaticResource Text.Body1}"/>
+                                <TextBlock Text="Select which robot has the camera mounted on it. Changes take effect immediately." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
+                                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
+                                    <RadioButton x:Name="CameraRobot1Radio"
+                                                 Content="Robot 1"
+                                                 GroupName="CameraRobotGroup"
+                                                 IsChecked="True"
+                                                 Checked="CameraRobotRadio_Checked"
+                                                 Tag="1"/>
+                                    <RadioButton x:Name="CameraRobot2Radio"
+                                                 Content="Robot 2"
+                                                 GroupName="CameraRobotGroup"
+                                                 Checked="CameraRobotRadio_Checked"
+                                                 Tag="2"/>
+                                </StackPanel>
+                            </StackPanel>
+
                             <Button x:Name="SaveSettingsButton" Content="SAVE" Style="{StaticResource Button.Filled}" HorizontalAlignment="Left" Click="SaveSettingsButton_Click" Margin="0,16,0,32"/>
+
                         </StackPanel>
                         </ScrollViewer>
                     </Border>

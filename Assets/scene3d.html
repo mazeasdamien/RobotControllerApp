@@ -6,96 +6,131 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>3D Scene Preview</title>
   <style>
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
 
     body {
-      background: rgb(10, 10, 10);
+      background: rgb(10, 10, 12);
       overflow: hidden;
-      font-family: 'Segoe UI', sans-serif;
+      font-family: -apple-system, 'Segoe UI Variable', 'Segoe UI', system-ui, BlinkMacSystemFont, sans-serif;
     }
 
-    canvas {
-      display: block;
+
+    canvas { display: block; }
+
+    /* ── Design Tokens ─────────────────────────────────── */
+    :root {
+      --glass-bg:    rgba(12, 12, 22, 0.82);
+      --glass-border: rgba(255,255,255,0.07);
+      --blur:        blur(18px);
+      --radius-lg:   14px;
+      --radius-md:   10px;
+      --radius-sm:   7px;
+      --accent:      #5599ff;
+      --accent-glow: rgba(85,153,255,0.25);
+      --accent2:     #ff8c42;
+      --green:       #00cc6a;
+      --red-soft:    rgba(255,80,80,0.85);
+      --text-muted:  rgba(255,255,255,0.38);
+      --text-dim:    rgba(255,255,255,0.62);
+      --text:        rgba(255,255,255,0.92);
     }
 
+    /* ── HUD (top-left) ───────────────────────────────── */
     #hud {
       position: absolute;
-      top: 14px;
-      left: 14px;
-      color: rgba(255, 255, 255, 0.75);
+      top: 16px;
+      left: 16px;
+      color: var(--text);
       font-size: 12px;
       pointer-events: none;
-      background: rgba(0, 0, 0, 0.5);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      border-radius: 8px;
-      padding: 10px 14px;
-      backdrop-filter: blur(8px);
-      min-width: 200px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 12px 16px 10px;
+      backdrop-filter: var(--blur);
+      width: 200px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
     }
 
-    #hud .title {
-      font-size: 13px;
+    #hud .hud-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    #hud .hud-icon {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #1a2a4a 0%, #0d1a35 100%);
+      border: 1px solid rgba(85,153,255,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+
+    #hud .hud-title {
+      font-size: 12px;
       font-weight: 600;
-      color: #fff;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    #hud .hud-subtitle {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    #hud .hud-stats {
+      display: flex;
+      gap: 10px;
       margin-bottom: 8px;
     }
 
-    #hud .hint {
-      opacity: 0.45;
-      font-size: 10px;
-      margin-top: 6px;
+    #hud .hud-stat {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 6px;
+      padding: 5px 10px;
+      flex: 1;
+      text-align: center;
     }
 
-    #pose-panel {
-      position: absolute;
-      top: 14px;
-      right: 14px;
-      background: rgba(0, 0, 0, 0.55);
-      border: 1px solid rgba(255, 195, 0, 0.25);
-      border-radius: 8px;
-      padding: 10px 14px;
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 11px;
-      backdrop-filter: blur(8px);
-      min-width: 190px;
-      font-family: 'Courier New', monospace;
-    }
-
-    #pose-panel .pt {
-      font-size: 12px;
-      font-weight: 600;
-      color: #ffc300;
-      margin-bottom: 6px;
-      font-family: 'Segoe UI', sans-serif;
-    }
-
-    #pose-panel .row {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
+    #hud .hud-stat-val {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
       margin-bottom: 2px;
     }
 
-    #pose-panel .label {
-      color: rgba(255, 255, 255, 0.45);
+    #hud .hud-stat-label {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
     }
 
-    #pose-panel .val {
-      color: #fff;
+    #hud .hint {
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
     }
 
-    #pose-panel.hidden {
-      display: none;
+    #hud .hint::before {
+      content: '·';
+      font-size: 14px;
+      color: rgba(255,255,255,0.25);
+      line-height: 1;
     }
 
 
+    #legend-items { margin-top: 0; }
 
     #legend .lt {
-      color: rgba(255, 255, 255, 0.4);
+      color: var(--text-muted);
       font-weight: 600;
       margin: 6px 0 4px;
       font-size: 10px;
@@ -108,244 +143,345 @@
       align-items: center;
       gap: 8px;
       margin-bottom: 3px;
+      font-size: 11px;
+      color: var(--text-dim);
     }
 
     .ld {
-      width: 9px;
-      height: 9px;
+      width: 8px; height: 8px;
       border-radius: 50%;
       flex-shrink: 0;
+      box-shadow: 0 0 4px currentColor;
     }
 
+    /* ── Empty state ──────────────────────────────────── */
     #no-objects {
       position: absolute;
-      top: 50%;
-      left: 50%;
+      top: 50%; left: 50%;
       transform: translate(-50%, -50%);
-      color: rgba(255, 255, 255, 0.2);
-      font-size: 14px;
+      color: rgba(255,255,255,0.18);
+      font-size: 13px;
       text-align: center;
       pointer-events: none;
+      letter-spacing: 0.02em;
     }
 
     #no-objects svg {
       display: block;
-      margin: 0 auto 10px;
-      opacity: 0.2;
+      margin: 0 auto 12px;
+      opacity: 0.15;
     }
 
+    /* ── WS Badge ────────────────────────────────────── */
+    /* WS badge — bottom-right, away from FK panel */
     #ws-badge {
       position: absolute;
-      bottom: 14px;
-      left: 14px;
-      background: rgba(0, 0, 0, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 20px;
-      padding: 5px 12px 5px 8px;
+      bottom: 16px;
+      right: 16px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      padding: 6px 14px 6px 10px;
       display: flex;
       align-items: center;
-      gap: 7px;
+      gap: 8px;
       font-size: 11px;
-      color: rgba(255, 255, 255, 0.65);
-      backdrop-filter: blur(8px);
+      font-weight: 500;
+      color: var(--text-muted);
+      backdrop-filter: var(--blur);
       pointer-events: none;
-      transition: border-color 0.4s;
+      transition: border-color 0.4s, box-shadow 0.4s;
     }
 
     #ws-badge .dot {
-      width: 8px;
-      height: 8px;
+      width: 7px; height: 7px;
       border-radius: 50%;
-      background: #888;
-      transition: background 0.4s;
+      background: #444;
+      transition: background 0.4s, box-shadow 0.4s;
       flex-shrink: 0;
     }
 
     #ws-badge.live .dot {
-      background: #00cc6a;
-      box-shadow: 0 0 6px #00cc6a88;
+      background: var(--green);
+      box-shadow: 0 0 0 3px rgba(0,204,106,0.2);
+      animation: pulse-dot 2s infinite;
     }
 
     #ws-badge.live {
-      border-color: rgba(0, 204, 106, 0.35);
+      border-color: rgba(0,204,106,0.3);
+      box-shadow: 0 0 20px rgba(0,204,106,0.08);
+      color: var(--text-dim);
     }
 
     #ws-badge.error .dot {
       background: #ff4444;
+      box-shadow: 0 0 0 3px rgba(255,68,68,0.2);
     }
 
-    /* ── FK Panel ─────────────────────────────────────────────── */
+    @keyframes pulse-dot {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(0,204,106,0.2); }
+      50%       { box-shadow: 0 0 0 6px rgba(0,204,106,0.08); }
+    }
+
+    /* FK Panel — bottom-center, wider to use the space naturally */
     #fk-panel {
       position: absolute;
-      bottom: 50px;
-      left: 14px;
-      background: rgba(8, 8, 20, 0.78);
-      border: 1px solid rgba(85, 153, 255, 0.25);
-      border-radius: 10px;
-      backdrop-filter: blur(10px);
-      color: #dde;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--glass-bg);
+      border: 1px solid rgba(85,153,255,0.18);
+      border-radius: var(--radius-lg);
+      backdrop-filter: var(--blur);
+      color: var(--text);
       font-size: 12px;
-      font-family: 'Segoe UI', sans-serif;
-      min-width: 230px;
+      width: 520px;
+      max-width: calc(100vw - 340px); /* stay clear of right-side panel */
       overflow: hidden;
-      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-        opacity 0.25s ease;
-      max-height: 400px;
+      transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1);
+      max-height: 360px; /* open by default */
       opacity: 1;
       user-select: none;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(85,153,255,0.06);
     }
 
-    #fk-panel.collapsed {
-      max-height: 38px;
-    }
+    /* Collapsed state — only shows the header bar */
+    #fk-panel.collapsed { max-height: 44px; }
 
     #fk-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 9px 12px;
+      padding: 11px 14px;
       cursor: pointer;
-      border-bottom: 1px solid rgba(85, 153, 255, 0.15);
-      font-weight: 600;
-      font-size: 12px;
-      color: #5599ff;
+      background: linear-gradient(90deg, rgba(85,153,255,0.08) 0%, transparent 100%);
+      border-bottom: 1px solid rgba(85,153,255,0.10);
       gap: 8px;
+      transition: background 0.2s;
     }
 
     #fk-header:hover {
-      background: rgba(85, 153, 255, 0.07);
+      background: linear-gradient(90deg, rgba(85,153,255,0.14) 0%, rgba(85,153,255,0.03) 100%);
     }
+
+    #fk-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #fk-header-icon {
+      width: 26px; height: 26px;
+      border-radius: 7px;
+      background: linear-gradient(135deg,rgba(85,153,255,0.25),rgba(85,153,255,0.08));
+      border: 1px solid rgba(85,153,255,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0;
+    }
+
+    #fk-header-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: #88bbff;
+      letter-spacing: 0.02em;
+    }
+
+    #fk-live-pill {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(0,204,106,0.12);
+      border: 1px solid rgba(0,204,106,0.3);
+      color: #00cc6a;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      display: none;
+    }
+
+    #fk-live-pill.visible { display: block; }
 
     #fk-toggle-icon {
-      font-size: 10px;
+      font-size: 9px;
+      color: rgba(85,153,255,0.5);
       transition: transform 0.3s;
-      color: #5599ff;
     }
 
-    #fk-panel.collapsed #fk-toggle-icon {
-      transform: rotate(-90deg);
-    }
+    #fk-panel.collapsed #fk-toggle-icon { transform: rotate(-90deg); }
 
-    #fk-body {
-      padding: 10px 12px 12px;
-    }
+    #fk-body { padding: 12px 14px 14px; }
 
+    /* Robot selector pills */
     .fk-robot-selector {
       display: flex;
-      gap: 6px;
-      margin-bottom: 10px;
+      gap: 5px;
+      margin-bottom: 12px;
+      background: rgba(0,0,0,0.25);
+      border-radius: 8px;
+      padding: 3px;
     }
 
     .fk-robot-btn {
       flex: 1;
-      padding: 4px 0;
-      border-radius: 5px;
-      border: 1px solid rgba(85, 153, 255, 0.3);
+      padding: 5px 0;
+      border-radius: 6px;
+      border: none;
       background: transparent;
-      color: rgba(200, 210, 255, 0.6);
+      color: var(--text-muted);
       font-size: 11px;
+      font-weight: 500;
+      font-family: inherit;
       cursor: pointer;
       transition: all 0.2s;
     }
 
     .fk-robot-btn.active {
-      background: rgba(85, 153, 255, 0.18);
-      border-color: #5599ff;
-      color: #fff;
+      background: linear-gradient(135deg, rgba(85,153,255,0.28), rgba(85,153,255,0.12));
+      color: #aaccff;
       font-weight: 600;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+
+    /* 2-column axis grid to use the wider bottom-center panel */
+    #fk-sliders {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px 20px;
     }
 
     .fk-axis-row {
       display: grid;
-      grid-template-columns: 54px 1fr 42px;
+      grid-template-columns: 38px 1fr 46px;
       align-items: center;
-      gap: 7px;
-      margin-bottom: 7px;
+      gap: 8px;
+      padding: 3px 0;
     }
 
     .fk-axis-label {
-      font-size: 11px;
-      color: rgba(200, 220, 255, 0.65);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
       text-align: right;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
+
+    .fk-slider-wrap { position: relative; }
 
     .fk-slider {
       -webkit-appearance: none;
       appearance: none;
       width: 100%;
-      height: 4px;
-      border-radius: 2px;
-      background: rgba(85, 153, 255, 0.2);
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(85,153,255,0.12);
       outline: none;
-      cursor: pointer;
-    }
-
-    .fk-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: #5599ff;
-      box-shadow: 0 0 5px #5599ff88;
-      cursor: pointer;
-      transition: box-shadow 0.15s;
-    }
-
-    .fk-slider:hover::-webkit-slider-thumb {
-      box-shadow: 0 0 9px #5599ffaa;
-    }
-
-    .fk-val {
-      font-size: 11px;
-      color: #fff;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-    }
-
-    #fk-reset-btn {
-      width: 100%;
-      margin-top: 6px;
-      padding: 5px 0;
-      border-radius: 5px;
-      border: 1px solid rgba(255, 100, 100, 0.3);
-      background: rgba(255, 60, 60, 0.08);
-      color: rgba(255, 150, 150, 0.8);
-      font-size: 11px;
       cursor: pointer;
       transition: background 0.2s;
     }
 
+    .fk-slider:hover { background: rgba(85,153,255,0.2); }
+
+    .fk-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 15px; height: 15px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #88bbff, #3366cc);
+      box-shadow: 0 0 6px rgba(85,153,255,0.55), 0 2px 4px rgba(0,0,0,0.4);
+      cursor: pointer;
+      border: 2px solid rgba(255,255,255,0.15);
+      transition: box-shadow 0.15s, transform 0.15s;
+    }
+
+    .fk-slider:active::-webkit-slider-thumb {
+      box-shadow: 0 0 12px rgba(85,153,255,0.8);
+      transform: scale(1.15);
+    }
+
+    .fk-val {
+      font-size: 11px;
+      font-weight: 600;
+      color: #aaccff;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      background: rgba(85,153,255,0.08);
+      border: 1px solid rgba(85,153,255,0.14);
+      border-radius: 5px;
+      padding: 2px 6px;
+    }
+
+    /* Divider between sections */
+    .fk-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.05);
+      margin: 8px 0;
+    }
+
+    #fk-reset-btn {
+      width: 100%;
+      margin-top: 8px;
+      padding: 7px 0;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255,100,100,0.2);
+      background: rgba(255,60,60,0.06);
+      color: rgba(255,150,150,0.75);
+      font-size: 11px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+      letter-spacing: 0.03em;
+    }
+
     #fk-reset-btn:hover {
-      background: rgba(255, 60, 60, 0.18);
+      background: rgba(255,60,60,0.14);
+      border-color: rgba(255,100,100,0.35);
+      color: rgba(255,180,180,0.9);
     }
   </style>
 </head>
 
+
 <body>
 
+  <!-- HUD: top-left info panel -->
   <div id="hud">
-    <div class="title">🔬 3D Scene Preview</div>
-    <div>Objects: <span id="obj-count">0</span></div>
-    <div id="legend-items" style="margin-top:6px;"></div>
-    <div class="hint">Drag · Scroll to zoom</div>
+    <div class="hud-header">
+      <div class="hud-icon">🔬</div>
+      <div>
+        <div class="hud-title">3D Scene Preview</div>
+        <div class="hud-subtitle">Orange Robot Hub</div>
+      </div>
+    </div>
+    <div class="hud-stats">
+      <div class="hud-stat">
+        <div class="hud-stat-val" id="obj-count">0</div>
+        <div class="hud-stat-label">Objects</div>
+      </div>
+      <div class="hud-stat" id="hud-robot-stat" style="display:none">
+        <div class="hud-stat-val" id="hud-robot-val" style="font-size:11px;">R1</div>
+        <div class="hud-stat-label">Camera</div>
+      </div>
+    </div>
+    <div id="legend-items"></div>
+    <div class="hint">Drag · Scroll to zoom · Right-click pan</div>
   </div>
-
-
-
-
 
   <div id="no-objects">
     <svg width="44" height="44" viewBox="0 0 24 24" fill="white">
-      <path
-        d="M12 2l-5.5 9h11L12 2zm0 3.84L14.77 10H9.23L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5S15.01 22 17.5 22s4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7a2.5 2.5 0 010-5 2.5 2.5 0 010 5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z" />
+      <path d="M12 2l-5.5 9h11L12 2zm0 3.84L14.77 10H9.23L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5S15.01 22 17.5 22s4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7a2.5 2.5 0 010-5 2.5 2.5 0 010 5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z" />
     </svg>
     Scan the scene to detect objects
   </div>
 
-  <!-- FK Control Panel -->
-  <div id="fk-panel" class="collapsed">
+  <!-- FK Control Panel — bottom-center -->
+  <div id="fk-panel">
     <div id="fk-header" onclick="toggleFkPanel()">
-      <span>🦾 Forward Kinematics</span>
+      <div id="fk-header-left">
+        <div id="fk-header-icon">🦾</div>
+        <span id="fk-header-text">Forward Kinematics</span>
+        <span id="fk-live-pill">LIVE</span>
+      </div>
       <span id="fk-toggle-icon">▼</span>
     </div>
     <div id="fk-body">
@@ -354,13 +490,13 @@
         <button class="fk-robot-btn" id="fk-r2-btn" onclick="selectFkRobot(1)">Robot 2</button>
         <button class="fk-robot-btn" id="fk-both-btn" onclick="selectFkRobot(2)">Both</button>
       </div>
-      <!-- Axis rows generated by JS -->
       <div id="fk-sliders"></div>
-      <button id="fk-reset-btn" onclick="resetFk()">↺ Reset to Home</button>
+      <div class="fk-divider"></div>
+      <button id="fk-reset-btn" onclick="resetFk()">↺ &nbsp;Reset to Home</button>
     </div>
   </div>
 
-  <!-- Live WS connection badge (visible when scene is opened in a browser remotely) -->
+  <!-- Live WS connection badge -->
   <div id="ws-badge">
     <div class="dot"></div>
     <span id="ws-label">Connecting…</span>
@@ -385,7 +521,8 @@
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.9;
+    renderer.toneMappingExposure = 0.85;
+
     document.body.appendChild(renderer.domElement);
 
     // ── Scene ──
@@ -409,15 +546,23 @@
     };
 
     // ── Lighting ──
-    scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-    const dir = new THREE.DirectionalLight(0xffffff, 1.6);
-    dir.position.set(1.5, 3, 2); dir.castShadow = true;
-    dir.shadow.mapSize.set(1024, 1024);
+    // Balanced setup: high ambient to fill shadows, overhead key to avoid
+    // grazing-angle normal-map streaks (the "wood grain" effect).
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+    // Key light — overhead angle prevents raking across the bump map
+    const dir = new THREE.DirectionalLight(0xffffff, 1.4);
+    dir.position.set(2, 5, 2); dir.castShadow = true;
+    dir.shadow.mapSize.set(2048, 2048);
     dir.shadow.camera.left = -2; dir.shadow.camera.right = 2;
     dir.shadow.camera.top = 2; dir.shadow.camera.bottom = -2;
+    dir.shadow.bias = -0.0005;
     scene.add(dir);
-    const fill = new THREE.PointLight(0x4444ff, 0.5, 5);
-    fill.position.set(-1.5, 1.5, -1); scene.add(fill);
+
+    // Soft neutral fill from the opposite side
+    const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+    fill.position.set(-2, 2, -1.5);
+    scene.add(fill);
 
     // ── Table (Real world size 80cm x 80cm) ──
     const TABLE_W = 0.80, TABLE_D = 0.80;
@@ -526,11 +671,57 @@
       });
     }
 
+    // ── Material polish for the Niryo Ned GLB ──────────────────────────────────
+    // The GLB's embedded normal maps are baked at high intensity for CAD renders.
+    // In a real-time scene with directional lighting they produce a "wood grain"
+    // effect. We soften them here and improve texture filtering.
+    function polishNedMaterials(root) {
+      const maxAniso = renderer.capabilities.getMaxAnisotropy();
+      root.traverse((node) => {
+        if (!node.isMesh) return;
+        node.castShadow = true;
+        node.receiveShadow = true;
+
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        mats.forEach((mat) => {
+          if (!mat || !mat.isMeshStandardMaterial) return;
+
+          // ── Moderate bump softening ──
+          // 0.55 removes the "wood grain" raking artifact while preserving
+          // surface micro-detail that makes the plastic look real.
+          if (mat.normalMap) {
+            mat.normalScale.set(0.55, 0.55);
+          }
+
+          // ── Plastic appearance tweak ──
+          // Only soften parts that look like the blue ABS body.
+          // Detect by checking the map tint vs a threshold colour.
+          const col = mat.color;
+          const isBlueBody = col.r < 0.35 && col.g > 0.3 && col.b > 0.55;
+          if (isBlueBody) {
+            mat.roughness  = Math.min(mat.roughness,  0.55); // slightly glossy plastic
+            mat.metalness  = Math.max(mat.metalness,  0.0);
+          }
+
+          // ── Max anisotropy on every texture channel ──
+          const textures = [mat.map, mat.normalMap, mat.roughnessMap, mat.metalnessMap, mat.aoMap];
+          textures.forEach((t) => {
+            if (t) {
+              t.anisotropy = maxAniso;
+              t.needsUpdate = true;
+            }
+          });
+
+          mat.needsUpdate = true;
+        });
+      });
+    }
+
     gltfLoader.load('ned.glb', (gltf) => {
       const nedModel = gltf.scene;
-      nedModel.traverse((node) => {
-        if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
-      });
+
+      // Apply material polish before cloning so both robots inherit it
+      polishNedMaterials(nedModel);
 
       const BASE_OFFSET = 0.095;
       const MARGIN = 0.017;
@@ -823,6 +1014,17 @@
       } catch (e) { console.error(e); }
     };
 
+    // Called when camera robot assignment changes (robotIdx: 0=R1, 1=R2)
+    window.setCameraRobot = function(robotIdx) {
+      const label = robotIdx === 1 ? 'R2' : 'R1';
+      const stat = document.getElementById('hud-robot-stat');
+      const val  = document.getElementById('hud-robot-val');
+      if (stat && val) {
+        stat.style.display = '';
+        val.textContent = label;
+      }
+    };
+
     const legendEl = document.getElementById('legend-items');
     const noObjEl = document.getElementById('no-objects');
     const countEl = document.getElementById('obj-count');
@@ -1029,6 +1231,10 @@
           const v = document.getElementById(`fk-val-${i}`);
           if (v) v.textContent = Math.round(FK_ANGLES[i]) + '°';
         });
+        // Show LIVE pill on first real data
+        const pill = document.getElementById('fk-live-pill');
+        if (pill && !pill.classList.contains('visible') && angles.some(a => Math.abs(a) > 0.1))
+          pill.classList.add('visible');
       } catch (e) { console.warn('[FK] setRobotJoints error', e); }
     };
 
@@ -1088,6 +1294,19 @@
               case 'updateCameraFeed':
                 if (window.updateCameraFeed) updateCameraFeed(msg.payload);
                 break;
+              case 'setRobotJoints': {
+                // payload: { angles: [deg x6], robotIdx: 0|1 }
+                const { angles, robotIdx } = msg.payload;
+                if (Array.isArray(angles) && window.setRobotJoints) {
+                  window.setRobotJoints(JSON.stringify(angles), robotIdx ?? 0);
+                  // Auto-expand FK panel on first live data so user sees it
+                  const panel = document.getElementById('fk-panel');
+                  if (panel && panel.classList.contains('collapsed') && angles.some(a => Math.abs(a) > 0.5)) {
+                    panel.classList.remove('collapsed');
+                  }
+                }
+                break;
+              }
             }
           } catch (e) { console.warn('WS parse error', e); }
         };

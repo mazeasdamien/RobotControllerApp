@@ -51,6 +51,13 @@ namespace RobotControllerApp.Services
         /// <summary>The scale factor of the 3D Projection.</summary>
         public double CameraFovScale { get; set; } = 0.40;
 
+        /// <summary>
+        /// Which physical robot carries the camera (1 = Robot 1, 2 = Robot 2).
+        /// The hub subscribes to the camera topic only on this robot's bridge.
+        /// </summary>
+        public int CameraRobot { get; set; } = 1;
+
+
         private static string SettingsPath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "RobotOrange", "settings.json");

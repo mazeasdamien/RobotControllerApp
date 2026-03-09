@@ -106,5 +106,25 @@ namespace RobotControllerApp.Services
 
         /// <summary>Returns the string identifier of the first valid robot connection dict key.</summary>
         public string? GetFirstConnectedRobotId() => _robotClients.Keys.FirstOrDefault();
+
+        /// <summary>
+        /// Broadcasts a message to ALL currently connected Unity/Quest clients simultaneously.
+        /// Used for control-plane notifications like camera_robot_changed.
+        /// </summary>
+        public async Task BroadcastToAllUnityClients(string message)
+        {
+            var bytes = Encoding.UTF8.GetBytes(message);
+            var tasks = _unityClients.Values
+                .Where(ws => ws.State == WebSocketState.Open)
+                .Select(async ws =>
+                {
+                    try
+                    {
+                        await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+                    }
+                    catch { }
+                });
+            await Task.WhenAll(tasks);
+        }
     }
 }

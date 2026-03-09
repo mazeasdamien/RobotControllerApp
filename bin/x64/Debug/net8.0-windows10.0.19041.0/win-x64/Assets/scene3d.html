@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>3D Scene Preview</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: rgb(10, 10, 12);
+      overflow: hidden;
+      font-family: -apple-system, 'Segoe UI Variable', 'Segoe UI', system-ui, BlinkMacSystemFont, sans-serif;
+    }
+
+
+    canvas { display: block; }
+
+    /* ── Design Tokens ─────────────────────────────────── */
+    :root {
+      --glass-bg:    rgba(12, 12, 22, 0.82);
+      --glass-border: rgba(255,255,255,0.07);
+      --blur:        blur(18px);
+      --radius-lg:   14px;
+      --radius-md:   10px;
+      --radius-sm:   7px;
+      --accent:      #5599ff;
+      --accent-glow: rgba(85,153,255,0.25);
+      --accent2:     #ff8c42;
+      --green:       #00cc6a;
+      --red-soft:    rgba(255,80,80,0.85);
+      --text-muted:  rgba(255,255,255,0.38);
+      --text-dim:    rgba(255,255,255,0.62);
+      --text:        rgba(255,255,255,0.92);
+    }
+
+    /* ── HUD (top-left) ───────────────────────────────── */
+    #hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      color: var(--text);
+      font-size: 12px;
+      pointer-events: none;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      padding: 12px 16px 10px;
+      backdrop-filter: var(--blur);
+      min-width: 210px;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+
+    #hud .hud-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    #hud .hud-icon {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #1a2a4a 0%, #0d1a35 100%);
+      border: 1px solid rgba(85,153,255,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+
+    #hud .hud-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      letter-spacing: 0.02em;
+    }
+
+    #hud .hud-subtitle {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 1px;
+    }
+
+    #hud .hud-stats {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    #hud .hud-stat {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 6px;
+      padding: 5px 10px;
+      flex: 1;
+      text-align: center;
+    }
+
+    #hud .hud-stat-val {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1;
+      margin-bottom: 2px;
+    }
+
+    #hud .hud-stat-label {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    #hud .hint {
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    #hud .hint::before {
+      content: '·';
+      font-size: 14px;
+      color: rgba(255,255,255,0.25);
+      line-height: 1;
+    }
+
+
+    #legend-items { margin-top: 0; }
+
+    #legend .lt {
+      color: var(--text-muted);
+      font-weight: 600;
+      margin: 6px 0 4px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .li {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 3px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .ld {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      box-shadow: 0 0 4px currentColor;
+    }
+
+    /* ── Empty state ──────────────────────────────────── */
+    #no-objects {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: rgba(255,255,255,0.18);
+      font-size: 13px;
+      text-align: center;
+      pointer-events: none;
+      letter-spacing: 0.02em;
+    }
+
+    #no-objects svg {
+      display: block;
+      margin: 0 auto 12px;
+      opacity: 0.15;
+    }
+
+    /* ── WS Badge ────────────────────────────────────── */
+    #ws-badge {
+      position: absolute;
+      bottom: 16px;
+      left: 16px;
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 999px;
+      padding: 6px 14px 6px 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--text-muted);
+      backdrop-filter: var(--blur);
+      pointer-events: none;
+      transition: border-color 0.4s, box-shadow 0.4s;
+    }
+
+    #ws-badge .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #444;
+      transition: background 0.4s, box-shadow 0.4s;
+      flex-shrink: 0;
+    }
+
+    #ws-badge.live .dot {
+      background: var(--green);
+      box-shadow: 0 0 0 3px rgba(0,204,106,0.2);
+      animation: pulse-dot 2s infinite;
+    }
+
+    #ws-badge.live {
+      border-color: rgba(0,204,106,0.3);
+      box-shadow: 0 0 20px rgba(0,204,106,0.08);
+      color: var(--text-dim);
+    }
+
+    #ws-badge.error .dot {
+      background: #ff4444;
+      box-shadow: 0 0 0 3px rgba(255,68,68,0.2);
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { box-shadow: 0 0 0 3px rgba(0,204,106,0.2); }
+      50%       { box-shadow: 0 0 0 6px rgba(0,204,106,0.08); }
+    }
+
+    /* ── FK Panel ─────────────────────────────────────── */
+    #fk-panel {
+      position: absolute;
+      bottom: 56px;
+      left: 16px;
+      background: var(--glass-bg);
+      border: 1px solid rgba(85,153,255,0.18);
+      border-radius: var(--radius-lg);
+      backdrop-filter: var(--blur);
+      color: var(--text);
+      font-size: 12px;
+      min-width: 256px;
+      overflow: hidden;
+      transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1), opacity 0.22s ease;
+      max-height: 460px;
+      opacity: 1;
+      user-select: none;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(85,153,255,0.06);
+    }
+
+    #fk-panel.collapsed { max-height: 44px; }
+
+    #fk-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 14px;
+      cursor: pointer;
+      background: linear-gradient(90deg, rgba(85,153,255,0.08) 0%, transparent 100%);
+      border-bottom: 1px solid rgba(85,153,255,0.10);
+      gap: 8px;
+      transition: background 0.2s;
+    }
+
+    #fk-header:hover {
+      background: linear-gradient(90deg, rgba(85,153,255,0.14) 0%, rgba(85,153,255,0.03) 100%);
+    }
+
+    #fk-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #fk-header-icon {
+      width: 26px; height: 26px;
+      border-radius: 7px;
+      background: linear-gradient(135deg,rgba(85,153,255,0.25),rgba(85,153,255,0.08));
+      border: 1px solid rgba(85,153,255,0.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0;
+    }
+
+    #fk-header-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: #88bbff;
+      letter-spacing: 0.02em;
+    }
+
+    #fk-live-pill {
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      background: rgba(0,204,106,0.12);
+      border: 1px solid rgba(0,204,106,0.3);
+      color: #00cc6a;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      display: none;
+    }
+
+    #fk-live-pill.visible { display: block; }
+
+    #fk-toggle-icon {
+      font-size: 9px;
+      color: rgba(85,153,255,0.5);
+      transition: transform 0.3s;
+    }
+
+    #fk-panel.collapsed #fk-toggle-icon { transform: rotate(-90deg); }
+
+    #fk-body { padding: 12px 14px 14px; }
+
+    /* Robot selector pills */
+    .fk-robot-selector {
+      display: flex;
+      gap: 5px;
+      margin-bottom: 12px;
+      background: rgba(0,0,0,0.25);
+      border-radius: 8px;
+      padding: 3px;
+    }
+
+    .fk-robot-btn {
+      flex: 1;
+      padding: 5px 0;
+      border-radius: 6px;
+      border: none;
+      background: transparent;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .fk-robot-btn.active {
+      background: linear-gradient(135deg, rgba(85,153,255,0.28), rgba(85,153,255,0.12));
+      color: #aaccff;
+      font-weight: 600;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+    }
+
+    /* Axis rows */
+    .fk-axis-row {
+      display: grid;
+      grid-template-columns: 44px 1fr 50px;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .fk-axis-label {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-muted);
+      text-align: right;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .fk-slider-wrap { position: relative; }
+
+    .fk-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(85,153,255,0.12);
+      outline: none;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .fk-slider:hover { background: rgba(85,153,255,0.2); }
+
+    .fk-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 15px; height: 15px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #88bbff, #3366cc);
+      box-shadow: 0 0 6px rgba(85,153,255,0.55), 0 2px 4px rgba(0,0,0,0.4);
+      cursor: pointer;
+      border: 2px solid rgba(255,255,255,0.15);
+      transition: box-shadow 0.15s, transform 0.15s;
+    }
+
+    .fk-slider:active::-webkit-slider-thumb {
+      box-shadow: 0 0 12px rgba(85,153,255,0.8);
+      transform: scale(1.15);
+    }
+
+    .fk-val {
+      font-size: 11px;
+      font-weight: 600;
+      color: #aaccff;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      background: rgba(85,153,255,0.08);
+      border: 1px solid rgba(85,153,255,0.14);
+      border-radius: 5px;
+      padding: 2px 6px;
+    }
+
+    /* Divider between sections */
+    .fk-divider {
+      height: 1px;
+      background: rgba(255,255,255,0.05);
+      margin: 8px 0;
+    }
+
+    #fk-reset-btn {
+      width: 100%;
+      margin-top: 8px;
+      padding: 7px 0;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255,100,100,0.2);
+      background: rgba(255,60,60,0.06);
+      color: rgba(255,150,150,0.75);
+      font-size: 11px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s, color 0.2s;
+      letter-spacing: 0.03em;
+    }
+
+    #fk-reset-btn:hover {
+      background: rgba(255,60,60,0.14);
+      border-color: rgba(255,100,100,0.35);
+      color: rgba(255,180,180,0.9);
+    }
+  </style>
+</head>
+
+
+<body>
+
+  <!-- HUD: top-left info panel -->
+  <div id="hud">
+    <div class="hud-header">
+      <div class="hud-icon">🔬</div>
+      <div>
+        <div class="hud-title">3D Scene Preview</div>
+        <div class="hud-subtitle">Orange Robot Hub</div>
+      </div>
+    </div>
+    <div class="hud-stats">
+      <div class="hud-stat">
+        <div class="hud-stat-val" id="obj-count">0</div>
+        <div class="hud-stat-label">Objects</div>
+      </div>
+      <div class="hud-stat" id="hud-robot-stat" style="display:none">
+        <div class="hud-stat-val" id="hud-robot-val" style="font-size:11px;">R1</div>
+        <div class="hud-stat-label">Camera</div>
+      </div>
+    </div>
+    <div id="legend-items"></div>
+    <div class="hint">Drag · Scroll to zoom · Right-click pan</div>
+  </div>
+
+  <div id="no-objects">
+    <svg width="44" height="44" viewBox="0 0 24 24" fill="white">
+      <path d="M12 2l-5.5 9h11L12 2zm0 3.84L14.77 10H9.23L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5S15.01 22 17.5 22s4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7a2.5 2.5 0 010-5 2.5 2.5 0 010 5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z" />
+    </svg>
+    Scan the scene to detect objects
+  </div>
+
+  <!-- FK Control Panel -->
+  <div id="fk-panel" class="collapsed">
+    <div id="fk-header" onclick="toggleFkPanel()">
+      <div id="fk-header-left">
+        <div id="fk-header-icon">🦾</div>
+        <span id="fk-header-text">Forward Kinematics</span>
+        <span id="fk-live-pill">LIVE</span>
+      </div>
+      <span id="fk-toggle-icon">▼</span>
+    </div>
+    <div id="fk-body">
+      <div class="fk-robot-selector">
+        <button class="fk-robot-btn active" id="fk-r1-btn" onclick="selectFkRobot(0)">Robot 1</button>
+        <button class="fk-robot-btn" id="fk-r2-btn" onclick="selectFkRobot(1)">Robot 2</button>
+        <button class="fk-robot-btn" id="fk-both-btn" onclick="selectFkRobot(2)">Both</button>
+      </div>
+      <div id="fk-sliders"></div>
+      <div class="fk-divider"></div>
+      <button id="fk-reset-btn" onclick="resetFk()">↺ &nbsp;Reset to Home</button>
+    </div>
+  </div>
+
+  <!-- Live WS connection badge -->
+  <div id="ws-badge">
+    <div class="dot"></div>
+    <span id="ws-label">Connecting…</span>
+  </div>
+
+  <script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+} }
+</script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // ── Renderer ──
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.85;
+
+    document.body.appendChild(renderer.domElement);
+
+    // ── Scene ──
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0a0a0a);
+    scene.fog = new THREE.Fog(0x0a0a0a, 5, 16);
+
+    const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 50);
+    camera.position.set(0.33 + 1.2, 1.2, 0.35 + 0.3); // Camera naturally on the right
+    camera.lookAt(0.33, 0.05, 0.35);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true; controls.dampingFactor = 0.08;
+    controls.target.set(0.33, 0.05, 0.35);
+    controls.maxPolarAngle = Math.PI / 2 + 0.15;
+    controls.minDistance = 0.3; controls.maxDistance = 10;
+    controls.mouseButtons = {
+      LEFT: THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.PAN,
+      RIGHT: THREE.MOUSE.DOLLY
+    };
+
+    // ── Lighting ──
+    // Balanced setup: high ambient to fill shadows, overhead key to avoid
+    // grazing-angle normal-map streaks (the "wood grain" effect).
+    scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+
+    // Key light — overhead angle prevents raking across the bump map
+    const dir = new THREE.DirectionalLight(0xffffff, 1.4);
+    dir.position.set(2, 5, 2); dir.castShadow = true;
+    dir.shadow.mapSize.set(2048, 2048);
+    dir.shadow.camera.left = -2; dir.shadow.camera.right = 2;
+    dir.shadow.camera.top = 2; dir.shadow.camera.bottom = -2;
+    dir.shadow.bias = -0.0005;
+    scene.add(dir);
+
+    // Soft neutral fill from the opposite side
+    const fill = new THREE.DirectionalLight(0xffffff, 0.35);
+    fill.position.set(-2, 2, -1.5);
+    scene.add(fill);
+
+    // ── Table (Real world size 80cm x 80cm) ──
+    const TABLE_W = 0.80, TABLE_D = 0.80;
+
+    // We want the laptop screen target (30cm x 18.9cm) to rest on the NEAR edge (-X direction) and centered horizontally (Z direction).
+    // The target's center is at OpenCV's (0,0).
+    // In Three.js space, origin (0,0,0) is therefore the center of the target.
+    // To align the Table's near edge with the target's near edge:
+    // Target Near edge from center is: (-0.15 in X)
+    // Table Near edge from center is: (-TABLE_W/2)
+    // So Table Center X = (TABLE_W/2) - 0.15;
+    // For Z (horizontal), since we want it centered, Table Center Z = 0;
+
+    const TABLE_CX = (TABLE_W / 2) - 0.15;
+    const TABLE_CZ = 0;
+
+    const tableMat = new THREE.MeshStandardMaterial({ color: 0x14142a, roughness: 0.55, metalness: 0.1 });
+    const tableMesh = new THREE.Mesh(new THREE.BoxGeometry(TABLE_W, 0.012, TABLE_D), tableMat);
+    tableMesh.receiveShadow = true;
+    tableMesh.position.set(TABLE_CX, -0.006, TABLE_CZ);
+    scene.add(tableMesh);
+
+    const grid = new THREE.GridHelper(TABLE_W, 12, 0x252560, 0x252560);
+    grid.position.set(TABLE_CX, 0.001, TABLE_CZ);
+    scene.add(grid);
+
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(new THREE.BoxGeometry(TABLE_W, 0.012, TABLE_D)),
+      new THREE.LineBasicMaterial({ color: 0x3a3a8a })
+    );
+    edges.position.copy(tableMesh.position); scene.add(edges);
+
+    // ── Load Niryo Ned 3D Models ──
+    const gltfLoader = new GLTFLoader();
+
+    // FK state
+    const FK_ROBOTS = [];          // [{root, joints:[node|null x6]}]
+    let fkTarget = 0;              // 0=R1, 1=R2, 2=Both
+    const FK_ANGLES = [0, 0, 0, 0, 0, 0]; // current angles in DEGREES
+
+    // Preferred joint names to search for, in priority order per axis.
+    // The Niryo Ned GLB typically uses: joint_1 … joint_6
+    // Fallback patterns cover other common URDFs.
+    const JOINT_PATTERNS = [
+      ['joint_1', 'Joint1', 'Axis1', 'axis_1', 'shoulder_link'],
+      ['joint_2', 'Joint2', 'Axis2', 'axis_2', 'arm_link'],
+      ['joint_3', 'Joint3', 'Axis3', 'axis_3', 'elbow_link'],
+      ['joint_4', 'Joint4', 'Axis4', 'axis_4', 'forearm_link', 'forearm'],
+      ['joint_5', 'Joint5', 'Axis5', 'axis_5', 'wrist_link', 'wrist'],
+      ['joint_6', 'Joint6', 'Axis6', 'axis_6', 'end_effector', 'tool_link'],
+    ];
+
+    // Axis of rotation per joint (local, matching Niryo URDF conventions)
+    const JOINT_AXES = [
+      new THREE.Vector3(0, 1, 0),   // J1: yaw  (Y)
+      new THREE.Vector3(0, 0, 1),   // J2: pitch (Z)
+      new THREE.Vector3(0, 0, 1),   // J3: pitch (Z)
+      new THREE.Vector3(1, 0, 0),   // J4: roll  (X)
+      new THREE.Vector3(0, 0, 1),   // J5: pitch (Z)
+      new THREE.Vector3(1, 0, 0),   // J6: roll  (X)
+    ];
+
+    // Angle limits in degrees [min, max] per axis
+    const JOINT_LIMITS = [
+      [-180, 180],
+      [-115, 115],
+      [-225, 45],
+      [-230, 230],
+      [-115, 115],
+      [-180, 180],
+    ];
+
+    function findJoints(root) {
+      const joints = [];
+      for (let i = 0; i < 6; i++) {
+        let found = null;
+        root.traverse((node) => {
+          if (found) return;
+          const n = node.name.toLowerCase();
+          for (const pat of JOINT_PATTERNS[i]) {
+            if (n === pat.toLowerCase() || n.startsWith(pat.toLowerCase())) {
+              found = node; return;
+            }
+          }
+        });
+        // Fallback: pick nth non-leaf Object3D in depth-first traversal
+        if (!found) {
+          let count = 0;
+          root.traverse((node) => {
+            if (found) return;
+            if (node !== root && node.isObject3D && !(node.isMesh)) {
+              if (count++ === i) found = node;
+            }
+          });
+        }
+        joints.push(found);
+        console.log(`[FK] Robot joint ${i + 1}: ${found ? found.name : 'NOT FOUND'}`);
+      }
+      return joints;
+    }
+
+    // Store original quaternions so we can apply FK on top cleanly
+    function storeRestPose(root) {
+      root.traverse((node) => {
+        node.userData.restQ = node.quaternion.clone();
+      });
+    }
+
+    // ── Material polish for the Niryo Ned GLB ──────────────────────────────────
+    // The GLB's embedded normal maps are baked at high intensity for CAD renders.
+    // In a real-time scene with directional lighting they produce a "wood grain"
+    // effect. We soften them here and improve texture filtering.
+    function polishNedMaterials(root) {
+      const maxAniso = renderer.capabilities.getMaxAnisotropy();
+      root.traverse((node) => {
+        if (!node.isMesh) return;
+        node.castShadow = true;
+        node.receiveShadow = true;
+
+        const mats = Array.isArray(node.material) ? node.material : [node.material];
+        mats.forEach((mat) => {
+          if (!mat || !mat.isMeshStandardMaterial) return;
+
+          // ── Moderate bump softening ──
+          // 0.55 removes the "wood grain" raking artifact while preserving
+          // surface micro-detail that makes the plastic look real.
+          if (mat.normalMap) {
+            mat.normalScale.set(0.55, 0.55);
+          }
+
+          // ── Plastic appearance tweak ──
+          // Only soften parts that look like the blue ABS body.
+          // Detect by checking the map tint vs a threshold colour.
+          const col = mat.color;
+          const isBlueBody = col.r < 0.35 && col.g > 0.3 && col.b > 0.55;
+          if (isBlueBody) {
+            mat.roughness  = Math.min(mat.roughness,  0.55); // slightly glossy plastic
+            mat.metalness  = Math.max(mat.metalness,  0.0);
+          }
+
+          // ── Max anisotropy on every texture channel ──
+          const textures = [mat.map, mat.normalMap, mat.roughnessMap, mat.metalnessMap, mat.aoMap];
+          textures.forEach((t) => {
+            if (t) {
+              t.anisotropy = maxAniso;
+              t.needsUpdate = true;
+            }
+          });
+
+          mat.needsUpdate = true;
+        });
+      });
+    }
+
+    gltfLoader.load('ned.glb', (gltf) => {
+      const nedModel = gltf.scene;
+
+      // Apply material polish before cloning so both robots inherit it
+      polishNedMaterials(nedModel);
+
+      const BASE_OFFSET = 0.095;
+      const MARGIN = 0.017;
+      const FORWARD_SHIFT = 0.05;
+      const OFFSET = BASE_OFFSET + MARGIN;
+
+      // Robot 1: Top-Right corner
+      const r1 = nedModel.clone();
+      r1.position.set(TABLE_CX + 0.40 - OFFSET - FORWARD_SHIFT, 0, TABLE_CZ - 0.40 + OFFSET);
+      r1.rotation.y = Math.PI;
+      scene.add(r1);
+      storeRestPose(r1);
+      FK_ROBOTS.push({ root: r1, joints: findJoints(r1) });
+
+      // Robot 2: Bottom-Right corner
+      const r2 = nedModel.clone();
+      r2.position.set(TABLE_CX + 0.40 - OFFSET - FORWARD_SHIFT, 0, TABLE_CZ + 0.40 - OFFSET);
+      r2.rotation.y = Math.PI;
+      scene.add(r2);
+      storeRestPose(r2);
+      FK_ROBOTS.push({ root: r2, joints: findJoints(r2) });
+
+      buildFkSliders();
+    }, undefined, (e) => console.error("Could not load ned.glb:", e));
+
+    // Helper to draw text labels
+    function makeTextSprite(message) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256; canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      ctx.font = 'Bold 32px "Segoe UI", sans-serif';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(message, 128, 64);
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+      const sprite = new THREE.Sprite(spriteMaterial);
+      sprite.scale.set(0.15, 0.075, 1);
+      return sprite;
+    }
+
+    // Add 80cm labels for width and length
+    const labelX = makeTextSprite("X: 80 cm");
+    labelX.position.set(TABLE_CX, 0.02, TABLE_CZ + TABLE_D / 2 + 0.02);
+    scene.add(labelX);
+
+    const labelZ = makeTextSprite("Y: 80 cm");
+    labelZ.position.set(TABLE_CX + TABLE_W / 2 + 0.03, 0.02, TABLE_CZ);
+    scene.add(labelZ);
+
+    // ── Marker Board Representation (Real scale ~ 30cm x 18.9cm) ──
+    const boardMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
+    const boardMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.30, 0.189), boardMat);
+    boardMesh.rotation.x = -Math.PI / 2;
+    boardMesh.position.set(0, 0.002, 0);
+    scene.add(boardMesh);
+
+    // World axes precisely at the center of the Niryo paper
+    const axesHelper = new THREE.AxesHelper(0.10);
+    axesHelper.position.y = 0.005; scene.add(axesHelper);
+
+    // Toggle for calibration guides
+    window.toggleCalibrationPlane = function (show) {
+      boardMesh.visible = show;
+      axesHelper.visible = show;
+    };
+
+    // ── Object group ──
+    const objGroup = new THREE.Group();
+    scene.add(objGroup);
+
+    // ── Camera Cone (virtual camera visualisation) ──
+    let camCone = null;
+    let camFrustumLines = null;
+    let camVideoPlane = null;
+    let camVideoTexture = null;
+
+    function buildCameraViz(tx, ty, tz, poseObj) {
+      try {
+        // Remove previous
+        if (camCone) { scene.remove(camCone); camCone.geometry.dispose(); camCone.material.dispose(); }
+        if (camFrustumLines) { scene.remove(camFrustumLines); camFrustumLines.geometry.dispose(); camFrustumLines.material.dispose(); }
+        if (camVideoPlane) { scene.remove(camVideoPlane); camVideoPlane.geometry.dispose(); camVideoPlane.material.dispose(); camVideoPlane = null; }
+
+        // Body of camera - use a 4 sided pyramid to match a camera body
+        const coneGeo = new THREE.ConeGeometry(0.06, 0.14, 4, 1, false, Math.PI / 4);
+        coneGeo.translate(0, -0.07, 0); // Shift origin to the tip (apex)
+        coneGeo.rotateX(Math.PI / 2);   // Align cone's 'forward' (+Y) with OpenCV's 'forward' (+Z)
+
+        const coneMat = new THREE.MeshStandardMaterial({ color: 0xffc300, emissive: 0xffc300, emissiveIntensity: 0.12, roughness: 0.4 });
+        camCone = new THREE.Mesh(coneGeo, coneMat);
+
+        // 2. Map OpenCV Object Space -> Three.js Space
+        // OpenCV Space: X is Right, Y is Forward on table, Z is Up from table
+        // Three Space: X is Right, Y is Up, Z is Backward
+        const camX = tx;
+        const camY = Math.max(0.05, Math.abs(tz)); // Guard minimum height
+        const camZ = -ty;
+
+        camCone.position.set(camX, camY, camZ);
+
+        if (poseObj && poseObj.R11 !== undefined) {
+          // Mathematical conversion to Three.js basis vectors.
+          // In OpenCV, rvec is an axis-angle representing World -> Camera.
+          // The inverse rotation is -angle, going Camera -> World.
+          const ax = poseObj.Rx, ay = poseObj.Ry, az = poseObj.Rz;
+          const angle = Math.sqrt(ax * ax + ay * ay + az * az);
+          const qCv = new THREE.Quaternion();
+          if (angle > 0.0001) {
+            // OpenCV axis
+            const axisCv = new THREE.Vector3(ax / angle, ay / angle, az / angle);
+            // We want Camera -> World in OpenCV space, so inverse rotation
+            qCv.setFromAxisAngle(axisCv, -angle);
+          }
+
+          // OpenCV World to ThreeJS World conversion
+          // OpenCV World: X=right, Y=forward, Z=up
+          // ThreeJS World: X=right, Y=up, Z=backward (-Z is forward)
+          // Mapping: (x, y, z) -> (x, z, -y) is a -90 deg rotation around X
+          const qWorld = new THREE.Quaternion();
+          qWorld.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+
+          // The camera requires a 180-degree rotation around its own axis to flip upside down
+          const qRot180 = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI);
+          const qFinal = new THREE.Quaternion().copy(qWorld).multiply(qCv).multiply(qRot180);
+
+          camCone.quaternion.copy(qFinal);
+
+          camCone.castShadow = false;
+          scene.add(camCone);
+
+          // True Frustum lines
+          const apex = new THREE.Vector3(camX, camY, camZ);
+
+          // By mapping with qFinal, we extract the transformed axes directly:
+          // OpenCV camera's local forward is +Z
+          const forward = new THREE.Vector3(0, 0, 1).applyQuaternion(qFinal);
+          // OpenCV camera's local up is -Y (since +Y is visually down)
+          const trueUp = new THREE.Vector3(0, -1, 0).applyQuaternion(qFinal);
+          // OpenCV camera's local right is +X
+          const right = new THREE.Vector3(1, 0, 0).applyQuaternion(qFinal);
+
+          // Project the rays exactly onto the table plane (Y=0)
+          let dist = 2.0; // fallback
+          if (forward.y < -0.05) {
+            dist = Math.abs(camY / forward.y);
+          }
+
+          const aspect = (camVideoTexture && camVideoTexture.image && camVideoTexture.image.width > 0)
+            ? (camVideoTexture.image.width / camVideoTexture.image.height)
+            : (16 / 9); // Default HD webcam ratio
+
+          const fovScale = window.currentFovScale !== undefined ? window.currentFovScale : 0.45;
+          const halfH = dist * fovScale;
+          const halfW = halfH * aspect;
+
+          const centerFocus = apex.clone().addScaledVector(forward, dist);
+
+          const virtualCorners = [
+            centerFocus.clone().addScaledVector(right, -halfW).addScaledVector(trueUp, halfH),
+            centerFocus.clone().addScaledVector(right, halfW).addScaledVector(trueUp, halfH),
+            centerFocus.clone().addScaledVector(right, halfW).addScaledVector(trueUp, -halfH),
+            centerFocus.clone().addScaledVector(right, -halfW).addScaledVector(trueUp, -halfH)
+          ];
+
+          // Math: Where do the 4 corner rays hit the physical table?
+          function getIntercept(point) {
+            const ray = point.clone().sub(apex);
+            // If the camera is looking parallel or upward, prevent infinity by drawing far away
+            if (ray.y >= -0.001) {
+              ray.normalize();
+              return apex.clone().add(ray.multiplyScalar(15));
+            }
+            const t = (0.002 - apex.y) / ray.y;
+            return apex.clone().add(ray.multiplyScalar(t));
+          }
+
+          const corners = [
+            getIntercept(virtualCorners[0]), // Top-Left
+            getIntercept(virtualCorners[1]), // Top-Right
+            getIntercept(virtualCorners[2]), // Bottom-Right
+            getIntercept(virtualCorners[3])  // Bottom-Left
+          ];
+
+          // Render video projection perfectly flattened mathematically onto the table mesh
+          if (camVideoTexture) {
+            // Create a subdivided grid to fix WebGL affine texture distortion
+            const rectGeo = new THREE.PlaneGeometry(1, 1, 32, 32);
+            const posAttr = rectGeo.attributes.position;
+            const uvAttr = rectGeo.attributes.uv;
+
+            for (let i = 0; i < posAttr.count; i++) {
+              const u = uvAttr.getX(i);
+              const v = uvAttr.getY(i);
+
+              // Optical pinhole inversion (flip UV mathematically before raycasting)
+              const wX = ((1.0 - u) - 0.5) * 2.0 * halfW;
+              const wY = ((1.0 - v) - 0.5) * 2.0 * halfH;
+
+              const pt = centerFocus.clone()
+                .addScaledVector(right, wX)
+                .addScaledVector(trueUp, wY);
+
+              const intercept = getIntercept(pt);
+              posAttr.setXYZ(i, intercept.x, intercept.y, intercept.z);
+            }
+            rectGeo.computeVertexNormals();
+
+            const pMat = new THREE.MeshBasicMaterial({
+              map: camVideoTexture,
+              side: THREE.DoubleSide,
+              transparent: true,
+              opacity: window.currentCamOpacity !== undefined ? window.currentCamOpacity : 0.85
+            });
+            camVideoPlane = new THREE.Mesh(rectGeo, pMat);
+            scene.add(camVideoPlane);
+          }
+
+          const lines = [];
+          corners.forEach(c => { lines.push(apex); lines.push(c); });
+          for (let i = 0; i < 4; i++) { lines.push(corners[i]); lines.push(corners[(i + 1) % 4]); }
+
+          const fGeo = new THREE.BufferGeometry().setFromPoints(lines);
+          const fMat = new THREE.LineBasicMaterial({ color: 0xffc300, opacity: 0.45, transparent: true });
+          camFrustumLines = new THREE.LineSegments(fGeo, fMat);
+          scene.add(camFrustumLines);
+        }
+
+      } catch (err) {
+        document.getElementById('legend-items').innerHTML = `<div style="color:red; font-size:10px;">${err.message}<br/>${err.stack}</div>`;
+      }
+    }
+
+    // ── Helpers ──
+    function colorFromLabel(label) {
+      const map = {
+        red: 0xff3333, blue: 0x3366ff, green: 0x33cc66, yellow: 0xffdd00,
+        orange: 0xff7700, purple: 0xaa44ff, pink: 0xff66aa, white: 0xeeeeff,
+        black: 0x222233, grey: 0x778899, gray: 0x778899, brown: 0xaa6633,
+        cyan: 0x00ddff, magenta: 0xff00aa,
+      };
+      const lo = label.toLowerCase();
+      for (const [k, v] of Object.entries(map)) if (lo.includes(k)) return v;
+      let h = 0; for (const c of label) h = (c.charCodeAt(0) + ((h << 5) - h)) | 0;
+      return Math.abs(h) % 0xffffff;
+    }
+
+    // ── Public API (called from C#) ──
+    window.setCameraFovScale = function (val) {
+      window.currentFovScale = val;
+    };
+
+    window.setCameraFeedOpacity = function (val) {
+      window.currentCamOpacity = val;
+      if (camVideoPlane && camVideoPlane.material) {
+        camVideoPlane.material.opacity = val;
+      }
+    };
+
+    window.updateCameraFeed = function (base64Url) {
+      let isFirstTime = false;
+      if (!camVideoTexture) {
+        camVideoTexture = new THREE.Texture();
+        camVideoTexture.colorSpace = THREE.SRGBColorSpace;
+        isFirstTime = true;
+      }
+      const img = new Image();
+      img.onload = () => {
+        camVideoTexture.image = img;
+        camVideoTexture.needsUpdate = true;
+        if (isFirstTime && window.lastPoseObj && !camVideoPlane) {
+          window.setCameraPose(JSON.stringify(window.lastPoseObj));
+        }
+      };
+      img.src = base64Url;
+    };
+
+    window.setDetectedObjects = function (jsonStr) {
+      try { renderObjects(JSON.parse(jsonStr)); } catch (e) { console.error(e); }
+    };
+
+    window.setCameraPose = function (jsonStr) {
+      try {
+        const p = JSON.parse(jsonStr);
+        window.lastPoseObj = p;
+        // The raw UI panel was removed to favor the native WPF overlay
+        // Update 3D camera cone
+        buildCameraViz(p.X, p.Y, p.Z, p);
+      } catch (e) { console.error(e); }
+    };
+
+    // Called when camera robot assignment changes (robotIdx: 0=R1, 1=R2)
+    window.setCameraRobot = function(robotIdx) {
+      const label = robotIdx === 1 ? 'R2' : 'R1';
+      const stat = document.getElementById('hud-robot-stat');
+      const val  = document.getElementById('hud-robot-val');
+      if (stat && val) {
+        stat.style.display = '';
+        val.textContent = label;
+      }
+    };
+
+    const legendEl = document.getElementById('legend-items');
+    const noObjEl = document.getElementById('no-objects');
+    const countEl = document.getElementById('obj-count');
+
+    function clearObjects() {
+      while (objGroup.children.length) {
+        const c = objGroup.children[0];
+        c.geometry?.dispose();
+        (Array.isArray(c.material) ? c.material : [c.material]).forEach(m => m?.dispose());
+        objGroup.remove(c);
+      }
+      legendEl.innerHTML = '';
+    }
+
+    function renderObjects(items) {
+      clearObjects();
+      noObjEl.style.display = items.length ? 'none' : 'block';
+      countEl.textContent = items.length;
+
+      items.forEach(item => {
+        const raw = colorFromLabel(item.label);
+        const col = new THREE.Color(raw);
+
+        // worldX / worldY are in metres from the camera's perspective projection
+        // Map as OpenCV X → Three.js X, OpenCV Y (Forward) → Three.js -Z (Forward)
+        // Map as OpenCV X → Three.js X, OpenCV Y (Forward) → Three.js -Z (Forward)
+        const px = item.worldX;
+        const pz = -item.worldY;
+
+        const bw = Math.max(0.025, Math.min(0.35, item.sizeW));
+        const bd = Math.max(0.025, Math.min(0.35, item.sizeH));
+
+        function makeTextSprite(message, color) {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = 512; canvas.height = 128;
+          ctx.fillStyle = '#' + color.getHexString();
+          ctx.font = 'bold 48px Arial, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(message, 256, 64);
+          const texture = new THREE.CanvasTexture(canvas);
+          texture.minFilter = THREE.LinearFilter;
+          const spriteMaterial = new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false });
+          const sprite = new THREE.Sprite(spriteMaterial);
+          sprite.scale.set(0.15, 0.0375, 1);
+          return sprite;
+        }
+
+        const labelSprite = makeTextSprite(item.label, col);
+
+        function addSphere() {
+          const radius = Math.min(bw, bd) / 2.5;
+          const geo = new THREE.SphereGeometry(radius, 32, 16);
+          const mat = new THREE.MeshStandardMaterial({
+            color: col, roughness: 0.35, metalness: 0.15,
+            emissive: col, emissiveIntensity: 0.08
+          });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.castShadow = true; mesh.receiveShadow = true;
+          mesh.position.set(px, radius, pz);
+
+          if (item.angleRad !== undefined) {
+            mesh.rotation.y = -item.angleRad;
+          }
+
+          const pivotAxes = new THREE.AxesHelper(0.08); // 8cm axes visual length
+          mesh.add(pivotAxes);
+
+          objGroup.add(mesh);
+
+          labelSprite.position.set(px, radius * 2 + 0.03, pz);
+          objGroup.add(labelSprite);
+        }
+
+        if (item.modelUrl && item.modelUrl.trim() !== '') {
+          // Prefer the remote-friendly URL when available (Quest browser via LAN)
+          const resolvedUrl = (item.modelUrlRemote && item.modelUrlRemote.trim() !== '')
+            ? item.modelUrlRemote
+            : item.modelUrl;
+          gltfLoader.load(resolvedUrl, (gltf) => {
+            const model = gltf.scene;
+
+            model.traverse((node) => {
+              if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
+            });
+
+            // Pivot to bottom center
+            const box = new THREE.Box3().setFromObject(model);
+            const cy = box.min.y;
+            model.position.y = -cy; // shifts model up so its lowest point is at 0
+
+            const wrapper = new THREE.Group();
+            wrapper.add(model);
+
+            // Real-world Scale based on BBox width (sizeW is in meters)
+            const modelW = box.max.x - box.min.x;
+            const targetW = Math.max(0.01, item.sizeW);
+            const s = modelW > 0.0001 ? targetW / modelW : 1;
+            wrapper.scale.set(s, s, s);
+
+            if (item.angleRad !== undefined) {
+              wrapper.rotation.y = -item.angleRad;
+            }
+
+            wrapper.position.set(px, 0, pz); // on the table surface
+
+            const boxScaled = new THREE.Box3().setFromObject(wrapper);
+            labelSprite.position.set(px, boxScaled.max.y + 0.03, pz);
+
+            const pivotAxes = new THREE.AxesHelper(0.08 / s); // 8cm axes visual length
+            wrapper.add(pivotAxes);
+
+            objGroup.add(wrapper);
+            objGroup.add(labelSprite);
+          }, undefined, (e) => {
+            console.warn('Failed to load model:', item.modelUrl, e);
+            addSphere();
+          });
+        } else {
+          addSphere();
+        }
+
+        // Legend
+        const d = document.createElement('div');
+        d.className = 'li';
+        d.innerHTML = `<div class="ld" style="background:#${col.getHexString()}"></div><span>${item.label}</span>`;
+        legendEl.appendChild(d);
+      });
+    }
+
+    // ── FK Panel Logic ─────────────────────────────────────────────────────────
+    window.toggleFkPanel = function () {
+      const panel = document.getElementById('fk-panel');
+      panel.classList.toggle('collapsed');
+    };
+
+    window.selectFkRobot = function (idx) {
+      fkTarget = idx;
+      ['fk-r1-btn', 'fk-r2-btn', 'fk-both-btn'].forEach((id, i) => {
+        document.getElementById(id).classList.toggle('active', i === idx);
+      });
+    };
+
+    window.resetFk = function () {
+      FK_ANGLES.fill(0);
+      document.querySelectorAll('.fk-slider').forEach((s, i) => {
+        s.value = 0;
+        document.getElementById(`fk-val-${i}`).textContent = '0°';
+      });
+      applyFk();
+    };
+
+    function applyFk() {
+      const targets = fkTarget === 2 ? FK_ROBOTS : [FK_ROBOTS[fkTarget]];
+      for (const robot of targets) {
+        if (!robot) continue;
+        robot.joints.forEach((joint, i) => {
+          if (!joint) return;
+          // Reset to rest quaternion first, then apply rotation
+          joint.quaternion.copy(joint.userData.restQ);
+          const q = new THREE.Quaternion();
+          q.setFromAxisAngle(JOINT_AXES[i], THREE.MathUtils.degToRad(FK_ANGLES[i]));
+          joint.quaternion.multiply(q);
+        });
+      }
+    }
+
+    function buildFkSliders() {
+      const container = document.getElementById('fk-sliders');
+      container.innerHTML = '';
+      for (let i = 0; i < 6; i++) {
+        const [mn, mx] = JOINT_LIMITS[i];
+        const row = document.createElement('div');
+        row.className = 'fk-axis-row';
+        row.innerHTML = `
+          <span class="fk-axis-label">Axis ${i + 1}</span>
+          <input class="fk-slider" type="range"
+            id="fk-s-${i}" min="${mn}" max="${mx}" step="1" value="0"
+            oninput="onFkSlider(${i}, this.value)">
+          <span class="fk-val" id="fk-val-${i}">0°</span>`;
+        container.appendChild(row);
+      }
+    }
+
+    window.onFkSlider = function (idx, val) {
+      FK_ANGLES[idx] = parseFloat(val);
+      document.getElementById(`fk-val-${idx}`).textContent = Math.round(val) + '°';
+      applyFk();
+    };
+
+    // Expose to C# (setRobotJoints([a1,a2,a3,a4,a5,a6], robotIndex))
+    window.setRobotJoints = function (anglesJson, robotIdx) {
+      try {
+        const angles = JSON.parse(anglesJson);
+        const prevTarget = fkTarget;
+        fkTarget = robotIdx ?? 0;
+        angles.forEach((a, i) => { FK_ANGLES[i] = a; });
+        applyFk();
+        fkTarget = prevTarget;
+        // Sync sliders UI
+        document.querySelectorAll('.fk-slider').forEach((s, i) => {
+          s.value = FK_ANGLES[i];
+          const v = document.getElementById(`fk-val-${i}`);
+          if (v) v.textContent = Math.round(FK_ANGLES[i]) + '°';
+        });
+        // Show LIVE pill on first real data
+        const pill = document.getElementById('fk-live-pill');
+        if (pill && !pill.classList.contains('visible') && angles.some(a => Math.abs(a) > 0.1))
+          pill.classList.add('visible');
+      } catch (e) { console.warn('[FK] setRobotJoints error', e); }
+    };
+
+    // ── Render loop ──
+    (function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    })();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+    // ── Remote WebSocket client (Quest / LAN browser live feed) ──────────────
+    // Only active when the page is opened from a real HTTP server (not app.local).
+    // When loaded inside WebView2 via app.local, this block is skipped silently.
+    (function initRemoteWS() {
+      const badge = document.getElementById('ws-badge');
+      const label = document.getElementById('ws-label');
+
+      // Detect whether we are served from the broadcast Kestrel server
+      // (any real host:port) vs the virtual WebView2 host (app.local).
+      const isRemote = location.hostname !== 'app.local' && location.hostname !== '';
+      if (!isRemote) {
+        badge.style.display = 'none'; // Hidden inside the WinUI app
+        return;
+      }
+
+      let retryDelay = 1500;
+      let ws = null;
+
+      function connect() {
+        const wsUrl = `ws://${location.host}/scene3d-ws`;
+        label.textContent = 'Connecting…';
+        badge.classList.remove('live', 'error');
+
+        ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+          retryDelay = 1500;
+          badge.classList.add('live');
+          label.textContent = 'Live';
+        };
+
+        ws.onmessage = (evt) => {
+          try {
+            const msg = JSON.parse(evt.data);
+            switch (msg.type) {
+              case 'setCameraPose':
+                if (window.setCameraPose) setCameraPose(JSON.stringify(msg.payload));
+                break;
+              case 'setDetectedObjects':
+                if (window.setDetectedObjects) setDetectedObjects(JSON.stringify(msg.payload));
+                break;
+              case 'updateCameraFeed':
+                if (window.updateCameraFeed) updateCameraFeed(msg.payload);
+                break;
+              case 'setRobotJoints': {
+                // payload: { angles: [deg x6], robotIdx: 0|1 }
+                const { angles, robotIdx } = msg.payload;
+                if (Array.isArray(angles) && window.setRobotJoints) {
+                  window.setRobotJoints(JSON.stringify(angles), robotIdx ?? 0);
+                  // Auto-expand FK panel on first live data so user sees it
+                  const panel = document.getElementById('fk-panel');
+                  if (panel && panel.classList.contains('collapsed') && angles.some(a => Math.abs(a) > 0.5)) {
+                    panel.classList.remove('collapsed');
+                  }
+                }
+                break;
+              }
+            }
+          } catch (e) { console.warn('WS parse error', e); }
+        };
+
+        ws.onerror = () => {
+          badge.classList.remove('live');
+          badge.classList.add('error');
+          label.textContent = 'Error';
+        };
+
+        ws.onclose = () => {
+          badge.classList.remove('live');
+          label.textContent = `Reconnecting in ${(retryDelay / 1000).toFixed(1)}s…`;
+          setTimeout(connect, retryDelay);
+          retryDelay = Math.min(retryDelay * 1.5, 15000); // Exponential back-off, max 15s
+        };
+      }
+
+      connect();
+    })();
+
+  </script>
+</body>
+
+</html>

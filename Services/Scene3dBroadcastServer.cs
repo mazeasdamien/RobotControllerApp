@@ -44,6 +44,9 @@ namespace RobotControllerApp.Services
         public static event Action<string>? OnLog;
         private static void Log(string msg) => OnLog?.Invoke($"[Scene3D] {msg}");
 
+        /// <summary>Fired when a new remote browser connects. Subscriber should push a full state snapshot.</summary>
+        public event Func<Task>? OnClientConnected;
+
         // ── Internal state ────────────────────────────────────────────────────────
 
         // All currently-connected Quest (or any) browser WebSocket clients.
@@ -128,6 +131,13 @@ namespace RobotControllerApp.Services
                     string clientId = Guid.NewGuid().ToString("N")[..8];
                     _clients[clientId] = ws;
                     Log($"Quest browser connected — id={clientId}  ip={context.Connection.RemoteIpAddress}  total={_clients.Count}");
+
+                    // Push full state snapshot to the newly connected client
+                    if (OnClientConnected != null)
+                    {
+                        try { await OnClientConnected.Invoke(); }
+                        catch { }
+                    }
 
                     // Keep the socket open — drain any incoming messages (ping/pong or controls)
                     var buffer = new byte[4096];

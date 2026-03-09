@@ -48,6 +48,12 @@ namespace RobotControllerApp.Services
         /// <summary>Set to false for robots without a camera (skips camera topic subscription).</summary>
         public bool HasCamera { get; set; } = true;
 
+        /// <summary>Fired when a compressed camera frame arrives on this bridge (robotId, imageBytes).</summary>
+        public event Action<string, byte[]>? OnCameraFrameReceived;
+
+        // Whether the camera is currently subscribed
+        private bool _cameraSubscribed = false;
+
         /// <summary>Most recent measurement of round-trip latency to the local relay.</summary>
         public long LastLatencyMs { get; private set; } = 0;
 
@@ -123,6 +129,33 @@ namespace RobotControllerApp.Services
                         ParseLearningModeIfPresent(message);
                         ParseHardwareStatusIfPresent(message);
                         ParseRobotStatusIfPresent(message);
+
+                        // Intercept & fire camera frame event
+                        if (HasCamera && message.Contains("compressed_video_stream", StringComparison.OrdinalIgnoreCase))
+                        {
+                            try
+                            {
+                                int dataPropIndex = message.IndexOf("\"data\"");
+                                if (dataPropIndex != -1)
+                                {
+                                    int colonIndex = message.IndexOf(':', dataPropIndex);
+                                    int startQuote = colonIndex != -1 ? message.IndexOf('"', colonIndex + 1) : -1;
+                                    if (startQuote != -1)
+                                    {
+                                        int start = startQuote + 1;
+                                        int end = message.IndexOf('"', start);
+                                        if (end != -1)
+                                        {
+                                            string b64 = message[start..end];
+                                            if (b64.Length > 100)
+                                                OnCameraFrameReceived?.Invoke(RobotId, Convert.FromBase64String(b64));
+                                        }
+                                    }
+                                }
+                            }
+                            catch { }
+                        }
+
                         await SendToRelay(message); // Forward to Relay
                     }
                 }
@@ -359,17 +392,8 @@ namespace RobotControllerApp.Services
             // Only subscribe to camera if robot has one
             if (HasCamera)
             {
-                var subscribeCamera = new
-                {
-                    op = "subscribe",
-                    topic = "/niryo_robot_vision/compressed_video_stream",
-                    type = "sensor_msgs/CompressedImage",
-                    throttle_rate = 0
-                };
-                await SendToRobotAsync(JsonSerializer.Serialize(subscribeCamera));
+                await SubscribeCameraAsync();
             }
-
-            // Gripper subscription removed
 
             var subscribeState = new
             {
@@ -397,6 +421,47 @@ namespace RobotControllerApp.Services
                 throttle_rate = 1000
             };
             await SendToRobotAsync(JsonSerializer.Serialize(subscribeRobotStatus));
+        }
+
+        private async Task SubscribeCameraAsync()
+        {
+            _cameraSubscribed = true;
+            var sub = new
+            {
+                op = "subscribe",
+                topic = "/niryo_robot_vision/compressed_video_stream",
+                type = "sensor_msgs/CompressedImage",
+                throttle_rate = 0
+            };
+            await SendToRobotAsync(JsonSerializer.Serialize(sub));
+            Log($"[{RobotId}] 📷 Camera subscribed");
+        }
+
+        private async Task UnsubscribeCameraAsync()
+        {
+            _cameraSubscribed = false;
+            var unsub = new
+            {
+                op = "unsubscribe",
+                topic = "/niryo_robot_vision/compressed_video_stream"
+            };
+            await SendToRobotAsync(JsonSerializer.Serialize(unsub));
+            Log($"[{RobotId}] Camera unsubscribed");
+        }
+
+        /// <summary>
+        /// Dynamically enable or disable the camera subscription on this robot.
+        /// Safe to call at any time — silently ignored if not connected.
+        /// </summary>
+        public async Task SetCameraEnabledAsync(bool enable)
+        {
+            HasCamera = enable;
+            if (!IsConnected) return; // Will take effect on next reconnect via HasCamera flag
+
+            if (enable && !_cameraSubscribed)
+                await SubscribeCameraAsync();
+            else if (!enable && _cameraSubscribed)
+                await UnsubscribeCameraAsync();
         }
 
         private async Task SendToRobotAsync(string json)
