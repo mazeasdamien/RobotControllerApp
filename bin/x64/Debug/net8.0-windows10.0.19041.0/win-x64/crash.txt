@@ -1,13 +1,13 @@
-Cannot find a Resource with the Name/Key Brush.Border [Line: 810 Position: 84]
-Microsoft.UI.Xaml.Markup.XamlParseException: Le texte associé à ce code d’erreur est introuvable.
+Cannot find a Resource with the Name/Key Text.Headline2 [Line: 470 Position: 64]
+Microsoft.UI.Xaml.Markup.XamlParseException: The text associated with this error code could not be found.
 
-Cannot find a Resource with the Name/Key Brush.Border [Line: 810 Position: 84]
+Cannot find a Resource with the Name/Key Text.Headline2 [Line: 470 Position: 64]
    at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
    at WinRT.ExceptionHelpers.ThrowExceptionForHR(Int32 hr)
    at ABI.Microsoft.UI.Xaml.IApplicationStaticsMethods.LoadComponent(IObjectReference _obj, Object component, Uri resourceLocator, ComponentResourceLocation componentResourceLocation)
    at Microsoft.UI.Xaml.Application.LoadComponent(Object component, Uri resourceLocator, ComponentResourceLocation componentResourceLocation)
-   at RobotControllerApp.MainWindow.InitializeComponent() in C:\Users\QYTH4815\Documents\GitHub\RobotControllerApp\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\MainWindow.g.i.cs:line 261
-   at RobotControllerApp.MainWindow..ctor() in C:\Users\QYTH4815\Documents\GitHub\RobotControllerApp\MainWindow.xaml.cs:line 94
-   at RobotControllerApp.App.OnLaunched(LaunchActivatedEventArgs args) in C:\Users\QYTH4815\Documents\GitHub\RobotControllerApp\App.xaml.cs:line 29
+   at RobotControllerApp.MainWindow.InitializeComponent() in C:\Users\Damien Mazeas\Desktop\portfolio\Orange\RobotControllerApp\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\MainWindow.g.i.cs:line 293
+   at RobotControllerApp.MainWindow..ctor() in C:\Users\Damien Mazeas\Desktop\portfolio\Orange\RobotControllerApp\MainWindow.xaml.cs:line 124
+   at RobotControllerApp.App.OnLaunched(LaunchActivatedEventArgs args) in C:\Users\Damien Mazeas\Desktop\portfolio\Orange\RobotControllerApp\App.xaml.cs:line 29
    at Microsoft.UI.Xaml.Application.Microsoft.UI.Xaml.IApplicationOverrides.OnLaunched(LaunchActivatedEventArgs args)
    at ABI.Microsoft.UI.Xaml.IApplicationOverrides.Do_Abi_OnLaunched_0(IntPtr thisPtr, IntPtr args)

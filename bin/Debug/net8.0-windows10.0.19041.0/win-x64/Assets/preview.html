@@ -245,43 +245,42 @@
       }
     }
 
-    /* FK Panel — bottom-center, wider to use the space naturally */
+    /* FK / Control Panel — left side, fixed */
     #fk-panel {
-      position: absolute;
-      bottom: 16px;
-      left: 50%;
-      transform: translateX(-50%);
+      position: fixed;
+      top: 50%;
+      left: 16px;
+      transform: translateY(-50%);
       background: var(--glass-bg);
       border: 1px solid rgba(85, 153, 255, 0.18);
       border-radius: var(--radius-lg);
       backdrop-filter: var(--blur);
       color: var(--text);
       font-size: 12px;
-      width: 520px;
-      max-width: calc(100vw - 340px);
-      /* stay clear of right-side panel */
+      width: 230px;
       overflow: hidden;
-      resize: both;
-      min-width: 300px;
-      min-height: 100px;
+      resize: none;
       transition: max-height 0.38s cubic-bezier(0.4, 0, 0.2, 1);
-      max-height: 600px;
-      /* large enough to show all content */
+      max-height: 92vh;
       opacity: 1;
       user-select: none;
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(85, 153, 255, 0.06);
+      z-index: 30;
     }
 
-    /* Collapsed state — only shows the header bar */
+    /* Collapsed state — only shows the 44px header bar */
     #fk-panel.collapsed {
       max-height: 44px;
+      overflow: hidden;
     }
 
     #fk-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 11px 14px;
+      padding: 0 14px;
+      height: 44px;
+      flex-shrink: 0;
       cursor: pointer;
       background: linear-gradient(90deg, rgba(85, 153, 255, 0.08) 0%, transparent 100%);
       border-bottom: 1px solid rgba(85, 153, 255, 0.10);
@@ -300,9 +299,9 @@
     }
 
     #fk-header-icon {
-      width: 26px;
-      height: 26px;
-      border-radius: 7px;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
       background: linear-gradient(135deg, rgba(85, 153, 255, 0.25), rgba(85, 153, 255, 0.08));
       border: 1px solid rgba(85, 153, 255, 0.3);
       display: flex;
@@ -346,6 +345,17 @@
       transform: rotate(-90deg);
     }
 
+    #fk-collapse-btn {
+      font-size: 18px;
+      color: rgba(85, 153, 255, 0.7);
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.3s;
+      padding: 2px 4px;
+      line-height: 1;
+    }
+
     #fk-body {
       padding: 12px 14px 14px;
     }
@@ -381,11 +391,11 @@
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
     }
 
-    /* 2-column axis grid to use the wider bottom-center panel */
+    /* Single-column axis list for the narrower left panel */
     #fk-sliders {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .fk-axis-row {
@@ -487,14 +497,13 @@
     /* ── Control Panel: quick action row ─────────────────────────── */
     #cp-actions {
       display: flex;
-      gap: 6px;
+      flex-direction: column;
+      gap: 5px;
       margin-bottom: 10px;
-      flex-wrap: wrap;
     }
 
     .cp-action-btn {
-      flex: 1;
-      min-width: 100px;
+      width: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -545,6 +554,229 @@
 
     .cp-action-btn--reset:hover {
       background: rgba(255, 140, 30, 0.16);
+    }
+
+    /* ── Context / Scene Panel ──────────────────────────────────── */
+    #ctx-panel {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--glass-bg);
+      border: 1px solid rgba(0, 204, 106, 0.18);
+      border-radius: var(--radius-lg);
+      backdrop-filter: var(--blur);
+      color: var(--text);
+      font-size: 12px;
+      width: 320px;
+      overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      max-height: 400px;
+      user-select: none;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 204, 106, 0.06);
+      z-index: 30;
+    }
+
+    #ctx-panel.collapsed {
+      max-height: 46px;
+      overflow: hidden;
+    }
+
+    #ctx-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 14px;
+      height: 44px;
+      flex-shrink: 0;
+      cursor: pointer;
+      background: linear-gradient(90deg, rgba(0, 204, 106, 0.08) 0%, transparent 100%);
+      border-bottom: 1px solid rgba(0, 204, 106, 0.10);
+      gap: 8px;
+      transition: background 0.2s;
+    }
+
+    #ctx-header:hover {
+      background: linear-gradient(90deg, rgba(0, 204, 106, 0.15) 0%, rgba(0, 204, 106, 0.03) 100%);
+    }
+
+    #ctx-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #ctx-header-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, rgba(0, 204, 106, 0.25), rgba(0, 180, 90, 0.08));
+      border: 1px solid rgba(0, 204, 106, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    #ctx-header-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: #55ddaa;
+      letter-spacing: 0.02em;
+    }
+
+    #ctx-collapse-btn {
+      font-size: 18px;
+      color: rgba(0, 204, 106, 0.7);
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.3s;
+      padding: 2px 4px;
+      line-height: 1;
+    }
+
+    #ctx-panel.collapsed #ctx-collapse-btn {
+      transform: rotate(-90deg);
+    }
+
+    #ctx-body {
+      padding: 12px 14px 14px;
+    }
+
+    .ctx-scan-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    #ctx-scan-btn {
+      flex: 1;
+      padding: 9px 0;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(0, 204, 106, 0.35);
+      background: rgba(0, 204, 106, 0.08);
+      color: #55ddaa;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s;
+    }
+
+    #ctx-scan-btn:hover {
+      background: rgba(0, 204, 106, 0.16);
+      border-color: rgba(0, 204, 106, 0.55);
+    }
+
+    #ctx-scan-btn.scanning {
+      background: rgba(0, 204, 106, 0.22);
+      border-color: rgba(0, 204, 106, 0.7);
+      animation: scan-pulse 1.1s infinite;
+    }
+
+    @keyframes scan-pulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 rgba(0, 204, 106, 0);
+      }
+
+      50% {
+        box-shadow: 0 0 12px rgba(0, 204, 106, 0.4);
+      }
+    }
+
+    #ctx-autoscan-btn {
+      padding: 9px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 160, 50, 0.3);
+      background: rgba(255, 140, 30, 0.07);
+      color: rgba(255, 200, 120, 0.85);
+      font-size: 11px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s;
+      white-space: nowrap;
+    }
+
+    #ctx-autoscan-btn:hover {
+      background: rgba(255, 140, 30, 0.16);
+    }
+
+    #ctx-autoscan-btn.active {
+      background: rgba(255, 140, 30, 0.22);
+      border-color: rgba(255, 180, 80, 0.65);
+      color: #ffc864;
+      animation: scan-pulse 1.3s infinite;
+    }
+
+    #ctx-status {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-align: center;
+      min-height: 14px;
+      letter-spacing: 0.02em;
+      margin-top: 4px;
+    }
+
+    #ctx-status.scanning {
+      color: var(--green);
+    }
+
+    #ctx-status.error {
+      color: #ff6666;
+    }
+
+    /* Photo strip — scrollable row of cropped thumbnails */
+    #ctx-photos {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 6px 0 4px;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 204, 106, 0.3) transparent;
+      margin-top: 6px;
+    }
+
+    #ctx-photos:empty {
+      display: none;
+    }
+
+    .ctx-photo-card {
+      flex-shrink: 0;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(0, 204, 106, 0.18);
+      border-radius: 8px;
+      padding: 5px 5px 5px;
+      width: 80px;
+    }
+
+    .ctx-photo-card img {
+      width: 70px;
+      height: 70px;
+      object-fit: cover;
+      border-radius: 5px;
+    }
+
+    .ctx-photo-label {
+      font-size: 9px;
+      font-weight: 600;
+      color: #55ddaa;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
     }
 
     /* ── Control Panel: calibration sliders row ───────────────────── */
@@ -858,13 +1090,16 @@
 
     #voice-panel.collapsed {
       max-height: 46px;
+      overflow: hidden;
     }
 
     #voice-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 11px 14px;
+      padding: 0 14px;
+      height: 44px;
+      flex-shrink: 0;
       cursor: pointer;
       background: linear-gradient(90deg, rgba(200, 80, 255, 0.08) 0%, transparent 100%);
       border-bottom: 1px solid rgba(200, 80, 255, 0.10);
@@ -903,13 +1138,14 @@
     }
 
     #voice-collapse-btn {
-      font-size: 9px;
-      color: rgba(200, 80, 255, 0.5);
+      font-size: 18px;
+      color: rgba(200, 80, 255, 0.7);
       background: none;
       border: none;
       cursor: pointer;
       transition: transform 0.3s;
       padding: 2px 4px;
+      line-height: 1;
     }
 
     #voice-panel.collapsed #voice-collapse-btn {
@@ -1078,16 +1314,25 @@
     Scan the scene to detect objects
   </div>
 
-  <!-- FK Control Panel — bottom-center -->
+  <!-- FK Control Panel — left side -->
   <div id="fk-panel">
-    <div id="fk-header" class="drag-handle">
-      <div id="fk-header-left"> <span id="fk-header-text">Control Panel</span>
+    <div id="fk-header" onclick="toggleFkPanel()">
+      <div id="fk-header-left">
+        <div id="fk-header-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#88bbff" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+          </svg>
+        </div>
+        <span id="fk-header-text">Control Panel</span>
       </div>
-      <button id="fk-collapse-btn" onclick="toggleFkPanel()" title="Collapse">▾</button>
+      <button id="fk-collapse-btn" title="Collapse">▾</button>
     </div>
     <div id="fk-body">
 
-      <!-- Quick actions row (formerly sidebar) -->
+      <!-- Quick actions row -->
       <div id="cp-actions">
         <button class="cp-action-btn" id="sb-freeze-btn" onclick="toggleFreeze()">
           <span id="sb-freeze-label">Live Feed</span>
@@ -1098,14 +1343,11 @@
         <button class="cp-action-btn" id="sb-vr-btn" onclick="toggleVR()">
           <span id="sb-vr-label">Enter MR</span>
         </button>
-        <button class="cp-action-btn" id="sb-calib-guides-btn" onclick="toggleCalibrationPlane()">
-          <span id="sb-calib-guides-label">Hide Target</span>
+        <button class="cp-action-btn" id="sb-calib-guides-btn" onclick="toggleCalibrationPlane()" style="opacity:0.55;">
+          <span id="sb-calib-guides-label">Show Target</span>
         </button>
         <button class="cp-action-btn" onclick="toggleSceneBg()">
           <span>White BG</span>
-        </button>
-        <button class="cp-action-btn cp-action-btn--reset" onclick="resetXrScene()" title="Snap robots back into view">
-          <span>Reset Scene</span>
         </button>
       </div>
 
@@ -1118,12 +1360,10 @@
           <input class="cp-slider" type="range" id="calib-fov-slider" min="0.10" max="1.5" step="0.01" value="0.45"
             oninput="onCalibFov(this.value)">
         </div>
-        <div class="cp-slider-row">
-          <span class="cp-slider-label">Live Feed Opacity</span>
-          <input class="cp-slider" type="range" min="0" max="1" step="0.05" value="0.65"
-            oninput="onCalibOpacity(this.value)">
-        </div>
       </div>
+      <button class="cp-action-btn" id="cp-feed-opacity-btn" onclick="toggleFeedOpacity()" style="margin-bottom:6px;">
+        <span id="cp-feed-opacity-label">Hide Live Feed</span>
+      </button>
 
       <div class="fk-divider"></div>
 
@@ -1137,22 +1377,32 @@
       <button id="fk-reset-btn" onclick="resetFk()">↺ &nbsp;Reset to Home</button>
     </div>
   </div>
-  </div>
 
   <!-- Voice-to-Text Panel — top-right -->
   <div id="voice-panel">
-    <div id="voice-header" class="drag-handle">
+    <div id="voice-header" class="drag-handle" onclick="toggleVoicePanel()">
       <div id="voice-header-left">
+        <div id="voice-header-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#cc88ff" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="23" />
+            <line x1="8" y1="23" x2="16" y2="23" />
+          </svg>
+        </div>
         <span id="voice-header-text">Voice Input</span>
       </div>
-      <button id="voice-collapse-btn" onclick="toggleVoicePanel()" title="Collapse">▾</button>
+      <button id="voice-collapse-btn" title="Collapse">▾</button>
     </div>
     <div id="voice-body">
       <select id="mic-select"
         style="width:100%; margin-bottom: 10px; font-size: 11px; padding: 6px; border-radius: 6px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.4); color: var(--text); outline: none;">
         <option value="">Default Microphone</option>
       </select>
-      <button id="ptt-btn" onclick="toggleRecording()">
+      <button id="ptt-btn"
+        onmousedown="startHoldRecord()" onmouseup="stopHoldRecord()" onmouseleave="stopHoldRecord()"
+        ontouchstart="startHoldRecord()" ontouchend="stopHoldRecord()">
         <span id="ptt-mic-icon">🎙️</span>
         <span id="ptt-label">Hold to Record</span>
       </button>
@@ -1164,6 +1414,33 @@
 
   <!-- XR Toast notification -->
   <div id="xr-toast"></div>
+
+  <!-- Context / Scene Panel — bottom-center -->
+  <div id="ctx-panel">
+    <div id="ctx-header" onclick="toggleCtxPanel()">
+      <div id="ctx-header-left">
+        <div id="ctx-header-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#55ddaa" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <line x1="11" y1="8" x2="11" y2="14" />
+            <line x1="8" y1="11" x2="14" y2="11" />
+          </svg>
+        </div>
+        <span id="ctx-header-text">Scene Context</span>
+      </div>
+      <button id="ctx-collapse-btn" title="Collapse">▾</button>
+    </div>
+    <div id="ctx-body">
+      <div class="ctx-scan-row">
+        <button id="ctx-scan-btn" onclick="triggerScan()">Scan Scene</button>
+        <button id="ctx-autoscan-btn" onclick="toggleAutoScan()">Auto Scan</button>
+      </div>
+      <div id="ctx-status"></div>
+      <div id="ctx-photos"></div>
+    </div>
+  </div>
 
   <!-- Live WS connection badge -->
   <div id="ws-badge">
@@ -1415,7 +1692,17 @@
       FK_ROBOTS.push({ root: r2, joints: findJoints(r2) });
 
       buildFkSliders();
+
+      // Apply zero-position FK to both robots immediately so that
+      // sliders at 0° match the visual pose when the page loads.
+      FK_ANGLES.fill(0);
+      for (let rIdx = 0; rIdx < FK_ROBOTS.length; rIdx++) {
+        fkTarget = rIdx;
+        applyFk();
+      }
+      fkTarget = 0; // restore default selection to Robot 1
     }, undefined, (e) => console.error("Could not load ned.glb:", e));
+
 
     // Helper to draw text labels
     function makeTextSprite(message) {
@@ -1454,8 +1741,10 @@
     const axesHelper = new THREE.AxesHelper(0.10);
     axesHelper.position.y = 0.005; scene.add(axesHelper);
 
-    // Toggle for calibration guides
-    window._guidesVisible = true;
+    // Toggle for calibration guides — hidden by default
+    window._guidesVisible = false;
+    boardMesh.visible = false;
+    axesHelper.visible = false;
     window.toggleCalibrationPlane = function () {
       window._guidesVisible = !window._guidesVisible;
 
@@ -1674,10 +1963,15 @@
       const data = {};
       ['fk-panel', 'sidebar'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) data[id] = {
-          left: el.style.left, top: el.style.top, right: el.style.right, bottom: el.style.bottom,
-          width: el.style.width, height: el.style.height
-        };
+        if (el) {
+          const isCollapsed = el.classList.contains('collapsed');
+          data[id] = {
+            left: el.style.left, top: el.style.top, right: el.style.right, bottom: el.style.bottom,
+            width: el.style.width,
+            // Never save height when collapsed — it would lock the panel at 44px permanently
+            height: isCollapsed ? '' : el.style.height
+          };
+        }
       });
       localStorage.setItem(PANEL_POS_KEY, JSON.stringify(data));
     }
@@ -1695,7 +1989,8 @@
           if (d.right && !d.left) el.style.right = d.right;
           if (d.bottom && !d.top) el.style.bottom = d.bottom;
           if (d.width && id === 'fk-panel') el.style.width = d.width;
-          if (d.height && id === 'fk-panel') el.style.height = d.height;
+          // Only restore height if it's a real expanded size (> 100px). Never restore a collapsed 44px.
+          if (d.height && id === 'fk-panel' && parseInt(d.height) > 100) el.style.height = d.height;
         });
       } catch (_) { }
     }
@@ -1834,6 +2129,19 @@
       window.sendCommandToHost('opacity', parseFloat(v));
     };
 
+    let _feedOpacityHidden = false;
+    window.toggleFeedOpacity = function () {
+      _feedOpacityHidden = !_feedOpacityHidden;
+      const opacity = _feedOpacityHidden ? 0 : 0.75;
+      window.onCalibOpacity(opacity);
+      const lbl = document.getElementById('cp-feed-opacity-label');
+      const btn = document.getElementById('cp-feed-opacity-btn');
+      if (lbl) lbl.textContent = _feedOpacityHidden ? 'Show Live Feed' : 'Hide Live Feed';
+      if (btn) btn.style.opacity = _feedOpacityHidden ? '0.55' : '1';
+    };
+    // Apply default 75% opacity on load
+    window.onCalibOpacity(0.75);
+
     window.updateCameraFeed = function (base64Url) {
       if (_feedFrozen) return;
       let isFirstTime = false;
@@ -1853,8 +2161,101 @@
       img.src = base64Url;
     };
 
+    // setDetectedObjects is defined fully in the Context Panel block below
+    // (it handles photo strip + 3D rendering + auto-scan chaining)
+
+    // ── Context / Scene Panel ─────────────────────────────────────────────────
+    let _scanInProgress = false;
+    let _autoScanActive = false;
+    let _autoScanPending = false;
+
+    window.toggleCtxPanel = function () {
+      document.getElementById('ctx-panel').classList.toggle('collapsed');
+    };
+
+    window.triggerScan = function () {
+      if (_scanInProgress) return;
+      _scanInProgress = true;
+      _autoScanPending = true;
+
+      const btn = document.getElementById('ctx-scan-btn');
+      const statusEl = document.getElementById('ctx-status');
+      if (btn) btn.classList.add('scanning');
+      if (statusEl) { statusEl.textContent = 'Scanning…'; statusEl.className = 'scanning'; }
+
+      // Send scan command to C# host (WebView2) or via WS (Quest / LAN)
+      window.sendCommandToHost('scanScene', true);
+
+      // Timeout fallback: if no result after 35s, unlock (Gemini can take ~30s)
+      setTimeout(() => {
+        if (_scanInProgress) {
+          _scanInProgress = false;
+          _autoScanPending = false;
+          if (btn) btn.classList.remove('scanning');
+          if (statusEl) { statusEl.textContent = 'No response from app — check camera is active.'; statusEl.className = 'error'; }
+        }
+      }, 35000);
+    };
+
+    // Render the photo strip in the context panel
+    function renderCtxPhotos(items) {
+      const strip = document.getElementById('ctx-photos');
+      if (!strip) return;
+      strip.innerHTML = '';
+      items.forEach(item => {
+        if (!item.cropBase64) return;
+        const card = document.createElement('div');
+        card.className = 'ctx-photo-card';
+        const img = document.createElement('img');
+        img.src = item.cropBase64;
+        img.alt = item.label;
+        const lbl = document.createElement('div');
+        lbl.className = 'ctx-photo-label';
+        lbl.textContent = item.label;
+        card.appendChild(img);
+        card.appendChild(lbl);
+        strip.appendChild(card);
+      });
+    }
+
+    // Intercept all setDetectedObjects calls to also update the context panel
     window.setDetectedObjects = function (jsonStr) {
-      try { renderObjects(JSON.parse(jsonStr)); } catch (e) { console.error(e); }
+      _scanInProgress = false;
+      const btn = document.getElementById('ctx-scan-btn');
+      const statusEl = document.getElementById('ctx-status');
+      if (btn) btn.classList.remove('scanning');
+      try {
+        const items = JSON.parse(jsonStr);
+        renderObjects(items);
+        renderCtxPhotos(items);
+
+        // Auto-expand context panel so user sees results
+        const ctxPanel = document.getElementById('ctx-panel');
+        if (ctxPanel) ctxPanel.classList.remove('collapsed');
+
+        if (statusEl) {
+          statusEl.textContent = items.length ? `${items.length} object(s) found` : 'No objects detected.';
+          statusEl.className = '';
+        }
+      } catch (e) { console.error(e); }
+
+      // Chain next scan if auto-scan is on
+      if (_autoScanActive) {
+        setTimeout(triggerScan, 400);
+      }
+    };
+
+    window.toggleAutoScan = function () {
+      _autoScanActive = !_autoScanActive;
+      const btn = document.getElementById('ctx-autoscan-btn');
+      const statusEl = document.getElementById('ctx-status');
+      if (btn) btn.classList.toggle('active', _autoScanActive);
+      if (_autoScanActive) {
+        if (statusEl) { statusEl.textContent = 'Auto-scan on'; statusEl.className = 'scanning'; }
+        if (!_scanInProgress) triggerScan();
+      } else {
+        if (statusEl) { statusEl.textContent = 'Auto-scan off'; statusEl.className = ''; }
+      }
     };
 
     window.setCameraPose = function (jsonStr) {
@@ -2012,24 +2413,85 @@
     // ── FK Panel Logic ─────────────────────────────────────────────────────────
     window.toggleFkPanel = function () {
       const panel = document.getElementById('fk-panel');
+      const isCollapsing = !panel.classList.contains('collapsed');
       panel.classList.toggle('collapsed');
+      // Clear any inline height set by the ResizeObserver/drag so CSS max-height takes control
+      if (!isCollapsing) panel.style.height = '';
     };
+
+    // Per-robot stored angles ([robot0angles], [robot1angles])
+    const FK_ANGLES_R = [new Array(6).fill(0), new Array(6).fill(0)];
+
+    // Helper: sync the slider UI from a given angles array
+    function syncSlidersFromAngles(angles) {
+      document.querySelectorAll('.fk-slider').forEach((s, i) => {
+        s.value = angles[i] ?? 0;
+        const v = document.getElementById(`fk-val-${i}`);
+        if (v) v.textContent = Math.round(angles[i] ?? 0) + '°';
+      });
+    }
 
     window.selectFkRobot = function (idx) {
       fkTarget = idx;
       ['fk-r1-btn', 'fk-r2-btn', 'fk-both-btn'].forEach((id, i) => {
-        document.getElementById(id).classList.toggle('active', i === idx);
+        const el = document.getElementById(id);
+        if (el) el.classList.toggle('active', i === idx);
       });
+      // Update sliders to show the selected robot's last known angles
+      if (idx < 2) {
+        for (let i = 0; i < 6; i++) FK_ANGLES[i] = FK_ANGLES_R[idx][i];
+        syncSlidersFromAngles(FK_ANGLES_R[idx]);
+      }
     };
 
+    let _resetRafId = null; // tracks in-flight reset animation
+
     window.resetFk = function () {
-      FK_ANGLES.fill(0);
-      document.querySelectorAll('.fk-slider').forEach((s, i) => {
-        s.value = 0;
-        document.getElementById(`fk-val-${i}`).textContent = '0°';
-      });
-      applyFk();
+      // Cancel any ongoing reset
+      if (_resetRafId) { cancelAnimationFrame(_resetRafId); _resetRafId = null; }
+
+      const DURATION = 600; // ms
+      const startAngles = [...FK_ANGLES];
+      const startTime = performance.now();
+
+      // Ease-out cubic
+      const ease = t => 1 - Math.pow(1 - t, 3);
+
+      function tick(now) {
+        const t = Math.min((now - startTime) / DURATION, 1);
+        const e = ease(t);
+
+        for (let i = 0; i < 6; i++) {
+          FK_ANGLES[i] = startAngles[i] * (1 - e); // lerp toward 0
+        }
+
+        // Sync sliders live
+        document.querySelectorAll('.fk-slider').forEach((s, i) => {
+          s.value = FK_ANGLES[i];
+          const v = document.getElementById(`fk-val-${i}`);
+          if (v) v.textContent = Math.round(FK_ANGLES[i]) + '°';
+        });
+
+        applyFk();
+
+        if (t < 1) {
+          _resetRafId = requestAnimationFrame(tick);
+        } else {
+          // Snap exactly to zero at the end
+          FK_ANGLES.fill(0);
+          document.querySelectorAll('.fk-slider').forEach((s, i) => {
+            s.value = 0;
+            const v = document.getElementById(`fk-val-${i}`);
+            if (v) v.textContent = '0°';
+          });
+          applyFk();
+          _resetRafId = null;
+        }
+      }
+
+      _resetRafId = requestAnimationFrame(tick);
     };
+
 
     function applyFk() {
       const targets = fkTarget === 2 ? FK_ROBOTS : [FK_ROBOTS[fkTarget]];
@@ -2042,7 +2504,7 @@
           const q = new THREE.Quaternion();
 
           let renderAngle = FK_ANGLES[i];
-          if (i === 1) renderAngle -= 3; // J2
+          if (i === 1) renderAngle -= 33; // J2
           if (i === 2) renderAngle += 75; // J3
 
           q.setFromAxisAngle(JOINT_AXES[i], THREE.MathUtils.degToRad(renderAngle));
@@ -2078,17 +2540,25 @@
     window.setRobotJoints = function (anglesJson, robotIdx) {
       try {
         const angles = JSON.parse(anglesJson);
+        const rIdx = robotIdx ?? 0;
+
+        // Store per-robot
+        if (rIdx < 2) {
+          angles.forEach((a, i) => { FK_ANGLES_R[rIdx][i] = a; });
+        }
+
+        // Apply FK for this robot
         const prevTarget = fkTarget;
-        fkTarget = robotIdx ?? 0;
+        fkTarget = rIdx;
         angles.forEach((a, i) => { FK_ANGLES[i] = a; });
         applyFk();
         fkTarget = prevTarget;
-        // Sync sliders UI
-        document.querySelectorAll('.fk-slider').forEach((s, i) => {
-          s.value = FK_ANGLES[i];
-          const v = document.getElementById(`fk-val-${i}`);
-          if (v) v.textContent = Math.round(FK_ANGLES[i]) + '°';
-        });
+
+        // Only sync sliders if this is the currently displayed robot
+        if (rIdx === fkTarget || fkTarget === 2) {
+          syncSlidersFromAngles(angles);
+        }
+
         // Show LIVE pill on first real data
         const pill = document.getElementById('fk-live-pill');
         if (pill && !pill.classList.contains('visible') && angles.some(a => Math.abs(a) > 0.1))
@@ -2386,7 +2856,7 @@
 
         ws.onclose = () => {
           badge.classList.remove('live');
-          label.textContent = `Reconnecting in ${(retryDelay / 1000).toFixed(1)}s…`;
+          label.textContent = 'Reconnecting…';
           setTimeout(connect, retryDelay);
           retryDelay = Math.min(retryDelay * 1.5, 15000); // Exponential back-off, max 15s
         };
@@ -2411,12 +2881,21 @@
         document.getElementById('voice-panel').classList.toggle('collapsed');
       };
 
+      // Hold-to-record: press starts, release stops
+      window.startHoldRecord = async function () {
+        if (_isRecording) return; // already going
+        await startRecording();
+      };
+
+      window.stopHoldRecord = function () {
+        if (!_isRecording) return; // nothing to stop
+        stopRecording();
+      };
+
+      // Keep toggleRecording for backwards compat (WebView2 host calls)
       window.toggleRecording = async function () {
-        if (_isRecording) {
-          stopRecording();
-        } else {
-          await startRecording();
-        }
+        if (_isRecording) stopRecording();
+        else await startRecording();
       };
 
       async function startRecording() {
@@ -2444,8 +2923,8 @@
           _mediaRecorder.start();
 
           pttBtn.classList.add('recording');
-          pttLabel.textContent = 'Recording… tap to stop';
-          setStatus('Recording — tap button to send', '');
+          pttLabel.textContent = 'Release to send…';
+          setStatus('Recording — release to send', '');
         } catch (err) {
           setStatus('Microphone access denied: ' + err.message, 'error');
           _isRecording = false;
@@ -2547,6 +3026,12 @@
               option.text = device.label || `Microphone ${select.options.length}`;
               select.appendChild(option);
             });
+
+            // Auto-select the Intel mic when available (common on Windows laptops in Chrome)
+            const intelOption = Array.from(select.options).find(o =>
+              o.text.toLowerCase().includes('intel')
+            );
+            if (intelOption) select.value = intelOption.value;
           }
         } catch (e) {
           console.error("Failed to list microphones", e);

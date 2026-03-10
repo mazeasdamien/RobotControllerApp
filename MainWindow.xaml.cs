@@ -27,7 +27,8 @@ namespace RobotControllerApp
         public string Name { get; set; } = "";
         public Microsoft.UI.Xaml.Media.SolidColorBrush ColorBrush { get; set; } = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
         public Microsoft.UI.Xaml.Media.Imaging.BitmapImage? CroppedImage { get; set; }
-        public byte[]? CropJpgBytes { get; set; }
+        public byte[]? CropJpgBytes { get; set; }   // Full-res for local WinUI display
+        public byte[]? ThumbJpgBytes { get; set; }  // Compressed thumbnail for WebSocket broadcast
         public bool IsAlreadyInLibrary { get; set; }
         public double PreviewOpacity => IsAlreadyInLibrary ? 0.3 : 1.0;
 
@@ -88,12 +89,14 @@ namespace RobotControllerApp
         private bool _updatingToggle = false;
 
         private byte[]? _latestWebcamFrameBytes;
+        private volatile bool _analyzeInProgress = false; // scan lock — prevents queuing concurrent Gemini calls
         private readonly System.Collections.ObjectModel.ObservableCollection<DetectedObjectViewModel> _detectedObjects = new();
         private readonly System.Collections.ObjectModel.ObservableCollection<DetectedObjectViewModel> _selectedForBanana = new();
         private readonly System.Collections.ObjectModel.ObservableCollection<GeneratedBananaImageModel> _bananaImages = new();
 
         private double _totalGeminiCost = 0.0;
         private double _totalBananaCost = 0.0;
+        private double _totalTripo3dCost = 0.0;
 
         private System.Collections.ObjectModel.ObservableCollection<LibraryItemViewModel> _libraryItems = new();
         private List<LibraryItemConfig> _libraryConfig = new();
@@ -179,6 +182,8 @@ namespace RobotControllerApp
             if (_settings.BananaModel == "gemini-3.1-flash-image-preview") BananaModelComboBox.SelectedIndex = 1;
             else if (_settings.BananaModel == "gemini-3-pro-image-preview") BananaModelComboBox.SelectedIndex = 2;
             else BananaModelComboBox.SelectedIndex = 0;
+
+
 
             BananaPromptTextBox.Text = string.IsNullOrWhiteSpace(_settings.BananaPromptTemplate)
                 ? DefaultBananaPrompt
@@ -623,9 +628,8 @@ namespace RobotControllerApp
 
                                     var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
 
-                                    // Context preview (if existent) or Local WebCam preview removed
-                                    if (ContextView.Visibility == Visibility.Visible) ContextWebcamPreview.Source = bitmap;
-                                    // }
+                                    // Camera preview — always update ContextWebcamPreview (now shown on dashboard)
+                                    ContextWebcamPreview.Source = bitmap;
 
                                     if (!_feedFrozen)
                                     {
@@ -918,14 +922,54 @@ namespace RobotControllerApp
             }
         }
 
-        private async void NavView_Loaded(object _, RoutedEventArgs __)
+        private async void RootGrid_Loaded(object _, RoutedEventArgs __)
         {
-            // Initial Selection
-            if (NavView.MenuItems.Count > 0)
-                NavView.SelectedItem = NavView.MenuItems[0];
-
-            // Auto Connect Sequence
             await StartSystem();
+        }
+
+        // Legacy stub — NavView still exists in hidden stubs, do nothing on load
+        private async void NavView_Loaded(object _, RoutedEventArgs __) { }
+
+        private void SettingsToggleBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (SettingsOverlay == null) return;
+            bool isOpen = SettingsOverlay.Visibility == Visibility.Visible;
+            SettingsOverlay.Visibility = isOpen ? Visibility.Collapsed : Visibility.Visible;
+            if (!isOpen) LoadSettingsIntoUI(); // refresh fields whenever panel opens
+        }
+
+        private void SettingsOverlayBackdrop_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+        {
+            if (SettingsOverlay != null) SettingsOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        private void LoadSettingsIntoUI()
+        {
+            // Sync the settings overlay fields with current _settings values
+            try
+            {
+                RelayPortInput.Text        = _settings.RelayPort.ToString();
+                RobotIpInput.Text          = _settings.RobotIp;
+                Robot2IpInput.Text         = _settings.Robot2Ip;
+                OrangeApiKeyInput.Password = _settings.OrangeApiKey;
+                OrangeApiUrlInput.Text     = _settings.OrangeApiUrl;
+                GeminiApiKeyInput.Password = _settings.GeminiApiKey;
+                TripoApiKeyInput.Password  = _settings.TripoApiKey;
+                BananaPromptTextBox.Text   = string.IsNullOrWhiteSpace(_settings.BananaPromptTemplate)
+                    ? DefaultBananaPrompt : _settings.BananaPromptTemplate;
+                BananaScaleSlider.Value    = _settings.BananaFramingScale <= 0 ? 0.6 : _settings.BananaFramingScale;
+                if (_settings.BananaModel == "gemini-3.1-flash-image-preview") BananaModelComboBox.SelectedIndex = 1;
+                else if (_settings.BananaModel == "gemini-3-pro-image-preview") BananaModelComboBox.SelectedIndex = 2;
+                else BananaModelComboBox.SelectedIndex = 0;
+            }
+            catch { /* settings panel may not be fully loaded yet */ }
+        }
+
+        private void UpdateTotalCostDisplay()
+        {
+            double total = _totalGeminiCost + _totalBananaCost + _totalTripo3dCost;
+            if (TotalCostText != null)
+                TotalCostText.Text = $"{total:0.0000} €";
         }
 
         private async Task StartSystem()
@@ -997,6 +1041,7 @@ namespace RobotControllerApp
                 _settings.OrangeApiUrl = OrangeApiUrlInput.Text.Trim();
                 _settings.GeminiApiKey = GeminiApiKeyInput.Password.Trim();
                 _settings.TripoApiKey = TripoApiKeyInput.Password.Trim();
+
 
                 // Update running broadcast server's Whisper credentials live
                 _broadcastServer.WhisperApiKey = _settings.OrangeApiKey;
@@ -1075,6 +1120,7 @@ namespace RobotControllerApp
 
             UpdateBananaCost();
         }
+
 
         // ─── Camera Robot Selection ────────────────────────────────────────────
 
@@ -1278,9 +1324,7 @@ namespace RobotControllerApp
         {
             // Hide all views first
             DashboardView.Visibility = Visibility.Collapsed;
-            TelemetryView.Visibility = Visibility.Collapsed;
             SettingsView.Visibility = Visibility.Collapsed;
-            NetworkView.Visibility = Visibility.Collapsed;
             ContextView.Visibility = Visibility.Collapsed;
             Preview3DView.Visibility = Visibility.Collapsed;
 
@@ -1298,17 +1342,9 @@ namespace RobotControllerApp
                         NavView.IsPaneOpen = true;
                         DashboardView.Visibility = Visibility.Visible;
                         break;
-                    case "telemetry":
-                        NavView.IsPaneOpen = true;
-                        TelemetryView.Visibility = Visibility.Visible;
-                        break;
                     case "settings":
                         NavView.IsPaneOpen = true;
                         SettingsView.Visibility = Visibility.Visible;
-                        break;
-                    case "network":
-                        NavView.IsPaneOpen = true;
-                        NetworkView.Visibility = Visibility.Visible;
                         break;
                     case "context":
                         NavView.IsPaneOpen = true;
@@ -1325,6 +1361,7 @@ namespace RobotControllerApp
                 }
             }
         }
+
 
         private bool _webViewReady = false;
         private bool _feedFrozen  = false;
@@ -1500,9 +1537,11 @@ namespace RobotControllerApp
                         ? $"/library/{libItem.ModelFileName}"
                         : "";
 
-                    // Inline crop photo (JPEG→base64) so WebXR can render result thumbnails
-                    string cropBase64 = obj.CropJpgBytes != null && obj.CropJpgBytes.Length > 0
-                        ? "data:image/jpeg;base64," + Convert.ToBase64String(obj.CropJpgBytes)
+                    // Inline crop photo — use compressed thumbnail (~240px, q72) for WebSocket broadcast
+                    // ThumbJpgBytes is ~8-15KB vs full-res CropJpgBytes which can be 100KB+
+                    var thumbBytes = obj.ThumbJpgBytes ?? obj.CropJpgBytes;
+                    string cropBase64 = thumbBytes != null && thumbBytes.Length > 0
+                        ? "data:image/jpeg;base64," + Convert.ToBase64String(thumbBytes)
                         : "";
 
                     return new
@@ -1515,16 +1554,24 @@ namespace RobotControllerApp
                         angleRad = obj.AngleDegrees * Math.PI / 180.0,
                         modelUrl,
                         modelUrlRemote,
-                        cropBase64
+                        cropBase64,
+                        hasModel = !string.IsNullOrEmpty(modelUrlRemote),  // true = GLB available
+                        isInLibrary = obj.IsAlreadyInLibrary               // true = image exists but maybe no GLB yet
                     };
                 }).ToList();
 
                 string json = System.Text.Json.JsonSerializer.Serialize(items);
-
-                // ① Push to local WebView2 (Disabled)
-
-                // ② Broadcast to remote browser
                 _ = _broadcastServer.BroadcastAsync("setDetectedObjects", json);
+
+                // Broadcast cumulative API costs so the preview panel can display them
+                var costs = new
+                {
+                    scanEur   = Math.Round(_totalGeminiCost, 5),
+                    bananaEur = Math.Round(_totalBananaCost, 4),
+                    tripoEur  = Math.Round(_totalTripo3dCost, 4),
+                    totalEur  = Math.Round(_totalGeminiCost + _totalBananaCost + _totalTripo3dCost, 4)
+                };
+                _ = _broadcastServer.BroadcastAsync("setScanCosts", System.Text.Json.JsonSerializer.Serialize(costs));
 
                 // Also refresh camera pose overlay
                 if (_lastValidPose != null)
@@ -1982,11 +2029,7 @@ namespace RobotControllerApp
 
         private void DrawNetworkGraph()
         {
-            // Only draw if the view is visible to save resources
-            if (NetworkView.Visibility != Visibility.Visible) return;
-
-            UpdatePath(UnityPath, _unityLatencyHistory);
-            DrawPeakIndicator(_unityLatencyHistory);
+            // Graph canvas removed from UI — NetworkView stubs kept for monitoring logic only.
         }
 
         private void DrawPeakIndicator(List<double> history)
@@ -2108,9 +2151,16 @@ namespace RobotControllerApp
         {
             if (_latestWebcamFrameBytes == null || _latestWebcamFrameBytes.Length == 0) return;
 
-            GenerateObjectImagesBtn.IsEnabled = false;
-            GenerationProgress.Visibility = Visibility.Visible;
-            GenerationProgress.IsActive = true;
+            // Drop concurrent calls — prevents scan queue buildup when Gemini takes 20-30s
+            if (_analyzeInProgress)
+            {
+                Log("[Scene3D] Scan already in progress — ignoring concurrent request.");
+                return;
+            }
+            _analyzeInProgress = true;
+
+            if (GenerateObjectImagesBtn != null) GenerateObjectImagesBtn.IsEnabled = false;
+            if (GenerationProgress != null) { GenerationProgress.Visibility = Visibility.Visible; GenerationProgress.IsActive = true; }
 
             try
             {
@@ -2168,6 +2218,7 @@ namespace RobotControllerApp
                         double costUsd = (pTokens / 1_000_000.0 * 0.30) + (cTokens / 1_000_000.0 * 2.50);
                         _totalGeminiCost += costUsd * 0.94;
                         GeminiCostText.Text = $"Robotics-ER Cost: {_totalGeminiCost:0.00000} €";
+                        UpdateTotalCostDisplay();
                     }
 
                     // ── Parse Gemini native format: candidates[0].content.parts[0].text ──
@@ -2219,8 +2270,9 @@ namespace RobotControllerApp
                                     if (item.TryGetProperty("angle_degrees", out var angleProp))
                                         angleProp.TryGetDouble(out angleDegrees);
 
-                                    // Ignore objects cut off by the edge of the camera
-                                    if (xmin < 10 || ymin < 10 || xmax > 990 || ymax > 990) continue;
+                                    // Ignore objects fully cut off at the very edge of the frame (5-unit margin, Gemini uses 0-1000 scale)
+                                    if (xmin < 5 || ymin < 5 || xmax > 995 || ymax > 995) continue;
+                                    Log($"[Scene3D] Detected: {label} box=[{ymin},{xmin},{ymax},{xmax}]");
 
                                     int pixelXMin = (int)(xmin * imgW / 1000.0);
                                     int pixelYMin = (int)(ymin * imgH / 1000.0);
@@ -2244,7 +2296,27 @@ namespace RobotControllerApp
                                     if (rect.Width > 0 && rect.Height > 0)
                                     {
                                         using var cropMat = new OpenCvSharp.Mat(sourceMat, rect);
+
+                                        // Downscale to thumbnail for WebSocket broadcast (max 240px side)
+                                        // This keeps the base64 payload small enough for Cloudflare / LAN WebSocket
+                                        const int MaxThumbSide = 240;
+                                        OpenCvSharp.Mat thumbMat = cropMat;
+                                        bool ownThumb = false;
+                                        if (cropMat.Width > MaxThumbSide || cropMat.Height > MaxThumbSide)
+                                        {
+                                            double scale = Math.Min((double)MaxThumbSide / cropMat.Width, (double)MaxThumbSide / cropMat.Height);
+                                            thumbMat = new OpenCvSharp.Mat();
+                                            ownThumb = true;
+                                            OpenCvSharp.Cv2.Resize(cropMat, thumbMat,
+                                                new OpenCvSharp.Size((int)(cropMat.Width * scale), (int)(cropMat.Height * scale)));
+                                        }
+
+                                        // High-quality JPEG for local WinUI display
                                         byte[] cropJpgBytes = cropMat.ImEncode(".jpg");
+                                        // Compressed thumbnail for WebSocket (lower quality = smaller payload)
+                                        byte[] thumbJpgBytes = thumbMat.ImEncode(".jpg",
+                                            new OpenCvSharp.ImageEncodingParam(OpenCvSharp.ImwriteFlags.JpegQuality, 72));
+                                        if (ownThumb) thumbMat.Dispose();
 
                                         var bitmap = new BitmapImage();
                                         using var ms = new System.IO.MemoryStream(cropJpgBytes);
@@ -2255,13 +2327,14 @@ namespace RobotControllerApp
 
                                         var uiColor = ColorFromLabel(label);
 
-
                                         _detectedObjects.Add(new DetectedObjectViewModel
+
                                         {
                                             Name = objName,
                                             ColorBrush = new Microsoft.UI.Xaml.Media.SolidColorBrush(uiColor),
                                             CroppedImage = bitmap,
                                             CropJpgBytes = cropJpgBytes,
+                                            ThumbJpgBytes = thumbJpgBytes,
                                             IsAlreadyInLibrary = isAlreadyInLibrary,
                                             UvXmin = xmin,
                                             UvYmin = ymin,
@@ -2275,30 +2348,36 @@ namespace RobotControllerApp
                         }
                     }
 
-                    // Broadcast to all connected WebXR/browser clients (Quest, LAN, Chrome, etc.)
-                    // PushObjectsToSceneAsync checks _broadcastServer.IsRunning internally.
+                    // Broadcast results (always runs — even if 0 objects detected)
+                    // This ensures the browser scan spinner always gets unblocked.
                     await PushObjectsToSceneAsync();
                 }
                 else
                 {
-                    if (AutoScanToggle.IsChecked != true)
-                        await new ContentDialog() { Title = "Robotics-ER API Error", Content = $"Error from Gemini Robotics-ER:\n{responseString}", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                    Log($"[Scene3D] Gemini API error: {responseString.Substring(0, Math.Min(200, responseString.Length))}");
+                    // On API error, send empty list to unblock browser spinner
+                    _ = _broadcastServer.BroadcastAsync("setDetectedObjects", "[]");
+                    if (AutoScanToggle?.IsChecked != true)
+                        try { await new ContentDialog() { Title = "Robotics-ER API Error", Content = $"Error from Gemini Robotics-ER:\n{responseString}", CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync(); } catch { }
                 }
             }
             catch (Exception ex)
             {
-                if (AutoScanToggle.IsChecked != true)
-                    await new ContentDialog() { Title = "Execution Error", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync();
+                Log($"[Scene3D] AnalyzeSceneAsync exception: {ex.Message}");
+                // On exception, send empty list to unblock browser spinner
+                _ = _broadcastServer.BroadcastAsync("setDetectedObjects", "[]");
+                if (AutoScanToggle?.IsChecked != true)
+                    try { await new ContentDialog() { Title = "Execution Error", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync(); } catch { }
             }
             finally
             {
-                if (AutoScanToggle.IsChecked != true)
+                _analyzeInProgress = false;
+                if (AutoScanToggle?.IsChecked != true && GenerateObjectImagesBtn != null)
                 {
                     GenerateObjectImagesBtn.IsEnabled = true;
                     GenerateObjectImagesBtn.Content = "Analyze Scene Manually";
                 }
-                GenerationProgress.IsActive = false;
-                GenerationProgress.Visibility = Visibility.Collapsed;
+                if (GenerationProgress != null) { GenerationProgress.IsActive = false; GenerationProgress.Visibility = Visibility.Collapsed; }
             }
         }
 
@@ -2621,56 +2700,11 @@ namespace RobotControllerApp
                 client.Timeout = TimeSpan.FromMinutes(10);
 
                 // ── 1. Upload image ──────────────────────────────────────────
+                // Send the transparent PNG directly — enable_image_autofix on Tripo3D
+                // handles input cleanup, so no OpenCV pre-processing needed.
                 btn.Content = "Uploading image...";
                 string imgPath = Path.Combine(LibraryPath, configData.ImageFileName);
                 byte[] imgBytes = await File.ReadAllBytesAsync(imgPath);
-
-                // ── Green screen composite ────────────────────────────────────
-                // Tripo3D generates much cleaner meshes from an image with a solid
-                // green background than from a raw transparent PNG.
-                try
-                {
-                    using var src = OpenCvSharp.Mat.FromImageData(imgBytes, OpenCvSharp.ImreadModes.Unchanged);
-                    if (src.Channels() == 4) // has alpha
-                    {
-                        // Create solid neon-green background (BGR: 0, 255, 0)
-                        using var bgr = new OpenCvSharp.Mat(src.Size(), OpenCvSharp.MatType.CV_8UC3,
-                            new OpenCvSharp.Scalar(0, 255, 0));
-
-                        // Split source into B G R A channels
-                        var channels = OpenCvSharp.Cv2.Split(src);
-                        using var alpha = channels[3]; // alpha mask
-
-                        // Normalise alpha to [0.0, 1.0]
-                        using var alphaF = new OpenCvSharp.Mat();
-                        alpha.ConvertTo(alphaF, OpenCvSharp.MatType.CV_32F, 1.0 / 255.0);
-
-                        // Convert source BGR to float for blending
-                        using var srcBgr = new OpenCvSharp.Mat();
-                        using var srcBgrF = new OpenCvSharp.Mat();
-                        OpenCvSharp.Cv2.CvtColor(src, srcBgr, OpenCvSharp.ColorConversionCodes.BGRA2BGR);
-                        srcBgr.ConvertTo(srcBgrF, OpenCvSharp.MatType.CV_32FC3);
-
-                        using var bgrF = new OpenCvSharp.Mat();
-                        bgr.ConvertTo(bgrF, OpenCvSharp.MatType.CV_32FC3);
-
-                        // Alpha blend: out = alpha*src + (1-alpha)*bg
-                        using var alpha3 = new OpenCvSharp.Mat();
-                        OpenCvSharp.Cv2.CvtColor(alphaF, alpha3, OpenCvSharp.ColorConversionCodes.GRAY2BGR);
-
-                        using var blended = new OpenCvSharp.Mat();
-                        using var oneMinusAlpha3 = new OpenCvSharp.Mat();
-                        OpenCvSharp.Cv2.Subtract(OpenCvSharp.Scalar.All(1.0), alpha3, oneMinusAlpha3);
-                        OpenCvSharp.Cv2.Add(alpha3.Mul(srcBgrF), oneMinusAlpha3.Mul(bgrF), blended);
-
-                        using var result = new OpenCvSharp.Mat();
-                        blended.ConvertTo(result, OpenCvSharp.MatType.CV_8UC3);
-
-                        imgBytes = result.ImEncode(".png");
-                        foreach (var c in channels) c.Dispose();
-                    }
-                }
-                catch { /* keep original bytes on failure */ }
 
                 string uploadTaskId;
                 using (var formData = new MultipartFormDataContent())
@@ -2695,9 +2729,12 @@ namespace RobotControllerApp
                     {
                         type = "image_to_model",
                         file = new { type = "png", file_token = fileToken },
-                        // Turbo is blazing fast and generates lightweight low-fidelity models perfect for our 3D tabletop preview
                         model_version = "Turbo-v1.0-20250506",
-                        texture = true
+                        texture = true,
+                        pbr = false,              // skip PBR bake — faster + smaller GLB
+                        face_limit = 8000,        // cap polygon count for lighter web load
+                        compress = "geometry",    // meshopt compression
+                        enable_image_autofix = true
                     };
                     var taskJson = System.Text.Json.JsonSerializer.Serialize(taskPayload);
                     var taskContent = new StringContent(taskJson, System.Text.Encoding.UTF8, "application/json");
@@ -2760,6 +2797,9 @@ namespace RobotControllerApp
                 SaveLibrary();
 
                 generationSuccess = true;
+                // Turbo-v1.0-20250506 costs approximately $0.20/model → ~0.19 EUR
+                _totalTripo3dCost += 0.19;
+                DispatcherQueue.TryEnqueue(UpdateTotalCostDisplay);
             }
             catch (Exception ex)
             {
@@ -2815,16 +2855,18 @@ namespace RobotControllerApp
 
                     string base64Image = Convert.ToBase64String(obj.CropJpgBytes);
 
-                    bool isGreenish = obj.Name.Contains("GREEN", StringComparison.OrdinalIgnoreCase) || obj.Name.Contains("LIME", StringComparison.OrdinalIgnoreCase) || obj.Name.Contains("TEAL", StringComparison.OrdinalIgnoreCase);
-                    string chromaColorName = isGreenish ? "MAGENTA (#FF00FF)" : "NEON GREEN (#00FF00)";
-
                     string customPromptPart = string.IsNullOrWhiteSpace(_settings.BananaPromptTemplate)
                         ? "preserving 100% of its original shape, text, labels, proportions, and perspective"
                         : _settings.BananaPromptTemplate;
 
                     double frameScale = _settings.BananaFramingScale > 0 ? _settings.BananaFramingScale * 100 : 60;
 
-                    string promptText = $"Extract the physical {obj.Name} shown in this image {customPromptPart}. Subtly enhance the object's colors so they look natural and realistic, but slightly cleaner than the raw camera photo. Keep it completely faithful to the original photo input visually, geometrically, and texturally. Your job is to extract this specific {obj.Name} and place it on a pure, solid {chromaColorName} chroma key background. Completely ERASE any other objects (like hands, tools, overlapping items, furniture, floors). IMPORTANT: The {chromaColorName} background must be completely flat, unshaded, with ABSOLUTELY NO SHADOWS, no ambient occlusion, and no reflections under or around the object. Provide a 1:1 square output where the {obj.Name} occupies about {frameScale}% of the canvas.";
+                    // Clean extraction prompt — no chroma key, output goes directly to Tripo3D enable_image_autofix
+                    string promptText = $"Extract the physical {obj.Name} shown in this image {customPromptPart}. " +
+                        $"Subtly enhance the object's colors so they look natural and realistic, but completely faithful to the original photo. " +
+                        $"Remove all other objects (hands, tools, furniture, floors). " +
+                        $"Place the object on a clean, plain WHITE background with no shadows, gradients, or vignettes. " +
+                        $"Provide a 1:1 square output where the {obj.Name} occupies about {frameScale}% of the canvas.";
 
                     var payload = new
                     {
@@ -2859,48 +2901,10 @@ namespace RobotControllerApp
                                     if (!string.IsNullOrEmpty(b64))
                                     {
                                         byte[] bytes = Convert.FromBase64String(b64);
-                                        byte[] pngBytes;
+                                        // Use the Gemini-generated image directly — no OpenCV post-processing.
+                                        // Tripo3D's enable_image_autofix handles any remaining background cleanup.
+                                        byte[] pngBytes = bytes;
 
-                                        try
-                                        {
-                                            // Process the Gemini output through OpenCV to remove chroma key background
-                                            using var src = OpenCvSharp.Mat.FromImageData(bytes, OpenCvSharp.ImreadModes.Color);
-                                            using var argb = new OpenCvSharp.Mat();
-                                            OpenCvSharp.Cv2.CvtColor(src, argb, OpenCvSharp.ColorConversionCodes.BGR2BGRA);
-
-                                            using var mask = new OpenCvSharp.Mat();
-
-                                            if (isGreenish)
-                                            {
-                                                // Magenta is high Red and Blue, low Green (OpenCV is BGR)
-                                                OpenCvSharp.Cv2.InRange(src, new OpenCvSharp.Scalar(150, 0, 150), new OpenCvSharp.Scalar(255, 120, 255), mask);
-                                            }
-                                            else
-                                            {
-                                                // Neon Green is high Green, low Red and Blue
-                                                OpenCvSharp.Cv2.InRange(src, new OpenCvSharp.Scalar(0, 150, 0), new OpenCvSharp.Scalar(120, 255, 120), mask);
-                                            }
-
-                                            // Slightly expand the mask and soften it to remove fringing artifacts cleanly
-                                            using var kernel = OpenCvSharp.Cv2.GetStructuringElement(OpenCvSharp.MorphShapes.Ellipse, new OpenCvSharp.Size(3, 3));
-                                            OpenCvSharp.Cv2.Dilate(mask, mask, kernel);
-                                            OpenCvSharp.Cv2.GaussianBlur(mask, mask, new OpenCvSharp.Size(3, 3), 0);
-
-                                            using var maskInv = new OpenCvSharp.Mat();
-                                            OpenCvSharp.Cv2.BitwiseNot(mask, maskInv);
-
-                                            // Apply mask to alpha channel
-                                            var channels = OpenCvSharp.Cv2.Split(argb);
-                                            maskInv.CopyTo(channels[3]); // Transparent where mask was chroma color
-                                            OpenCvSharp.Cv2.Merge(channels, argb);
-
-                                            pngBytes = argb.ImEncode(".png");
-                                            foreach (var c in channels) c.Dispose();
-                                        }
-                                        catch
-                                        {
-                                            pngBytes = bytes; // Fallback
-                                        }
 
                                         var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
                                         using (var ms = new System.IO.MemoryStream(pngBytes))
@@ -2945,6 +2949,7 @@ namespace RobotControllerApp
                                         }
                                         double framingScaleUsd = (_settings.BananaFramingScale > 0) ? (_settings.BananaFramingScale * 0.01) : 0;
                                         _totalBananaCost += ((priceOutX1M + framingScaleUsd) * 0.94); // Approx USD -> EUR
+                                        UpdateTotalCostDisplay();
 
 
                                         obj.IsAlreadyInLibrary = true;
@@ -3127,13 +3132,11 @@ namespace RobotControllerApp
                         CalibCameraPreview.Source = bmp;
                     }
 
-                    if (ContextView.Visibility == Visibility.Visible)
-                    {
-                        var bmp2 = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
-                        using var ms2 = new System.IO.MemoryStream(jpeg);
-                        await bmp2.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms2));
-                        ContextWebcamPreview.Source = bmp2;
-                    }
+                    // Camera preview on dashboard — always refresh
+                    var bmp2 = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
+                    using var ms2 = new System.IO.MemoryStream(jpeg);
+                    await bmp2.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms2));
+                    ContextWebcamPreview.Source = bmp2;
                 }
                 catch { }
             });
@@ -3362,7 +3365,6 @@ namespace RobotControllerApp
                 if (type == "scanScene")
                 {
                     Log("[Scene3D] Remote scan request received.");
-                    // Run on UI thread (AnalyzeSceneAsync accesses UI components)
                     DispatcherQueue.TryEnqueue(async () =>
                     {
                         try
@@ -3370,11 +3372,23 @@ namespace RobotControllerApp
                             if (_latestWebcamFrameBytes == null || _latestWebcamFrameBytes.Length == 0)
                             {
                                 Log("[Scene3D] Scan ignored — no camera frame available.");
+                                _ = _broadcastServer.BroadcastAsync("setDetectedObjects", "[]");
+                                return;
+                            }
+                            if (_analyzeInProgress)
+                            {
+                                Log("[Scene3D] Scan ignored — previous scan still in progress.");
+                                // Don't send empty list — browser is already showing "Scanning…"
+                                // and the running scan will send results when done
                                 return;
                             }
                             await AnalyzeSceneAsync();
                         }
-                        catch (Exception ex) { Log($"[Scene3D] Remote scan error: {ex.Message}"); }
+                        catch (Exception ex)
+                        {
+                            Log($"[Scene3D] Remote scan error: {ex.Message}");
+                            _ = _broadcastServer.BroadcastAsync("setDetectedObjects", "[]");
+                        }
                     });
                     return;
                 }

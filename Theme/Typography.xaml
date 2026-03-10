@@ -15,6 +15,15 @@
         <Setter Property="LineHeight" Value="40"/>
     </Style>
 
+    <!-- HEADLINE 2 (Section Titles) -->
+    <Style x:Key="Text.Headline2" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Font.Family.Brand}"/>
+        <Setter Property="FontSize" Value="24"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="{StaticResource Brush.Text.Primary}"/>
+        <Setter Property="LineHeight" Value="32"/>
+    </Style>
+
     <!-- HEADLINE 3 (Card Titles) -->
     <Style x:Key="Text.Headline3" TargetType="TextBlock">
         <Setter Property="FontFamily" Value="{StaticResource Font.Family.Brand}"/>

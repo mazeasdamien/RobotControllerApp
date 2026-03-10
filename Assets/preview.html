@@ -494,7 +494,141 @@
     }
 
 
-    /* ── Control Panel: quick action row ─────────────────────────── */
+    /* ── IK Panel ────────────────────────────────────────────── */
+    #ik-panel {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      margin-bottom: 8px;
+    }
+
+    #ik-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      cursor: pointer;
+      background: rgba(255, 165, 0, 0.06);
+      border-bottom: 1px solid rgba(255, 165, 0, 0.12);
+      user-select: none;
+    }
+
+    #ik-header-left {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #ffaa44;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+    }
+
+    #ik-collapse-btn {
+      font-size: 18px;
+      color: rgba(255, 165, 0, 0.7);
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.3s;
+      padding: 2px 4px;
+      line-height: 1;
+    }
+
+    #ik-panel.collapsed #ik-body { display: none; }
+    #ik-panel.collapsed #ik-collapse-btn { transform: rotate(-90deg); }
+
+    #ik-body {
+      padding: 10px 13px 13px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .ik-robot-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .ik-robot-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 7px;
+      padding: 8px 10px;
+    }
+
+    .ik-robot-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+    .ik-r1-title { color: #5599ff; }
+    .ik-r2-title { color: #FFD279; }
+
+    .ik-toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+    }
+
+    .ik-toggle {
+      width: 28px; height: 15px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.15);
+      cursor: pointer;
+      position: relative;
+      transition: background 0.2s;
+    }
+    .ik-toggle.active { background: rgba(255,140,0,0.4); border-color: rgba(255,140,0,0.6); }
+    .ik-toggle::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.4);
+      transition: left 0.2s, background 0.2s;
+    }
+    .ik-toggle.active::after { left: 15px; background: #ffaa44; }
+
+    .ik-toggle-label {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .ik-pos-display {
+      font-size: 10px;
+      font-family: 'Consolas', monospace;
+      color: rgba(255,255,255,0.35);
+      margin-bottom: 6px;
+      line-height: 1.6;
+    }
+
+    .ik-send-btn {
+      width: 100%;
+      padding: 5px 0;
+      font-size: 10px;
+      font-weight: 600;
+      font-family: inherit;
+      border-radius: 5px;
+      border: 1px solid rgba(255,140,0,0.25);
+      background: rgba(255,140,0,0.08);
+      color: rgba(255,180,80,0.85);
+      cursor: pointer;
+      letter-spacing: 0.05em;
+      transition: background 0.2s;
+    }
+    .ik-send-btn:hover { background: rgba(255,140,0,0.18); }
+
+    /* IK handle sphere glow */
+    .ik-handle-glow { pointer-events: none; }
+
+
     #cp-actions {
       display: flex;
       flex-direction: column;
@@ -779,7 +913,55 @@
       width: 100%;
     }
 
-    /* ── Control Panel: calibration sliders row ───────────────────── */
+    /* Cost bar */
+    #ctx-costs {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-top: 5px;
+      font-size: 9px;
+      color: rgba(255,255,255,0.45);
+    }
+    .cost-chip {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      padding: 2px 7px;
+      white-space: nowrap;
+    }
+    .cost-chip.total { color: #ffd700; border-color: rgba(255,215,0,0.3); background: rgba(255,215,0,0.07); }
+
+    /* Model status badge on photo cards */
+    .ctx-model-badge {
+      font-size: 8px;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      padding: 2px 5px;
+      border-radius: 4px;
+      width: 100%;
+      text-align: center;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .ctx-model-badge.no-model {
+      background: rgba(255, 140, 0, 0.2);
+      border: 1px solid rgba(255, 140, 0, 0.5);
+      color: #ffaa40;
+    }
+    .ctx-model-badge.no-model:hover { opacity: 0.75; }
+    .ctx-model-badge.has-model {
+      background: rgba(0, 200, 100, 0.15);
+      border: 1px solid rgba(0, 200, 100, 0.4);
+      color: #55ddaa;
+      cursor: default;
+    }
+    .ctx-model-badge.not-in-library {
+      background: rgba(100, 100, 255, 0.15);
+      border: 1px solid rgba(100, 100, 255, 0.4);
+      color: #8899ff;
+    }
+    .ctx-model-badge.not-in-library:hover { opacity: 0.75; }
+
     #cp-sliders {
       display: flex;
       gap: 14px;
@@ -1374,9 +1556,54 @@
       </div>
       <div id="fk-sliders"></div>
       <div class="fk-divider"></div>
+      <div class="fk-divider"></div>
       <button id="fk-reset-btn" onclick="resetFk()">↺ &nbsp;Reset to Home</button>
+
+      <div class="fk-divider"></div>
+
+      <!-- ── IK Panel ────────────────────────────── -->
+      <div id="ik-panel">
+        <div id="ik-header" onclick="toggleIkPanel()">
+          <div id="ik-header-left">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ffaa44" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22V12"/><path d="M5 12H2a10 10 0 0 0 20 0h-3"/>
+              <circle cx="12" cy="5" r="3"/>
+            </svg>
+            IK Solver
+          </div>
+          <button id="ik-collapse-btn" title="Collapse">▾</button>
+        </div>
+        <div id="ik-body">
+          <div style="font-size:10px;color:var(--text-muted);opacity:0.7;">
+            Drag the coloured sphere handles in the 3D scene to move each robot's IK target.
+          </div>
+          <div class="ik-robot-row">
+            <!-- Robot 1 IK -->
+            <div class="ik-robot-card">
+              <div class="ik-robot-title ik-r1-title">Robot 1</div>
+              <div class="ik-toggle-row">
+                <div class="ik-toggle" id="ik-r1-toggle" onclick="toggleIk(0)"></div>
+                <span class="ik-toggle-label">Enable IK</span>
+              </div>
+              <div class="ik-pos-display" id="ik-r1-pos">x: —<br>y: —<br>z: —</div>
+              <button class="ik-send-btn" onclick="sendIkToRobot(0)">⬆ Send to Robot 1</button>
+            </div>
+            <!-- Robot 2 IK -->
+            <div class="ik-robot-card">
+              <div class="ik-robot-title ik-r2-title">Robot 2</div>
+              <div class="ik-toggle-row">
+                <div class="ik-toggle" id="ik-r2-toggle" onclick="toggleIk(1)"></div>
+                <span class="ik-toggle-label">Enable IK</span>
+              </div>
+              <div class="ik-pos-display" id="ik-r2-pos">x: —<br>y: —<br>z: —</div>
+              <button class="ik-send-btn" onclick="sendIkToRobot(1)">⬆ Send to Robot 2</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
-  </div>
   </div>
 
   <!-- Voice-to-Text Panel — top-right -->
@@ -1401,7 +1628,9 @@
         style="width:100%; margin-bottom: 10px; font-size: 11px; padding: 6px; border-radius: 6px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.4); color: var(--text); outline: none;">
         <option value="">Default Microphone</option>
       </select>
-      <button id="ptt-btn" onclick="toggleRecording()">
+      <button id="ptt-btn"
+        onmousedown="startHoldRecord()" onmouseup="stopHoldRecord()" onmouseleave="stopHoldRecord()"
+        ontouchstart="startHoldRecord()" ontouchend="stopHoldRecord()">
         <span id="ptt-mic-icon">🎙️</span>
         <span id="ptt-label">Hold to Record</span>
       </button>
@@ -1437,6 +1666,7 @@
         <button id="ctx-autoscan-btn" onclick="toggleAutoScan()">Auto Scan</button>
       </div>
       <div id="ctx-status"></div>
+      <div id="ctx-costs"></div>
       <div id="ctx-photos"></div>
     </div>
   </div>
@@ -1571,15 +1801,17 @@
       new THREE.Vector3(1, 0, 0),   // J6: roll  (X)
     ];
 
-    // Angle limits in degrees [min, max] per axis
+    // Angle limits in degrees [min, max] per axis — from Niryo Ned Unity ArticulationBody
     const JOINT_LIMITS = [
-      [-180, 180],
-      [-115, 115],
-      [-225, 45],
-      [-230, 230],
-      [-115, 115],
-      [-180, 180],
+      [-168,  168],   // J1 — base yaw
+      [-100,   32],   // J2 — shoulder
+      [ -75,   88],   // J3 — elbow
+      [-118,  118],   // J4 — forearm roll
+      [-108,  108],   // J5 — wrist pitch
+      [-168,  168],   // J6 — tool roll
     ];
+    // Symmetric display range per axis (so 0 is always slider centre)
+    const JOINT_SYMM = JOINT_LIMITS.map(([mn, mx]) => Math.max(Math.abs(mn), Math.abs(mx)));
 
     function findJoints(root) {
       const joints = [];
@@ -1691,7 +1923,316 @@
       FK_ROBOTS.push({ root: r2, joints: findJoints(r2) });
 
       buildFkSliders();
-    }, undefined, (e) => console.error("Could not load ned.glb:", e));
+
+      // Apply zero-position FK to both robots immediately
+      FK_ANGLES.fill(0);
+      for (let rIdx = 0; rIdx < FK_ROBOTS.length; rIdx++) {
+        fkTarget = rIdx;
+        applyFk();
+      }
+      fkTarget = 0;
+
+      // ── Ghost robots for IK visualisation ─────────────────────────────────
+      // Each ghost is a transparent clone used solely by the IK solver.
+      // The real FK robots are untouched; the ghost shows the IK "desired pose".
+      const IK_GHOST_COLORS = [0x3366ff, 0xffc222];
+
+      function makeGhostMaterial(hexColor) {
+        return new THREE.MeshStandardMaterial({
+          color: hexColor,
+          transparent: true,
+          opacity: 0.30,
+          depthWrite: false,
+          side: THREE.DoubleSide,
+          roughness: 0.6,
+          metalness: 0.1,
+        });
+      }
+
+      function paintGhost(root, mat) {
+        root.traverse(node => {
+          if (!node.isMesh) return;
+          node.castShadow = false;
+          node.receiveShadow = false;
+          node.material = mat; // shared material per ghost
+        });
+      }
+
+      // IK state
+      const IK_GHOSTS  = [];           // [{root, joints, tip}]
+      const IK_ANGLES_R = [[0,0,0,0,0,0],[0,0,0,0,0,0]];  // degrees
+      const IK_ENABLED  = [false, false];
+      const IK_TARGET_POS  = [new THREE.Vector3(), new THREE.Vector3()]; // world
+      const IK_TARGET_ROT  = [new THREE.Quaternion(), new THREE.Quaternion()];
+
+      // Build ghost for each FK robot
+      FK_ROBOTS.forEach((fkR, idx) => {
+        const ghost = fkR.root.clone();
+        ghost.traverse(n => { n.userData.restQ = n.quaternion.clone(); });
+        const ghostMat = makeGhostMaterial(IK_GHOST_COLORS[idx]);
+        paintGhost(ghost, ghostMat);
+        ghost.visible = false; // hidden until IK enabled
+        scene.add(ghost);
+
+        // Find joints and Tip in ghost
+        const ghostJoints = findJoints(ghost);
+        let ghostTip = null;
+        ghost.traverse(n => { if (n.name === 'Tip' || n.name === 'tip' || n.name === 'hand_link') ghostTip = n; });
+        if (!ghostTip) ghostTip = ghostJoints[5]; // fallback to j6
+
+        IK_GHOSTS.push({ root: ghost, joints: ghostJoints, tip: ghostTip });
+      });
+
+      // ── IK Handle spheres (draggable targets) ────────────────────────────
+      const IK_HANDLE_GEO   = new THREE.SphereGeometry(0.025, 16, 16);
+      const IK_HANDLE_OUTER = new THREE.SphereGeometry(0.040, 16, 16);
+      const IK_HANDLE_MATS  = [
+        new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.9 }),
+        new THREE.MeshBasicMaterial({ color: 0xffcc22, transparent: true, opacity: 0.9 }),
+      ];
+      const IK_HANDLE_HALOS = [
+        new THREE.MeshBasicMaterial({ color: 0x4488ff, transparent: true, opacity: 0.18, depthWrite: false }),
+        new THREE.MeshBasicMaterial({ color: 0xffcc22, transparent: true, opacity: 0.18, depthWrite: false }),
+      ];
+
+      const IK_HANDLES = [];
+      FK_ROBOTS.forEach((fkR, idx) => {
+        const group = new THREE.Group();
+        const inner = new THREE.Mesh(IK_HANDLE_GEO,   IK_HANDLE_MATS[idx]);
+        const halo  = new THREE.Mesh(IK_HANDLE_OUTER, IK_HANDLE_HALOS[idx]);
+        group.add(inner, halo);
+
+        // Place at default end-effector position
+        const tip = IK_GHOSTS[idx].tip;
+        if (tip) {
+          const wp = new THREE.Vector3();
+          fkR.root.updateWorldMatrix(true, true);
+          if (tip.getWorldPosition) tip.getWorldPosition(wp);
+          else wp.setFromMatrixPosition(tip.matrixWorld);
+          group.position.copy(wp);
+        } else {
+          group.position.copy(fkR.root.position).setY(0.25);
+        }
+
+        IK_TARGET_POS[idx].copy(group.position);
+        group.visible = false;
+        scene.add(group);
+        IK_HANDLES.push(group);
+      });
+
+      // ── IK ghost FK application ──────────────────────────────────────────
+      function applyGhostFk(robotIdx) {
+        const ghost = IK_GHOSTS[robotIdx];
+        if (!ghost) return;
+        const angles = IK_ANGLES_R[robotIdx];
+        for (let i = 0; i < 6; i++) {
+          const joint = ghost.joints[i];
+          if (!joint) continue;
+          const axis = JOINT_AXES[i];
+          const rad  = angles[i] * Math.PI / 180;
+          const restQ = joint.userData.restQ || new THREE.Quaternion();
+          const deltaQ = new THREE.Quaternion().setFromAxisAngle(axis, rad);
+          joint.quaternion.copy(restQ).multiply(deltaQ);
+        }
+        ghost.root.updateWorldMatrix(true, true);
+      }
+
+      // ── Jacobian DLS IK Solver (one step per frame) ─────────────────────
+      // Ported from Unity IK.cs — numerical Jacobian, 3-DOF position only.
+      // ∂ee/∂θᵢ ≈ (ee(θᵢ+δ) − ee(θᵢ)) / δ  (finite differences)
+      // DLS: dθ = Jᵀ(JJᵀ + λ²I)⁻¹ · e
+      const IK_LEARNING_RATE = 0.8;
+      const IK_DAMPING       = 0.05;
+      const IK_STOP_THRESH   = 0.002; // metres
+      const IK_DELTA_DEG     = 1.0;   // 1° finite-difference step
+
+      function solveIkStep(robotIdx) {
+        const ghost   = IK_GHOSTS[robotIdx];
+        const tip     = ghost?.tip;
+        if (!ghost || !tip || !IK_ENABLED[robotIdx]) return;
+
+        const angles  = IK_ANGLES_R[robotIdx];
+        const target  = IK_TARGET_POS[robotIdx];
+        const n = 6;
+        const DELTA_RAD = IK_DELTA_DEG * Math.PI / 180;
+
+        // Current EE position
+        applyGhostFk(robotIdx);
+        const ee0 = new THREE.Vector3();
+        tip.getWorldPosition(ee0);
+
+        // Error
+        const posErr = new THREE.Vector3().subVectors(target, ee0);
+        if (posErr.length() < IK_STOP_THRESH) return; // converged
+
+        // Build 3×n numerical Jacobian
+        const J = Array.from({ length: 3 }, () => new Float32Array(n));
+        for (let i = 0; i < n; i++) {
+          const saved = angles[i];
+          angles[i] += IK_DELTA_DEG; // perturb +1°
+          applyGhostFk(robotIdx);
+          const ee1 = new THREE.Vector3();
+          tip.getWorldPosition(ee1);
+          J[0][i] = (ee1.x - ee0.x) / DELTA_RAD;
+          J[1][i] = (ee1.y - ee0.y) / DELTA_RAD;
+          J[2][i] = (ee1.z - ee0.z) / DELTA_RAD;
+          angles[i] = saved; // restore
+        }
+        applyGhostFk(robotIdx); // restore pose
+
+        // JJᵀ (3×3) + λ²I
+        const lam2 = IK_DAMPING * IK_DAMPING;
+        const JJT  = [[0,0,0],[0,0,0],[0,0,0]];
+        for (let r = 0; r < 3; r++)
+          for (let c = 0; c < 3; c++) {
+            let s = 0;
+            for (let k = 0; k < n; k++) s += J[r][k] * J[c][k];
+            JJT[r][c] = s + (r === c ? lam2 : 0);
+          }
+
+        // Solve (JJᵀ)x = e via Gaussian elimination
+        const err = [posErr.x, posErr.y, posErr.z];
+        const x   = solveLinear3(JJT, err);
+
+        // dθ = Jᵀ x  (radians) → apply as degrees with learning rate
+        for (let i = 0; i < n; i++) {
+          let dang = 0;
+          for (let j = 0; j < 3; j++) dang += J[j][i] * x[j];
+          dang *= IK_LEARNING_RATE * 180 / Math.PI; // → degrees
+          const [mn, mx] = JOINT_LIMITS[i];
+          angles[i] = Math.max(mn, Math.min(mx, angles[i] + dang));
+        }
+        applyGhostFk(robotIdx);
+      }
+
+      function solveLinear3(A, b) {
+        const M = A.map(r => [...r]);
+        const x = [...b];
+        for (let k = 0; k < 2; k++)
+          for (let i = k + 1; i < 3; i++) {
+            if (Math.abs(M[k][k]) < 1e-12) continue;
+            const f = M[i][k] / M[k][k];
+            for (let j = k; j < 3; j++) M[i][j] -= f * M[k][j];
+            x[i] -= f * x[k];
+          }
+        const res = [0, 0, 0];
+        for (let i = 2; i >= 0; i--) {
+          let s = 0;
+          for (let j = i + 1; j < 3; j++) s += M[i][j] * res[j];
+          res[i] = Math.abs(M[i][i]) < 1e-12 ? 0 : (x[i] - s) / M[i][i];
+        }
+        return res;
+      }
+
+      // ── IK Handle pointer drag (desktop: pick → drag on depth plane) ──────
+      const _ikRaycaster  = new THREE.Raycaster();
+      const _ikMouse      = new THREE.Vector2();
+      const _ikDragPlane  = new THREE.Plane();
+      const _ikDragOffset = new THREE.Vector3();
+      let   _ikDragIdx    = -1;
+
+      function updateIkMouse(e) {
+        const rect = renderer.domElement.getBoundingClientRect();
+        _ikMouse.x =  ((e.clientX - rect.left)  / rect.width)  * 2 - 1;
+        _ikMouse.y = -((e.clientY - rect.top)   / rect.height) * 2 + 1;
+      }
+
+      renderer.domElement.addEventListener('pointerdown', e => {
+        if (!IK_HANDLES.length) return;
+        updateIkMouse(e);
+        _ikRaycaster.setFromCamera(_ikMouse, camera);
+        for (let i = 0; i < IK_HANDLES.length; i++) {
+          if (!IK_ENABLED[i]) continue;
+          const hits = _ikRaycaster.intersectObjects(IK_HANDLES[i].children, false);
+          if (hits.length) {
+            _ikDragIdx = i;
+            controls.enabled = false; // pause orbit while dragging
+            const camDir = new THREE.Vector3();
+            camera.getWorldDirection(camDir);
+            _ikDragPlane.setFromNormalAndCoplanarPoint(camDir.negate(), hits[0].point);
+            _ikDragOffset.subVectors(IK_HANDLES[i].position, hits[0].point);
+            e.stopPropagation();
+            break;
+          }
+        }
+      }, { capture: true });
+
+      renderer.domElement.addEventListener('pointermove', e => {
+        if (_ikDragIdx < 0) return;
+        updateIkMouse(e);
+        _ikRaycaster.setFromCamera(_ikMouse, camera);
+        const pt = new THREE.Vector3();
+        if (_ikRaycaster.ray.intersectPlane(_ikDragPlane, pt)) {
+          const newPos = pt.clone().add(_ikDragOffset);
+          IK_HANDLES[_ikDragIdx].position.copy(newPos);
+          IK_TARGET_POS[_ikDragIdx].copy(newPos);
+          // Update position display
+          const el = document.getElementById(`ik-r${_ikDragIdx + 1}-pos`);
+          if (el) el.innerHTML =
+            `x: ${newPos.x.toFixed(3)}<br>y: ${newPos.y.toFixed(3)}<br>z: ${newPos.z.toFixed(3)}`;
+        }
+      }, { capture: true });
+
+      renderer.domElement.addEventListener('pointerup', () => {
+        if (_ikDragIdx >= 0) { controls.enabled = true; _ikDragIdx = -1; }
+      });
+
+      // ── IK UI callbacks (global) ─────────────────────────────────────────
+      window.toggleIkPanel = function () {
+        document.getElementById('ik-panel').classList.toggle('collapsed');
+      };
+
+      window.toggleIk = function (robotIdx) {
+        IK_ENABLED[robotIdx] = !IK_ENABLED[robotIdx];
+        const toggle = document.getElementById(`ik-r${robotIdx + 1}-toggle`);
+        if (toggle) toggle.classList.toggle('active', IK_ENABLED[robotIdx]);
+
+        // Show/hide ghost + handle
+        if (IK_GHOSTS[robotIdx])  IK_GHOSTS[robotIdx].root.visible  = IK_ENABLED[robotIdx];
+        if (IK_HANDLES[robotIdx]) IK_HANDLES[robotIdx].visible       = IK_ENABLED[robotIdx];
+
+        if (IK_ENABLED[robotIdx]) {
+          // Initialise IK target at current real robot EE
+          const realRobot = FK_ROBOTS[robotIdx];
+          if (realRobot) {
+            realRobot.root.updateWorldMatrix(true, true);
+            // Copy real FK angles into ghost as starting point
+            const srcAngles = FK_ANGLES_R[robotIdx];
+            IK_ANGLES_R[robotIdx] = [...srcAngles];
+            applyGhostFk(robotIdx);
+
+            // Place handle at ghost EE
+            const tip = IK_GHOSTS[robotIdx].tip;
+            if (tip) {
+              const wp = new THREE.Vector3();
+              tip.getWorldPosition(wp);
+              IK_HANDLES[robotIdx].position.copy(wp);
+              IK_TARGET_POS[robotIdx].copy(wp);
+            }
+          }
+        }
+      };
+
+      window.sendIkToRobot = function (robotIdx) {
+        const angles = IK_ANGLES_R[robotIdx];
+        if (window._remoteWs && window._remoteWs.readyState === WebSocket.OPEN) {
+          window._remoteWs.send(JSON.stringify({
+            type: 'setJoints',
+            payload: { robotIdx, angles }
+          }));
+        }
+        // Also sync FK sliders to the IK solution for visual feedback
+        if (robotIdx === fkTarget || fkTarget === 2) {
+          syncSlidersFromAngles(angles);
+        }
+        FK_ANGLES_R[robotIdx] = [...angles]; // update stored FK state
+        const prevTarget = fkTarget;
+        fkTarget = robotIdx;
+        angles.forEach((a, i) => { FK_ANGLES[i] = a; });
+        applyFk();
+        fkTarget = prevTarget;
+      };
+
 
     // Helper to draw text labels
     function makeTextSprite(message) {
@@ -1913,7 +2454,9 @@
         }
 
       } catch (err) {
-        document.getElementById('legend-items').innerHTML = `<div style="color:red; font-size:10px;">${err.message}<br/>${err.stack}</div>`;
+        const legendItemsEl = document.getElementById('legend-items');
+        if (legendItemsEl) legendItemsEl.innerHTML = `<div style="color:red; font-size:10px;">${err.message}<br/>${err.stack}</div>`;
+        else console.error('[setCameraPose error]', err);
       }
     }
 
@@ -2068,9 +2611,26 @@
     window.sendCommandToHost = function (type, value) {
       const msg = JSON.stringify({ type: type, value: value });
       if (window.chrome && window.chrome.webview) {
+        console.log('[cmd] via WebView2:', type);
         window.chrome.webview.postMessage(msg);
       } else if (window._remoteWs && window._remoteWs.readyState === WebSocket.OPEN) {
+        console.log('[cmd] via WS:', type, '| wsState:', window._remoteWs.readyState);
         window._remoteWs.send(msg);
+      } else {
+        // Neither transport available — surface a meaningful error for debugging
+        const wsState = window._remoteWs ? window._remoteWs.readyState : 'null';
+        console.warn('[cmd] NO TRANSPORT for', type, '| wsState:', wsState);
+        if (type === 'scanScene') {
+          const statusEl = document.getElementById('ctx-status');
+          if (statusEl) {
+            statusEl.textContent = `WS not ready (state=${wsState}) — reconnecting…`;
+            statusEl.className = 'error';
+          }
+          // Reset scan lock so user can retry once WS reconnects
+          _scanInProgress = false;
+          const btn = document.getElementById('ctx-scan-btn');
+          if (btn) btn.classList.remove('scanning');
+        }
       }
     };
 
@@ -2115,6 +2675,11 @@
     };
     window.onCalibOpacity = (v) => {
       if (window.setCameraFeedOpacity) window.setCameraFeedOpacity(parseFloat(v));
+      // Note: do NOT call sendCommandToHost here — it's called on page load before WS is ready.
+      // Use setOpacityFromUser() when the user explicitly changes it.
+    };
+    window.setOpacityFromUser = (v) => {
+      window.onCalibOpacity(v);
       window.sendCommandToHost('opacity', parseFloat(v));
     };
 
@@ -2122,13 +2687,13 @@
     window.toggleFeedOpacity = function () {
       _feedOpacityHidden = !_feedOpacityHidden;
       const opacity = _feedOpacityHidden ? 0 : 0.75;
-      window.onCalibOpacity(opacity);
+      window.setOpacityFromUser(opacity);   // user action → send to host
       const lbl = document.getElementById('cp-feed-opacity-label');
       const btn = document.getElementById('cp-feed-opacity-btn');
       if (lbl) lbl.textContent = _feedOpacityHidden ? 'Show Live Feed' : 'Hide Live Feed';
       if (btn) btn.style.opacity = _feedOpacityHidden ? '0.55' : '1';
     };
-    // Apply default 75% opacity on load
+    // Apply default 75% opacity on load (local 3D scene only, no WS broadcast)
     window.onCalibOpacity(0.75);
 
     window.updateCameraFeed = function (base64Url) {
@@ -2175,15 +2740,15 @@
       // Send scan command to C# host (WebView2) or via WS (Quest / LAN)
       window.sendCommandToHost('scanScene', true);
 
-      // Timeout fallback: if no result after 15s, unlock
+      // Timeout fallback: if no result after 35s, unlock (Gemini can take ~30s)
       setTimeout(() => {
         if (_scanInProgress) {
           _scanInProgress = false;
           _autoScanPending = false;
           if (btn) btn.classList.remove('scanning');
-          if (statusEl) { statusEl.textContent = 'Scan timed out.'; statusEl.className = 'error'; }
+          if (statusEl) { statusEl.textContent = 'No response from app — check camera is active.'; statusEl.className = 'error'; }
         }
-      }, 15000);
+      }, 35000);
     };
 
     // Render the photo strip in the context panel
@@ -2195,14 +2760,34 @@
         if (!item.cropBase64) return;
         const card = document.createElement('div');
         card.className = 'ctx-photo-card';
+
         const img = document.createElement('img');
         img.src = item.cropBase64;
         img.alt = item.label;
+
         const lbl = document.createElement('div');
         lbl.className = 'ctx-photo-label';
         lbl.textContent = item.label;
+
+        // Model status badge
+        const badge = document.createElement('div');
+        if (item.hasModel) {
+          badge.className = 'ctx-model-badge has-model';
+          badge.textContent = '✓ 3D Model';
+          badge.title = 'GLB model loaded in scene';
+        } else if (item.isInLibrary) {
+          badge.className = 'ctx-model-badge not-in-library';
+          badge.textContent = '⟳ Update 3D';
+          badge.title = 'Object in library — click Hub to regenerate 3D';
+        } else {
+          badge.className = 'ctx-model-badge no-model';
+          badge.textContent = '⬡ Generate 3D';
+          badge.title = 'No 3D model — open Hub to generate one via Tripo3D';
+        }
+
         card.appendChild(img);
         card.appendChild(lbl);
+        card.appendChild(badge);
         strip.appendChild(card);
       });
     }
@@ -2279,13 +2864,13 @@
         (Array.isArray(c.material) ? c.material : [c.material]).forEach(m => m?.dispose());
         objGroup.remove(c);
       }
-      legendEl.innerHTML = '';
+      if (legendEl) legendEl.innerHTML = '';
     }
 
     function renderObjects(items) {
       clearObjects();
-      noObjEl.style.display = items.length ? 'none' : 'block';
-      countEl.textContent = items.length;
+      if (noObjEl) noObjEl.style.display = items.length ? 'none' : 'block';
+      if (countEl) countEl.textContent = items.length;
 
       items.forEach(item => {
         const raw = colorFromLabel(item.label);
@@ -2395,7 +2980,7 @@
         const d = document.createElement('div');
         d.className = 'li';
         d.innerHTML = `<div class="ld" style="background:#${col.getHexString()}"></div><span>${item.label}</span>`;
-        legendEl.appendChild(d);
+        if (legendEl) legendEl.appendChild(d);
       });
     }
 
@@ -2414,9 +2999,11 @@
     // Helper: sync the slider UI from a given angles array
     function syncSlidersFromAngles(angles) {
       document.querySelectorAll('.fk-slider').forEach((s, i) => {
-        s.value = angles[i] ?? 0;
+        const [mn, mx] = JOINT_LIMITS[i];
+        const clamped = Math.max(mn, Math.min(mx, angles[i] ?? 0));
+        s.value = clamped;   // symmetric range: value=0 → thumb at center
         const v = document.getElementById(`fk-val-${i}`);
-        if (v) v.textContent = Math.round(angles[i] ?? 0) + '°';
+        if (v) v.textContent = Math.round(clamped) + '°';
       });
     }
 
@@ -2433,14 +3020,54 @@
       }
     };
 
+    let _resetRafId = null; // tracks in-flight reset animation
+
     window.resetFk = function () {
-      FK_ANGLES.fill(0);
-      document.querySelectorAll('.fk-slider').forEach((s, i) => {
-        s.value = 0;
-        document.getElementById(`fk-val-${i}`).textContent = '0°';
-      });
-      applyFk();
+      // Cancel any ongoing reset
+      if (_resetRafId) { cancelAnimationFrame(_resetRafId); _resetRafId = null; }
+
+      const DURATION = 600; // ms
+      const startAngles = [...FK_ANGLES];
+      const startTime = performance.now();
+
+      // Ease-out cubic
+      const ease = t => 1 - Math.pow(1 - t, 3);
+
+      function tick(now) {
+        const t = Math.min((now - startTime) / DURATION, 1);
+        const e = ease(t);
+
+        for (let i = 0; i < 6; i++) {
+          FK_ANGLES[i] = startAngles[i] * (1 - e); // lerp toward 0
+        }
+
+        // Sync sliders live
+        document.querySelectorAll('.fk-slider').forEach((s, i) => {
+          s.value = FK_ANGLES[i];
+          const v = document.getElementById(`fk-val-${i}`);
+          if (v) v.textContent = Math.round(FK_ANGLES[i]) + '°';
+        });
+
+        applyFk();
+
+        if (t < 1) {
+          _resetRafId = requestAnimationFrame(tick);
+        } else {
+          // Snap exactly to zero at the end
+          FK_ANGLES.fill(0);
+          document.querySelectorAll('.fk-slider').forEach((s, i) => {
+            s.value = 0;
+            const v = document.getElementById(`fk-val-${i}`);
+            if (v) v.textContent = '0°';
+          });
+          applyFk();
+          _resetRafId = null;
+        }
+      }
+
+      _resetRafId = requestAnimationFrame(tick);
     };
+
 
     function applyFk() {
       const targets = fkTarget === 2 ? FK_ROBOTS : [FK_ROBOTS[fkTarget]];
@@ -2467,20 +3094,37 @@
       container.innerHTML = '';
       for (let i = 0; i < 6; i++) {
         const [mn, mx] = JOINT_LIMITS[i];
+        const sym = JOINT_SYMM[i];            // symmetric display range
+
         const row = document.createElement('div');
         row.className = 'fk-axis-row';
+
+        // Compute gradient stops to shade unreachable zone on the slider track
+        // Left dead zone: (sym+mn)/(2*sym)*100 %  |  Right dead zone: (sym+mx)/(2*sym)*100 %
+        const leftPct  = Math.round((sym + mn) / (2 * sym) * 100);
+        const rightPct = Math.round((sym + mx) / (2 * sym) * 100);
+        const reachStyle = `background: linear-gradient(to right,
+          rgba(85,153,255,0.07) 0%, rgba(85,153,255,0.07) ${leftPct}%,
+          rgba(85,153,255,0.22) ${leftPct}%, rgba(85,153,255,0.22) ${rightPct}%,
+          rgba(85,153,255,0.07) ${rightPct}%, rgba(85,153,255,0.07) 100%);`;
+
         row.innerHTML = `
           <span class="fk-axis-label">Axis ${i + 1}</span>
-          <input class="fk-slider" type="range"
-            id="fk-s-${i}" min="${mn}" max="${mx}" step="1" value="0"
-            oninput="onFkSlider(${i}, this.value)">
+          <div class="fk-slider-wrap">
+            <input class="fk-slider" type="range" style="${reachStyle}"
+              id="fk-s-${i}" min="-${sym}" max="${sym}" step="1" value="0"
+              data-min="${mn}" data-max="${mx}"
+              oninput="onFkSlider(${i}, this.value)">
+          </div>
           <span class="fk-val" id="fk-val-${i}">0°</span>`;
         container.appendChild(row);
       }
     }
 
-    window.onFkSlider = function (idx, val) {
-      FK_ANGLES[idx] = parseFloat(val);
+    window.onFkSlider = function (idx, rawVal) {
+      const [mn, mx] = JOINT_LIMITS[idx];
+      const val = Math.max(mn, Math.min(mx, parseFloat(rawVal))) ; // clamp to real limits
+      FK_ANGLES[idx] = val;
       document.getElementById(`fk-val-${idx}`).textContent = Math.round(val) + '°';
       applyFk();
     };
@@ -2711,6 +3355,12 @@
     // ── Render loop (setAnimationLoop required for WebXR) ──
     renderer.setAnimationLoop(() => {
       tickWorldGrab();
+      // IK solver — one DLS step per ghost robot per frame
+      if (typeof solveIkStep === 'function') {
+        for (let i = 0; i < 2; i++) {
+          if (IK_ENABLED && IK_ENABLED[i]) solveIkStep(i);
+        }
+      }
       controls.update();
       renderer.render(scene, camera);
     });
@@ -2782,15 +3432,30 @@
                 break;
               }
               case 'voiceTranscription': {
-                // Show the transcription sent from another client in the voice panel
+                // Broadcast echo from C# — shown on OTHER clients (e.g. Quest viewer).
+                // If this browser is the one that just recorded, status already says
+                // "Transcription complete" — don't overwrite it with "Transcription received".
                 const text = typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload);
                 const voiceOut = document.getElementById('voice-output');
                 const voiceStatus = document.getElementById('voice-status');
-                if (voiceOut) { voiceOut.textContent = text; voiceOut.classList.add('has-text'); }
-                if (voiceStatus) { voiceStatus.textContent = 'Transcription received'; voiceStatus.className = 'success'; }
+                const alreadyComplete = voiceStatus && voiceStatus.textContent === 'Transcription complete';
+                if (voiceOut && !alreadyComplete) { voiceOut.textContent = text; voiceOut.classList.add('has-text'); }
+                if (voiceStatus && !alreadyComplete) { voiceStatus.textContent = 'Transcription received'; voiceStatus.className = 'success'; }
                 // Auto-expand voice panel so the user sees the result
                 const vp = document.getElementById('voice-panel');
                 if (vp) vp.classList.remove('collapsed');
+                break;
+              }
+              case 'setScanCosts': {
+                const c = msg.payload;
+                const bar = document.getElementById('ctx-costs');
+                if (!bar) break;
+                const fmt = (v) => v < 0.001 ? '<0.001' : v.toFixed(4);
+                bar.innerHTML = `
+                  <span class="cost-chip" title="Gemini Robotics-ER scan cost">🔍 ${fmt(c.scanEur)} €</span>
+                  <span class="cost-chip" title="Gemini image extraction cost">🎨 ${fmt(c.bananaEur)} €</span>
+                  <span class="cost-chip" title="Tripo3D 3D model generation cost">🧊 ${fmt(c.tripoEur)} €</span>
+                  <span class="cost-chip total" title="Total cumulative API cost">Σ ${fmt(c.totalEur)} €</span>`;
                 break;
               }
             }
@@ -2830,12 +3495,21 @@
         document.getElementById('voice-panel').classList.toggle('collapsed');
       };
 
+      // Hold-to-record: press starts, release stops
+      window.startHoldRecord = async function () {
+        if (_isRecording) return; // already going
+        await startRecording();
+      };
+
+      window.stopHoldRecord = function () {
+        if (!_isRecording) return; // nothing to stop
+        stopRecording();
+      };
+
+      // Keep toggleRecording for backwards compat (WebView2 host calls)
       window.toggleRecording = async function () {
-        if (_isRecording) {
-          stopRecording();
-        } else {
-          await startRecording();
-        }
+        if (_isRecording) stopRecording();
+        else await startRecording();
       };
 
       async function startRecording() {
@@ -2863,8 +3537,8 @@
           _mediaRecorder.start();
 
           pttBtn.classList.add('recording');
-          pttLabel.textContent = 'Recording… tap to stop';
-          setStatus('Recording — tap button to send', '');
+          pttLabel.textContent = 'Release to send…';
+          setStatus('Recording — release to send', '');
         } catch (err) {
           setStatus('Microphone access denied: ' + err.message, 'error');
           _isRecording = false;

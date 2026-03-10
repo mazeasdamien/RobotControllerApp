@@ -162,17 +162,27 @@ namespace RobotControllerApp.Services
                     }
 
                     // Keep the socket open -- decode and forward any incoming messages (controls, FK, etc.)
-                    var buffer = new byte[4096];
+                    var buffer = new byte[65536]; // 64 KB receive buffer
+                    var messageBuffer = new System.IO.MemoryStream();
                     try
                     {
                         while (ws.State == WebSocketState.Open && !token.IsCancellationRequested)
                         {
-                            var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token);
-                            if (result.MessageType == WebSocketMessageType.Close)
-                                break;
+                            WebSocketReceiveResult result;
+                            messageBuffer.SetLength(0);
+                            do
+                            {
+                                result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token);
+                                if (result.MessageType == WebSocketMessageType.Close) break;
+                                if (result.Count > 0)
+                                    messageBuffer.Write(buffer, 0, result.Count);
+                            } while (!result.EndOfMessage);
+
+                            if (result.MessageType == WebSocketMessageType.Close) break;
+
                             if (result.MessageType == WebSocketMessageType.Text)
                             {
-                                var msg = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                                var msg = Encoding.UTF8.GetString(messageBuffer.ToArray());
                                 OnBrowserMessage?.Invoke(msg);
                             }
                         }

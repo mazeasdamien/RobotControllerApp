@@ -48,8 +48,6 @@ namespace RobotControllerApp.Services
         /// <summary>Custom prompt string for extracting object.</summary>
         public string BananaPromptTemplate { get; set; } = "";
 
-        /// <summary>The Tripo3D Model Quality Version.</summary>
-        public string TripoModelQuality { get; set; } = "Turbo-v1.0-20250506";
 
         /// <summary>The scale factor of the 3D Projection.</summary>
         public double CameraFovScale { get; set; } = 0.40;

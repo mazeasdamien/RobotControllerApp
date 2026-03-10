@@ -7,1197 +7,651 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid Background="{StaticResource Brush.Background.Page}">
-        
-        <NavigationView x:Name="NavView" 
-                        PaneDisplayMode="Left" 
-                        IsBackButtonVisible="Collapsed"
-                        IsSettingsVisible="False"
-                        SelectionChanged="NavView_SelectionChanged" 
-                        Loaded="NavView_Loaded">
-            
+    <Grid x:Name="RootGrid" Background="{StaticResource Brush.Background.Page}" Loaded="RootGrid_Loaded">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>  <!-- Top action bar -->
+            <RowDefinition Height="*"/>     <!-- Main content -->
+        </Grid.RowDefinitions>
 
-            <NavigationView.MenuItems>
-                <NavigationViewItem Content="Dashboard" Tag="home">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Home"/>
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
+        <!-- ══════════════════════════════════════════════════════════
+             TOP ACTION BAR
+             ══════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="0"
+                Background="{StaticResource Brush.Background.Card}"
+                BorderBrush="#1AFFFFFF" BorderThickness="0,0,0,1"
+                Padding="16,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>   <!-- App name -->
+                    <ColumnDefinition Width="*"/>      <!-- 3D URL -->
+                    <ColumnDefinition Width="Auto"/>   <!-- Actions -->
+                </Grid.ColumnDefinitions>
 
-                <NavigationViewItem Content="Telemetry" Tag="telemetry">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE9D9;"/>
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
+                <!-- App title -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xEBC5;" FontSize="18" Foreground="{StaticResource Brush.Primary}"/>
+                    <TextBlock Text="ORANGE HUB" FontSize="13" FontWeight="Bold"
+                               Foreground="{StaticResource Brush.Primary}"
+                               VerticalAlignment="Center" CharacterSpacing="60"/>
+                </StackPanel>
 
-                <NavigationViewItem Content="Networks" Tag="network">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="World"/>
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-
-                <NavigationViewItem Content="Context" Tag="context">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Find"/>
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-
-
-                <NavigationViewItem Content="3D Preview" Tag="preview3d">
-                    <NavigationViewItem.Icon>
-                        <FontIcon Glyph="&#xE943;"/>
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-            </NavigationView.MenuItems>
-
-            <NavigationView.FooterMenuItems>
-                <NavigationViewItem Content="Settings" Tag="settings">
-                    <NavigationViewItem.Icon>
-                        <SymbolIcon Symbol="Setting"/>
-                    </NavigationViewItem.Icon>
-                </NavigationViewItem>
-            </NavigationView.FooterMenuItems>
-
-            <!-- MAIN CONTENT AREA -->
-            <Grid x:Name="ContentArea">
-                
-                <!-- 1. DASHBOARD VIEW -->
-                <Grid x:Name="DashboardView">
-                    <Border Padding="{StaticResource Padding.Page}">
-                        <Grid>
-                            <Grid.Resources>
-                                <Storyboard x:Name="StatusPulseAnimation">
-                                    <!-- Relay Outer Pulse -->
-                                    <DoubleAnimation Storyboard.TargetName="RelayHaloOuter" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="1.0" To="1.2" Duration="0:0:2" AutoReverse="True" RepeatBehavior="Forever"/>
-                                    <DoubleAnimation Storyboard.TargetName="RelayHaloOuter" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="1.0" To="1.2" Duration="0:0:2" AutoReverse="True" RepeatBehavior="Forever"/>
-                                    <DoubleAnimation Storyboard.TargetName="RelayHaloOuter" Storyboard.TargetProperty="Opacity" From="0.3" To="0.1" Duration="0:0:2" AutoReverse="True" RepeatBehavior="Forever"/>
-                                    
-                                    <!-- Robot 1 Outer Pulse -->
-                                    <DoubleAnimation Storyboard.TargetName="Robot1HaloOuter" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="1.0" To="1.2" Duration="0:0:2.5" AutoReverse="True" RepeatBehavior="Forever"/>
-                                    <DoubleAnimation Storyboard.TargetName="Robot1HaloOuter" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="1.0" To="1.2" Duration="0:0:2.5" AutoReverse="True" RepeatBehavior="Forever"/>
-                                    <DoubleAnimation Storyboard.TargetName="Robot1HaloOuter" Storyboard.TargetProperty="Opacity" From="0.3" To="0.1" Duration="0:0:2.5" AutoReverse="True" RepeatBehavior="Forever"/>
-
-                                    <!-- Robot 2 Outer Pulse -->
-                                    <DoubleAnimation Storyboard.TargetName="Robot2HaloOuter" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="1.0" To="1.2" Duration="0:0:3" AutoReverse="True" RepeatBehavior="Forever"/>
-                                    <DoubleAnimation Storyboard.TargetName="Robot2HaloOuter" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="1.0" To="1.2" Duration="0:0:3" AutoReverse="True" RepeatBehavior="Forever"/>
-                                    <DoubleAnimation Storyboard.TargetName="Robot2HaloOuter" Storyboard.TargetProperty="Opacity" From="0.3" To="0.1" Duration="0:0:3" AutoReverse="True" RepeatBehavior="Forever"/>
-
-                                    <!-- Inner Circles subtle breathing -->
-                                    <DoubleAnimation Storyboard.TargetName="RelayHaloInner" Storyboard.TargetProperty="Opacity" From="0.5" To="0.3" Duration="0:0:1.5" AutoReverse="True" RepeatBehavior="Forever"/>
-                                    <DoubleAnimation Storyboard.TargetName="Robot1HaloInner" Storyboard.TargetProperty="Opacity" From="0.5" To="0.3" Duration="0:0:1.8" AutoReverse="True" RepeatBehavior="Forever"/>
-                                    <DoubleAnimation Storyboard.TargetName="Robot2HaloInner" Storyboard.TargetProperty="Opacity" From="0.5" To="0.3" Duration="0:0:2.1" AutoReverse="True" RepeatBehavior="Forever"/>
-                                </Storyboard>
-                            </Grid.Resources>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/> <!-- Header -->
-                                <RowDefinition Height="Auto"/> <!-- Status Cards -->
-                                <RowDefinition Height="Auto"/> <!-- Robot Controls -->
-                                <RowDefinition Height="Auto"/> <!-- Robot Info -->
-                                <RowDefinition Height="Auto"/> <!-- Video Feeds -->
-                                <RowDefinition Height="*"/>    <!-- Logs -->
-                            </Grid.RowDefinitions>
-
-                            <!-- HEADER REMOVED -->
-
-                            <!-- STATUS CARDS -->
-                            <Grid Grid.Row="1" ColumnSpacing="8" Margin="{StaticResource Margin.Card}" Height="90">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <!-- RELAY SERVER -->
-                                <Border Grid.Column="0" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
-                                                <FontIcon x:Name="RelayIcon" Glyph="&#xE77B;" FontSize="24" Foreground="{StaticResource Brush.Text.Muted}"/>
-                                                <TextBlock Text="REMOTE EXPERT" Style="{StaticResource Text.Headline3}"/>
-                                            </StackPanel>
-                                            <TextBlock x:Name="RelayActiveText" Text="WAITING" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" Margin="0,10,0,0"/>
-                                        </StackPanel>
-
-                                        <!-- Modern Status Indicator -->
-                                        <Grid x:Name="RelayStatusIndicator" Visibility="Collapsed" Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
-                                            <Ellipse x:Name="RelayHaloOuter" Width="48" Height="48" Stroke="{Binding ElementName=RelayActiveText, Path=Foreground}" StrokeThickness="1" Opacity="0.2" RenderTransformOrigin="0.5,0.5">
-                                                <Ellipse.RenderTransform>
-                                                    <ScaleTransform/>
-                                                </Ellipse.RenderTransform>
-                                            </Ellipse>
-                                            <Ellipse x:Name="RelayHaloInner" Width="36" Height="36" Stroke="{Binding ElementName=RelayActiveText, Path=Foreground}" StrokeThickness="2" Opacity="0.4"/>
-                                            <FontIcon x:Name="RelayHaloIcon" Glyph="&#xE701;" FontSize="18" Foreground="{Binding ElementName=RelayActiveText, Path=Foreground}"/>
-                                        </Grid>
-                                    </Grid>
-                                </Border>
-
-                                <!-- ROBOT 1 BRIDGE -->
-                                <Border Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
-                                                <FontIcon x:Name="Robot1Icon" Glyph="&#xEBC5;" FontSize="26" Foreground="{StaticResource Brush.Text.Muted}"/>
-                                                <TextBlock Text="ROBOT 1" Style="{StaticResource Text.Headline3}"/>
-                                            </StackPanel>
-                                            <TextBlock x:Name="Robot1ActiveText" Text="WAITING" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" Margin="0,10,0,0"/>
-                                        </StackPanel>
-
-                                        <!-- Modern Status Indicator -->
-                                        <Grid x:Name="Robot1StatusIndicator" Visibility="Collapsed" Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
-                                            <Ellipse x:Name="Robot1HaloOuter" Width="48" Height="48" Stroke="{Binding ElementName=Robot1Icon, Path=Foreground}" StrokeThickness="1" Opacity="0.2" RenderTransformOrigin="0.5,0.5">
-                                                <Ellipse.RenderTransform>
-                                                    <ScaleTransform/>
-                                                </Ellipse.RenderTransform>
-                                            </Ellipse>
-                                            <Ellipse x:Name="Robot1HaloInner" Width="36" Height="36" Stroke="{Binding ElementName=Robot1Icon, Path=Foreground}" StrokeThickness="2" Opacity="0.4"/>
-                                            <FontIcon Glyph="&#xE9D9;" FontSize="18" Foreground="{Binding ElementName=Robot1Icon, Path=Foreground}"/>
-                                        </Grid>
-                                    </Grid>
-                                </Border>
-
-                                <!-- ROBOT 2 BRIDGE -->
-                                <Border Grid.Column="2" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
-                                                <FontIcon x:Name="Robot2Icon" Glyph="&#xEBC5;" FontSize="26" Foreground="{StaticResource Brush.Text.Muted}"/>
-                                                <TextBlock Text="ROBOT 2" Style="{StaticResource Text.Headline3}"/>
-                                            </StackPanel>
-                                            <TextBlock x:Name="Robot2ActiveText" Text="WAITING" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" Margin="0,10,0,0"/>
-                                        </StackPanel>
-
-                                        <!-- Modern Status Indicator -->
-                                        <Grid x:Name="Robot2StatusIndicator" Visibility="Collapsed" Grid.Column="1" VerticalAlignment="Center" Margin="16,0,0,0">
-                                            <Ellipse x:Name="Robot2HaloOuter" Width="48" Height="48" Stroke="{Binding ElementName=Robot2Icon, Path=Foreground}" StrokeThickness="1" Opacity="0.2" RenderTransformOrigin="0.5,0.5">
-                                                <Ellipse.RenderTransform>
-                                                    <ScaleTransform/>
-                                                </Ellipse.RenderTransform>
-                                            </Ellipse>
-                                            <Ellipse x:Name="Robot2HaloInner" Width="36" Height="36" Stroke="{Binding ElementName=Robot2Icon, Path=Foreground}" StrokeThickness="2" Opacity="0.4"/>
-                                            <FontIcon Glyph="&#xE9D9;" FontSize="18" Foreground="{Binding ElementName=Robot2Icon, Path=Foreground}"/>
-                                        </Grid>
-                                    </Grid>
-                                </Border>
-                            </Grid>
-
-                            <!-- ROBOT CONTROLS â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€”â€” -->
-                            <Grid Grid.Row="2" ColumnSpacing="8" Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <!-- R1 Controls -->
-                                <Border Grid.Column="0" Background="{StaticResource Brush.Background.Card}"
-                                        CornerRadius="{StaticResource Radius.Medium}" Padding="16,10">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                            <TextBlock Text="Robot 1" FontSize="12" FontWeight="SemiBold"
-                                                       Foreground="{StaticResource Brush.Primary}" VerticalAlignment="Center"/>
-                                            <TextBlock Text="Learning" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
-                                            <ToggleSwitch x:Name="R1LearningToggle"
-                                                          OnContent="ON" OffContent="OFF" MinWidth="0"
-                                                          Margin="4,0,0,0"
-                                                          Toggled="R1LearningToggle_Toggled"/>
-                                        </StackPanel>
-                                        <Button x:Name="R1HomeButton" Grid.Column="1"
-                                                Content="HOME" Style="{StaticResource Button.Filled}"
-                                                Margin="0,0,8,0"
-                                                Click="R1HomeButton_Click"/>
-                                        <Button x:Name="R1CalibrateButton" Grid.Column="2"
-                                                Content="CALIBRATE" Margin="0,0,0,0"
-                                                Click="R1CalibrateButton_Click"/>
-                                    </Grid>
-
-                                </Border>
-
-                                <!-- R2 Controls -->
-                                <Border Grid.Column="1" Background="{StaticResource Brush.Background.Card}"
-                                        CornerRadius="{StaticResource Radius.Medium}" Padding="16,10">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                                            <TextBlock Text="Robot 2" FontSize="12" FontWeight="SemiBold"
-                                                       Foreground="#FFD279" VerticalAlignment="Center"/>
-                                            <TextBlock Text="Learning" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
-                                            <ToggleSwitch x:Name="R2LearningToggle"
-                                                          OnContent="ON" OffContent="OFF" MinWidth="0"
-                                                          Margin="4,0,0,0"
-                                                          Toggled="R2LearningToggle_Toggled"/>
-                                        </StackPanel>
-                                        <Button x:Name="R2HomeButton" Grid.Column="1"
-                                                Content="HOME" Style="{StaticResource Button.Filled}"
-                                                Margin="0,0,8,0"
-                                                Click="R2HomeButton_Click"/>
-                                        <Button x:Name="R2CalibrateButton" Grid.Column="2"
-                                                Content="CALIBRATE" Margin="0,0,0,0"
-                                                Click="R2CalibrateButton_Click"/>
-                                    </Grid>
-
-                                </Border>
-                            </Grid>
-
-                            <!-- ROBOT INFO BOXES -->
-                            <Grid Grid.Row="3" ColumnSpacing="8" Margin="0,0,0,8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Background="{StaticResource Brush.Background.Card}"
-                                        CornerRadius="{StaticResource Radius.Medium}" Padding="14,10">
-                                    <Grid ColumnSpacing="20">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel>
-                                            <TextBlock Text="STATUS" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
-                                            <TextBlock x:Name="R1StatusStr" Text="&#x2014;" FontSize="11" FontWeight="SemiBold"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="RPi TEMP" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
-                                            <TextBlock x:Name="R1RpiTemp" Text="&#x2014;" FontSize="11"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="2">
-                                            <TextBlock Text="CALIBRATION" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
-                                            <TextBlock x:Name="R1CalibStatus" Text="&#x2014;" FontSize="11"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="3">
-                                            <TextBlock Text="MOTOR MAX" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
-                                            <TextBlock x:Name="R1MotorTemp" Text="&#x2014;" FontSize="11"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="4">
-                                            <TextBlock Text="ERRORS" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
-                                            <TextBlock x:Name="R1HwErrors" Text="&#x2014;" FontSize="11"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                                <Border Grid.Column="1" Background="{StaticResource Brush.Background.Card}"
-                                        CornerRadius="{StaticResource Radius.Medium}" Padding="14,10">
-                                    <Grid ColumnSpacing="20">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                        </Grid.ColumnDefinitions>
-                                        <StackPanel>
-                                            <TextBlock Text="STATUS" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
-                                            <TextBlock x:Name="R2StatusStr" Text="&#x2014;" FontSize="11" FontWeight="SemiBold"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="1">
-                                            <TextBlock Text="RPi TEMP" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
-                                            <TextBlock x:Name="R2RpiTemp" Text="&#x2014;" FontSize="11"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="2">
-                                            <TextBlock Text="CALIBRATION" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
-                                            <TextBlock x:Name="R2CalibStatus" Text="&#x2014;" FontSize="11"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="3">
-                                            <TextBlock Text="MOTOR MAX" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
-                                            <TextBlock x:Name="R2MotorTemp" Text="&#x2014;" FontSize="11"/>
-                                        </StackPanel>
-                                        <StackPanel Grid.Column="4">
-                                            <TextBlock Text="ERRORS" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/>
-                                            <TextBlock x:Name="R2HwErrors" Text="&#x2014;" FontSize="11"/>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </Grid>
-
-
-                            <!-- LOGS & TELEMETRY -->
-                            <!-- LOGS & MINIMAL FEEDBACK -->
-                            <Grid Grid.Row="5" ColumnSpacing="24">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Hub Logs -->
-                                <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-                                    <TextBlock Text="Hub Logs" Style="{StaticResource Text.Headline3}" Margin="{StaticResource Margin.Component}"/>
-                                    <Border Grid.Row="1" Background="Black" CornerRadius="{StaticResource Radius.Small}" Padding="{StaticResource Padding.Small}">
-                                        <Grid>
-                                            <ScrollViewer x:Name="LogScroll"
-                                                          ViewChanged="LogScroll_ViewChanged">
-                                                <RichTextBlock x:Name="ConsoleLog" IsTextSelectionEnabled="True" Foreground="#00FF00" FontFamily="Consolas" FontSize="12"/>
-                                            </ScrollViewer>
-
-                                            <!-- Jump-to-bottom button â€” premium pill style -->
-                                            <Button x:Name="ScrollToBottomBtn"
-                                                    Click="ScrollToBottomBtn_Click"
-                                                    Visibility="Collapsed"
-                                                    HorizontalAlignment="Center"
-                                                    VerticalAlignment="Bottom"
-                                                    Margin="0,0,0,14"
-                                                    Padding="0"
-                                                    CornerRadius="999"
-                                                    Background="Transparent"
-                                                    BorderThickness="0">
-                                                <Border Background="#D0101022"
-                                                        CornerRadius="999"
-                                                        Padding="14,7"
-                                                        BorderBrush="#6600E5FF"
-                                                        BorderThickness="1">
-                                                    <Border.Shadow>
-                                                        <ThemeShadow/>
-                                                    </Border.Shadow>
-                                                    <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
-                                                        <FontIcon Glyph="&#xE74B;" FontSize="11" Foreground="#00E5FF"/>
-                                                        <TextBlock Text="LATEST" FontSize="11" FontWeight="Bold" Foreground="#00E5FF" VerticalAlignment="Center" CharacterSpacing="80"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </Button>
-                                        </Grid>
-                                    </Border>
-
-                                </Grid>
-
-                            </Grid>
-                        </Grid>
+                <!-- Scene3D URL chip (centre) -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6"
+                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Border Background="#10A9F0FF" CornerRadius="6" Padding="10,4"
+                            BorderBrush="#28A9F0FF" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <FontIcon Glyph="&#xE909;" FontSize="12" Foreground="#A9F0FF" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="Scene3dUrlText" FontFamily="Consolas" FontSize="12"
+                                       Foreground="#A9F0FF" VerticalAlignment="Center"
+                                       Text="Starting server..." IsTextSelectionEnabled="True"
+                                       MaxWidth="380" TextTrimming="CharacterEllipsis"/>
+                        </StackPanel>
                     </Border>
-                </Grid>
+                    <Button x:Name="CopyScene3dUrlBtn" Click="CopyScene3dUrlBtn_Click"
+                            Background="Transparent" BorderBrush="#28A9F0FF" BorderThickness="1"
+                            CornerRadius="6" Padding="8,4" VerticalAlignment="Center"
+                            ToolTipService.ToolTip="Copy WebXR URL">
+                        <FontIcon Glyph="&#xE8C8;" FontSize="13" Foreground="#A9F0FF"/>
+                    </Button>
+                    <Button x:Name="OpenScene3dBtn" Click="OpenScene3dBtn_Click"
+                            Background="Transparent" BorderBrush="#28A9F0FF" BorderThickness="1"
+                            CornerRadius="6" Padding="8,4" VerticalAlignment="Center"
+                            ToolTipService.ToolTip="Open in Browser">
+                        <FontIcon Glyph="&#xE8A7;" FontSize="13" Foreground="#A9F0FF"/>
+                    </Button>
+                </StackPanel>
 
-                <!-- 2. EXPERT TELEMETRY VIEW -->
-                <Grid x:Name="TelemetryView" Visibility="Collapsed">
-                    <Border Padding="{StaticResource Padding.Page}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="*"/>
-                            </Grid.RowDefinitions>
+                <!-- Right actions: Total Cost | Assets | Settings -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
 
-                            <!-- HEADER REMOVED -->
-                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-                                <Grid RowSpacing="24" ColumnSpacing="24">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="Auto"/>
-                                    </Grid.RowDefinitions>
+                    <!-- Total API cost counter -->
+                    <Border Background="#0DFFD700" CornerRadius="6" Padding="10,4"
+                            BorderBrush="#22FFD700" BorderThickness="1">
+                        <StackPanel Orientation="Horizontal" Spacing="5">
+                            <FontIcon Glyph="&#xE7C8;" FontSize="11" Foreground="#FFD700" VerticalAlignment="Center"/>
+                            <TextBlock x:Name="TotalCostText" Text="0.0000 €" FontSize="11"
+                                       FontWeight="SemiBold" Foreground="#FFD700"
+                                       VerticalAlignment="Center"
+                                       ToolTipService.ToolTip="Cumulative API spend (Scan + Extract + 3D)"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Open Asset Folder -->
+                    <Button Click="OpenLibraryFolder_Click"
+                            Background="Transparent" BorderBrush="#22FFFFFF" BorderThickness="1"
+                            CornerRadius="6" Padding="10,5" VerticalAlignment="Center"
+                            ToolTipService.ToolTip="Open Asset Library Folder">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE8B7;" FontSize="13" Foreground="#AAAAAA"/>
+                            <TextBlock Text="Assets" FontSize="12" Foreground="#AAAAAA" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Settings toggle -->
+                    <Button x:Name="SettingsToggleBtn" Click="SettingsToggleBtn_Click"
+                            Background="Transparent" BorderBrush="#22FFFFFF" BorderThickness="1"
+                            CornerRadius="6" Padding="10,5" VerticalAlignment="Center"
+                            ToolTipService.ToolTip="Settings">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE713;" FontSize="13" Foreground="#AAAAAA"/>
+                            <TextBlock Text="Settings" FontSize="12" Foreground="#AAAAAA" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ══════════════════════════════════════════════════════════
+             MAIN CONTENT (scrollable)
+             ══════════════════════════════════════════════════════════ -->
+        <Grid Grid.Row="1">
+
+            <!-- DASHBOARD (always visible) -->
+            <ScrollViewer x:Name="DashboardScroll" VerticalScrollBarVisibility="Auto">
+                <Border Padding="16,12">
+                    <Grid>
+                        <Grid.Resources>
+                            <Storyboard x:Name="StatusPulseAnimation">
+                                <DoubleAnimation Storyboard.TargetName="RelayHaloOuter" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="1.0" To="1.2" Duration="0:0:2" AutoReverse="True" RepeatBehavior="Forever"/>
+                                <DoubleAnimation Storyboard.TargetName="RelayHaloOuter" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="1.0" To="1.2" Duration="0:0:2" AutoReverse="True" RepeatBehavior="Forever"/>
+                                <DoubleAnimation Storyboard.TargetName="RelayHaloOuter" Storyboard.TargetProperty="Opacity" From="0.3" To="0.1" Duration="0:0:2" AutoReverse="True" RepeatBehavior="Forever"/>
+
+                                <DoubleAnimation Storyboard.TargetName="Robot1HaloOuter" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="1.0" To="1.2" Duration="0:0:2.5" AutoReverse="True" RepeatBehavior="Forever"/>
+                                <DoubleAnimation Storyboard.TargetName="Robot1HaloOuter" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="1.0" To="1.2" Duration="0:0:2.5" AutoReverse="True" RepeatBehavior="Forever"/>
+                                <DoubleAnimation Storyboard.TargetName="Robot1HaloOuter" Storyboard.TargetProperty="Opacity" From="0.3" To="0.1" Duration="0:0:2.5" AutoReverse="True" RepeatBehavior="Forever"/>
+
+                                <DoubleAnimation Storyboard.TargetName="Robot2HaloOuter" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="1.0" To="1.2" Duration="0:0:3" AutoReverse="True" RepeatBehavior="Forever"/>
+                                <DoubleAnimation Storyboard.TargetName="Robot2HaloOuter" Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="1.0" To="1.2" Duration="0:0:3" AutoReverse="True" RepeatBehavior="Forever"/>
+                                <DoubleAnimation Storyboard.TargetName="Robot2HaloOuter" Storyboard.TargetProperty="Opacity" From="0.3" To="0.1" Duration="0:0:3" AutoReverse="True" RepeatBehavior="Forever"/>
+
+                                <DoubleAnimation Storyboard.TargetName="RelayHaloInner"  Storyboard.TargetProperty="Opacity" From="0.5" To="0.3" Duration="0:0:1.5" AutoReverse="True" RepeatBehavior="Forever"/>
+                                <DoubleAnimation Storyboard.TargetName="Robot1HaloInner" Storyboard.TargetProperty="Opacity" From="0.5" To="0.3" Duration="0:0:1.8" AutoReverse="True" RepeatBehavior="Forever"/>
+                                <DoubleAnimation Storyboard.TargetName="Robot2HaloInner" Storyboard.TargetProperty="Opacity" From="0.5" To="0.3" Duration="0:0:2.1" AutoReverse="True" RepeatBehavior="Forever"/>
+                            </Storyboard>
+                        </Grid.Resources>
+
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>  <!-- Status cards -->
+                            <RowDefinition Height="Auto"/>  <!-- Robot controls -->
+                            <RowDefinition Height="Auto"/>  <!-- Robot info -->
+                            <RowDefinition Height="Auto"/>  <!-- Network latency -->
+                            <RowDefinition Height="Auto"/>  <!-- Analyze buttons row -->
+                            <RowDefinition Height="*"/>     <!-- Logs + Camera preview -->
+                        </Grid.RowDefinitions>
+
+                        <!-- ── STATUS CARDS ────────────────────────────────── -->
+                        <Grid Grid.Row="0" ColumnSpacing="8" Margin="0,0,0,8" Height="88">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- RELAY SERVER -->
+                            <Border Grid.Column="0" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}">
+                                <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
-
-                                    <!-- â•â• ROW 0 â€” ROBOT 1 STATE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-                                    <Border Grid.Row="0" Grid.Column="0"
-                                            Background="{StaticResource Brush.Background.Card}"
-                                            CornerRadius="{StaticResource Radius.Medium}" Padding="24">
-                                        <StackPanel Spacing="16">
-                                            <!-- Header -->
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xEBC5;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
-                                                <TextBlock Text="ROBOT 1 / State" Style="{StaticResource Text.Headline3}"/>
-                                            </StackPanel>
-                                            <!-- Section: Joints -->
-                                            <StackPanel Spacing="12">
-                                                <TextBlock Text="JOINT CONFIGURATION" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
-                                                <Grid>
-                                                    <TextBlock Text="Positions" Opacity="0.6" FontSize="12"/>
-                                                    <TextBlock x:Name="TelemJoints" Text="[-0.04, 0.50, -1.32, 0.00, -0.00, -0.00]"
-                                                               HorizontalAlignment="Right" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"/>
-                                                </Grid>
-                                            </StackPanel>
-                                            <Border Height="1" Background="White" Opacity="0.08"/>
-                                            <!-- Section: Camera -->
-                                            <StackPanel Spacing="8">
-                                                <TextBlock Text="ROBOT CAMERA" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <FontIcon Glyph="&#xE99A;" FontSize="14" Foreground="#00CC6A"/>
-                                                    <TextBlock Text="Robot Feed Active" FontSize="12" Foreground="#00CC6A" FontWeight="SemiBold"/>
-                                                </StackPanel>
-                                            </StackPanel>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
+                                            <FontIcon x:Name="RelayIcon" Glyph="&#xE77B;" FontSize="22" Foreground="{StaticResource Brush.Text.Muted}"/>
+                                            <TextBlock Text="REMOTE EXPERT" Style="{StaticResource Text.Headline3}"/>
                                         </StackPanel>
-                                    </Border>
-
-                                    <!-- â•â• ROW 0 â€” ROBOT 2 STATE â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-                                    <Border Grid.Row="0" Grid.Column="1"
-                                            Background="{StaticResource Brush.Background.Card}"
-                                            CornerRadius="{StaticResource Radius.Medium}" Padding="24">
-                                        <StackPanel Spacing="16">
-                                            <!-- Header -->
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xEBC5;" FontSize="20" Foreground="#FFD279"/>
-                                                <TextBlock Text="ROBOT 2 / State" Style="{StaticResource Text.Headline3}"/>
-                                            </StackPanel>
-                                            <!-- Section: Joints -->
-                                            <StackPanel Spacing="12">
-                                                <TextBlock Text="JOINT CONFIGURATION" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
-                                                <Grid>
-                                                    <TextBlock Text="Positions" Opacity="0.6" FontSize="12"/>
-                                                    <TextBlock x:Name="TelemJoints2" Text="[0.00, 0.00, 0.00, 0.00, 0.00, 0.00]"
-                                                               HorizontalAlignment="Right" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"/>
-                                                </Grid>
-                                            </StackPanel>
-                                            <!-- Section: Camera (N/A for Robot 2) -->
-                                            <StackPanel Spacing="8">
-                                                <TextBlock Text="ROBOT CAMERA" FontSize="10" FontWeight="SemiBold" Opacity="0.5" CharacterSpacing="60"/>
-                                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                                    <FontIcon Glyph="&#xE99A;" FontSize="14" Foreground="#555555"/>
-                                                    <TextBlock Text="No Camera Installed" FontSize="12" Foreground="#555555" FontWeight="SemiBold"/>
-                                                </StackPanel>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- â•â• ROW 1 â€” IK MATRIX (Robot 1 / Expert) â•â•â•â•â•â•â•â•â•â•â•â•â•â• -->
-                                    <Border Grid.Row="1" Grid.Column="0"
-                                            Background="{StaticResource Brush.Background.Card}"
-                                            CornerRadius="{StaticResource Radius.Medium}" Padding="24">
-                                        <StackPanel Spacing="16">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE7F4;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
-                                                <TextBlock Text="IK Matrix / Robot 1" Style="{StaticResource Text.Headline3}"/>
-                                            </StackPanel>
-                                            <StackPanel Spacing="12">
-                                                <TextBlock Text="Target Pose (World Coordinates)" Opacity="0.6"/>
-                                                <Border Background="Black" Padding="12" CornerRadius="8">
-                                                    <StackPanel>
-                                                        <TextBlock x:Name="TelemIKPos" Text="Pos: [0.00, 0.00, 0.00]" FontFamily="Consolas" FontSize="14" Foreground="#00FF00"/>
-                                                        <TextBlock x:Name="TelemIKRot" Text="Rot: [0.00, 0.00, 0.00, 1.00]" FontFamily="Consolas" FontSize="14" Foreground="#00FF00" Margin="0,4,0,0"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- IK Matrix - Robot 2 -->
-                                    <Border Grid.Row="1" Grid.Column="1"
-                                            Background="{StaticResource Brush.Background.Card}"
-                                            CornerRadius="{StaticResource Radius.Medium}" Padding="24">
-                                        <StackPanel Spacing="16">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE7F4;" FontSize="20" Foreground="#FFD279"/>
-                                                <TextBlock Text="IK Matrix / Robot 2" Style="{StaticResource Text.Headline3}"/>
-                                            </StackPanel>
-                                            <StackPanel Spacing="12">
-                                                <TextBlock Text="Target Pose (World Coordinates)" Opacity="0.6"/>
-                                                <Border Background="Black" Padding="12" CornerRadius="8">
-                                                    <StackPanel>
-                                                        <TextBlock x:Name="TelemIKPos2" Text="Pos: [0.00, 0.00, 0.00]" FontFamily="Consolas" FontSize="14" Foreground="#FFD279"/>
-                                                        <TextBlock x:Name="TelemIKRot2" Text="Rot: [0.00, 0.00, 0.00, 1.00]" FontFamily="Consolas" FontSize="14" Foreground="#FFD279" Margin="0,4,0,0"/>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-
-                                    <!-- Media Pipeline - Row 2 full width -->
-                                    <Border Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
-                                            Background="{StaticResource Brush.Background.Card}"
-                                            CornerRadius="{StaticResource Radius.Medium}" Padding="24">
-                                        <StackPanel Spacing="16">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE722;" FontSize="20" Foreground="#FFD279"/>
-                                                <TextBlock Text="Media Pipeline" Style="{StaticResource Text.Headline3}"/>
-                                            </StackPanel>
-                                            <Grid ColumnSpacing="48" RowSpacing="12">
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="Auto"/>
-                                                </Grid.RowDefinitions>
-                                                <TextBlock Text="Robot 1 &#x2014; Camera Feed" Grid.Row="0" Grid.ColumnSpan="2" Opacity="0.8" FontSize="11" FontWeight="SemiBold"/>
-                                                <StackPanel Grid.Row="1" Grid.Column="0">
-                                                    <TextBlock Text="Throughput" Opacity="0.6" FontSize="11"/>
-                                                    <TextBlock x:Name="TelemFps" Text="0.0" FontSize="32" FontWeight="Bold"/>
-                                                    <TextBlock Text="Frames / Second" FontSize="10" Opacity="0.5"/>
-                                                </StackPanel>
-                                                <StackPanel Grid.Row="1" Grid.Column="1">
-                                                    <TextBlock Text="Total Transmission" Opacity="0.6" FontSize="11"/>
-                                                    <TextBlock x:Name="TelemTotalImages" Text="0" FontSize="32" FontWeight="Bold" Foreground="#FFD279"/>
-                                                    <TextBlock Text="Encoded Images" FontSize="10" Opacity="0.5"/>
-                                                </StackPanel>
-                                                <TextBlock Text="Operator Webcam Feed" Grid.Row="0" Grid.Column="2" Grid.ColumnSpan="2" Opacity="0.8" FontSize="11" FontWeight="SemiBold"/>
-                                                <StackPanel Grid.Row="1" Grid.Column="2">
-                                                    <TextBlock Text="Throughput" Opacity="0.6" FontSize="11"/>
-                                                    <TextBlock x:Name="TelemOperatorFps" Text="0.0" FontSize="32" FontWeight="Bold"/>
-                                                    <TextBlock Text="Frames / Second" FontSize="10" Opacity="0.5"/>
-                                                </StackPanel>
-                                                <StackPanel Grid.Row="1" Grid.Column="3">
-                                                    <TextBlock Text="Total Transmission" Opacity="0.6" FontSize="11"/>
-                                                    <TextBlock x:Name="TelemOperatorTotalImages" Text="0" FontSize="32" FontWeight="Bold" Foreground="#0078D7"/>
-                                                    <TextBlock Text="Encoded Images" FontSize="10" Opacity="0.5"/>
-                                                </StackPanel>
-                                            </Grid>
-                                        </StackPanel>
-                                    </Border>
-
+                                        <TextBlock x:Name="RelayActiveText" Text="WAITING" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                    <Grid x:Name="RelayStatusIndicator" Visibility="Collapsed" Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                        <Ellipse x:Name="RelayHaloOuter" Width="44" Height="44" Stroke="{Binding ElementName=RelayActiveText, Path=Foreground}" StrokeThickness="1" Opacity="0.2" RenderTransformOrigin="0.5,0.5">
+                                            <Ellipse.RenderTransform><ScaleTransform/></Ellipse.RenderTransform>
+                                        </Ellipse>
+                                        <Ellipse x:Name="RelayHaloInner" Width="32" Height="32" Stroke="{Binding ElementName=RelayActiveText, Path=Foreground}" StrokeThickness="2" Opacity="0.4"/>
+                                        <FontIcon x:Name="RelayHaloIcon" Glyph="&#xE701;" FontSize="16" Foreground="{Binding ElementName=RelayActiveText, Path=Foreground}"/>
+                                    </Grid>
                                 </Grid>
-                            </ScrollViewer>
-                        </Grid>
-                    </Border>
-                </Grid>
+                            </Border>
 
-                <!-- CONTEXT VIEW -->
-                <Grid x:Name="ContextView" Visibility="Collapsed">
-                    <Border Padding="{StaticResource Padding.Page}">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="5*"/>
-                                <RowDefinition Height="3*"/>
-                            </Grid.RowDefinitions>
-                            
-                            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24" Visibility="Collapsed">
-                                <FontIcon Glyph="&#xE8A5;" FontSize="28" Foreground="{StaticResource Brush.Primary}" VerticalAlignment="Center"/>
-                                <TextBlock Text="Project Context" Style="{StaticResource Text.Headline1}" VerticalAlignment="Center"/>
-                            </StackPanel>
-
-                            <Grid Grid.Row="1" ColumnSpacing="24" Margin="0,0,0,16">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-
-                                <!-- Left Side: Webcam and Control -->
-                                <Border Grid.Column="0" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}" VerticalAlignment="Stretch">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-                                        
-                                        <TextBlock Text="Operator Webcam Feed" Style="{StaticResource Text.Headline3}" Margin="0,0,0,16"/>
-                                        
-                                        <Border Grid.Row="1" Background="#0A0A0A" CornerRadius="10" BorderBrush="#1E1E1E" BorderThickness="1" Margin="0,0,0,16">
-                                            <Image x:Name="ContextWebcamPreview" Stretch="Uniform"/>
-                                        </Border>
-
-                                        <Viewbox Grid.Row="2" Stretch="Uniform" HorizontalAlignment="Stretch" Margin="0,0,0,16" MaxHeight="250">
-                                            <GridView x:Name="DetectedObjectsList" SelectionMode="None" MaxWidth="1000">
-                                                <GridView.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <Grid>
-                                                            <StackPanel Margin="8" Opacity="{Binding PreviewOpacity}">
-                                                                <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="18" Foreground="{Binding ColorBrush}" Margin="0,0,0,8" HorizontalAlignment="Center"/>
-                                                                <Button Click="AddSelectedObject_Click" Tag="{Binding Name}"
-                                                                        Padding="0" Background="Transparent" BorderThickness="0"
-                                                                        ToolTipService.ToolTip="Click to add to Banana queue">
-                                                                    <Border CornerRadius="8" BorderBrush="{Binding ColorBrush}" BorderThickness="3" Background="#0A0A0A" Width="200" Height="200">
-                                                                        <Image Source="{Binding CroppedImage}" Stretch="Uniform"/>
-                                                                    </Border>
-                                                                </Button>
-                                                            </StackPanel>
-                                                        </Grid>
-                                                    </DataTemplate>
-                                                </GridView.ItemTemplate>
-                                            </GridView>
-                                        </Viewbox>
-
-                                        <Grid Grid.Row="3" Margin="0,0,0,0" ColumnSpacing="8">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            
-                                            <StackPanel Grid.Column="0" Spacing="4">
-                                                <Button x:Name="GenerateObjectImagesBtn" Content="Analyze Scene Manually" HorizontalAlignment="Stretch" Style="{StaticResource Button.Filled}" Click="GenerateObjectImagesBtn_Click"/>
-                                                <TextBlock x:Name="GeminiCostText" Text="Estimated Gemini Cost: 0.0000 €" FontSize="12" Opacity="0.5" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                            <ToggleButton x:Name="AutoScanToggle" Grid.Column="1" Content="Auto-Scan (8x/min)" HorizontalAlignment="Stretch" VerticalAlignment="Top" Height="36" Click="AutoScanToggle_Click"/>
-                                        </Grid>
-                                        <ProgressRing x:Name="GenerationProgress" Grid.Row="3" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="4,6,0,0"/>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Right Side: Generated Images -->
-                                <Border Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}" VerticalAlignment="Stretch">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                        </Grid.RowDefinitions>
-                                        <TextBlock Text="Isolated 3D Renders (Banana Pro 2)" Style="{StaticResource Text.Headline3}" Margin="0,0,0,16"/>
-                                        
-                                        <StackPanel Grid.Row="1" Margin="0,0,0,16">
-                                            <TextBlock Text="Selected Objects Queue" Opacity="0.5" FontSize="12" Margin="0,0,0,8"/>
-                                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" MaxHeight="160">
-                                                <GridView x:Name="SelectedObjectsList" SelectionMode="None">
-                                                    <GridView.ItemTemplate>
-                                                        <DataTemplate>
-                                                            <Grid>
-                                                                <StackPanel Margin="8">
-                                                                    <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="12" Foreground="{Binding ColorBrush}" Margin="0,0,0,4" HorizontalAlignment="Center"/>
-                                                                    <Border CornerRadius="8" BorderBrush="{Binding ColorBrush}" BorderThickness="3" Background="#0A0A0A" Width="80" Height="80">
-                                                                        <Image Source="{Binding CroppedImage}" Stretch="Uniform"/>
-                                                                    </Border>
-                                                                </StackPanel>
-                                                                <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="10"
-                                                                        HorizontalAlignment="Right" VerticalAlignment="Top" 
-                                                                        Margin="0,4,4,0" Width="20" Height="20" CornerRadius="10" Padding="0"
-                                                                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
-                                                                        Background="#CC000000" Foreground="White" BorderThickness="0"
-                                                                        Click="RemoveSelectedObject_Click" Tag="{Binding Name}"
-                                                                        ToolTipService.ToolTip="Remove from selection"/>
-                                                            </Grid>
-                                                        </DataTemplate>
-                                                    </GridView.ItemTemplate>
-                                                </GridView>
-                                            </ScrollViewer>
-                                        </StackPanel>
-
-                                        <Grid Grid.Row="2" Margin="0,0,0,16">
-                                            <StackPanel Spacing="4" HorizontalAlignment="Stretch">
-                                                <Button x:Name="GenerateBananaProImagesBtn" Content="Transform to Transparent Assets" HorizontalAlignment="Stretch" Style="{StaticResource Button.Filled}" Click="GenerateBananaProImagesBtn_Click"/>
-                                                <TextBlock x:Name="BananaCostText" Text="Estimated Banana Pro Cost: 0.00 €" FontSize="12" Opacity="0.5" HorizontalAlignment="Center"/>
-                                            </StackPanel>
-                                            <ProgressRing x:Name="BananaProgress" IsActive="False" Visibility="Collapsed" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,6,30,0"/>
-                                        </Grid>
-
-                                        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
-                                            <GridView x:Name="BananaImagesList" SelectionMode="None">
-                                                <GridView.ItemTemplate>
-                                                    <DataTemplate>
-                                                        <StackPanel Margin="8">
-                                                            <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14" Foreground="{Binding ColorBrush}" Margin="0,0,0,4"/>
-                                                            <Border CornerRadius="8" BorderBrush="#333333" BorderThickness="1" Background="#0A0A0A" Width="200" Height="200">
-                                                                <Image Source="{Binding ImageSource}" Stretch="Uniform"/>
-                                                            </Border>
-                                                        </StackPanel>
-                                                    </DataTemplate>
-                                                </GridView.ItemTemplate>
-                                            </GridView>
-                                        </ScrollViewer>
-                                    </Grid>
-                                </Border>
-                            </Grid>
-
-                            <!-- Bottom Side: Persistent Library Table -->
-                            <Border Grid.Row="2" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}" VerticalAlignment="Stretch">
+                            <!-- ROBOT 1 -->
+                            <Border Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}">
                                 <Grid>
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto"/>
-                                        <RowDefinition Height="*"/>
-                                    </Grid.RowDefinitions>
-                                    <Grid>
-                                        <TextBlock Text="Detected Object Library" Style="{StaticResource Text.Headline3}" Margin="0,0,0,16"/>
-                                        <Button Content="Open Asset Folder" HorizontalAlignment="Right" VerticalAlignment="Top" 
-                                                Background="Transparent" BorderBrush="#333333" BorderThickness="1" Foreground="#AAAAAA"
-                                                Click="OpenLibraryFolder_Click" Margin="0,0,0,16"/>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
+                                            <FontIcon x:Name="Robot1Icon" Glyph="&#xEBC5;" FontSize="24" Foreground="{StaticResource Brush.Text.Muted}"/>
+                                            <TextBlock Text="ROBOT 1" Style="{StaticResource Text.Headline3}"/>
+                                        </StackPanel>
+                                        <TextBlock x:Name="Robot1ActiveText" Text="WAITING" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                    <Grid x:Name="Robot1StatusIndicator" Visibility="Collapsed" Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                        <Ellipse x:Name="Robot1HaloOuter" Width="44" Height="44" Stroke="{Binding ElementName=Robot1Icon, Path=Foreground}" StrokeThickness="1" Opacity="0.2" RenderTransformOrigin="0.5,0.5">
+                                            <Ellipse.RenderTransform><ScaleTransform/></Ellipse.RenderTransform>
+                                        </Ellipse>
+                                        <Ellipse x:Name="Robot1HaloInner" Width="32" Height="32" Stroke="{Binding ElementName=Robot1Icon, Path=Foreground}" StrokeThickness="2" Opacity="0.4"/>
+                                        <FontIcon Glyph="&#xE9D9;" FontSize="16" Foreground="{Binding ElementName=Robot1Icon, Path=Foreground}"/>
                                     </Grid>
-                                    <Grid Grid.Row="1">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="*"/>
-                                        </Grid.RowDefinitions>
-                                        
-                                        <!-- Header Table -->
-                                        <Grid Margin="0,0,0,8" Padding="12,0,12,8" BorderBrush="#333333" BorderThickness="0,0,0,1">
-                                             <Grid.ColumnDefinitions>
-                                                 <ColumnDefinition Width="100"/>
-                                                 <ColumnDefinition Width="*"/>
-                                                 <ColumnDefinition Width="200"/>
-                                                 <ColumnDefinition Width="150"/>
-                                                 <ColumnDefinition Width="80"/>
-                                                 <ColumnDefinition Width="60"/>
-                                             </Grid.ColumnDefinitions>
-                                             <TextBlock Grid.Column="0" Text="PREVIEW" FontWeight="SemiBold" Foreground="#888"/>
-                                             <TextBlock Grid.Column="1" Text="OBJECT TYPE (LLM NAME)" FontWeight="SemiBold" Foreground="#888"/>
-                                             <TextBlock Grid.Column="2" Text="DATE DISCOVERED" FontWeight="SemiBold" Foreground="#888"/>
-                                             <TextBlock Grid.Column="3" Text="GENERATE" FontWeight="SemiBold" Foreground="#888" VerticalAlignment="Center"/>
-                                             <TextBlock Grid.Column="4" Text="3D VIEW" FontWeight="SemiBold" Foreground="#888" VerticalAlignment="Center"/>
-                                         </Grid>
-                                        
-                                        <!-- Rows -->
-                                        <ListView x:Name="LibraryList" Grid.Row="1" SelectionMode="None">
-                                            <ListView.ItemContainerStyle>
-                                                <Style TargetType="ListViewItem">
-                                                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
-                                                </Style>
-                                            </ListView.ItemContainerStyle>
-                                            <ListView.ItemTemplate>
-                                                <DataTemplate>
-                                                     <Grid Padding="0,8">
-                                                         <Grid.ColumnDefinitions>
-                                                             <ColumnDefinition Width="100"/>
-                                                             <ColumnDefinition Width="*"/>
-                                                             <ColumnDefinition Width="200"/>
-                                                             <ColumnDefinition Width="150"/>
-                                                             <ColumnDefinition Width="80"/>
-                                                             <ColumnDefinition Width="60"/>
-                                                         </Grid.ColumnDefinitions>
+                                </Grid>
+                            </Border>
 
-                                                         <!-- PNG thumbnail -->
-                                                         <Button Grid.Column="0" Width="60" Height="60" Padding="0" Background="Transparent" BorderThickness="0" ToolTipService.ToolTip="Click to View Image">
-                                                             <Border CornerRadius="6" BorderBrush="{Binding ColorBrush}" BorderThickness="2" Background="#0A0A0A" Width="60" Height="60">
-                                                                 <Image Source="{Binding ImageSource}" Stretch="Uniform"/>
-                                                             </Border>
-                                                             <Button.Flyout>
-                                                                 <Flyout Placement="BottomEdgeAlignedLeft">
-                                                                     <Image Source="{Binding ImageSource}" Stretch="Uniform" MaxWidth="400" MaxHeight="400" Margin="0"/>
-                                                                 </Flyout>
-                                                             </Button.Flyout>
-                                                         </Button>
-
-                                                         <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="16" Foreground="{Binding ColorBrush}"/>
-                                                         <TextBlock Grid.Column="2" Text="{Binding DateAdded}" VerticalAlignment="Center" Foreground="#888"/>
-
-                                                         <Button Grid.Column="3" Content="To 3D Model" VerticalAlignment="Center" HorizontalAlignment="Center"
-                                                                 Style="{StaticResource Button.Filled}" Click="Generate3DModel_Click" Loaded="Generate3DModel_Loaded"/>
-
-                                                         <!-- 3D preview button -->
-                                                         <Button Grid.Column="4" VerticalAlignment="Center" HorizontalAlignment="Center"
-                                                                 Background="Transparent" BorderThickness="0" Padding="4"
-                                                                 Click="Preview3DModel_Click"
-                                                                 ToolTipService.ToolTip="View 3D Model (Three.js)">
-                                                             <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="22" Foreground="#5599FF"
-                                                                        Loaded="Preview3DBtn_Loaded"/>
-                                                         </Button>
-
-                                                         <Button Grid.Column="5" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets"
-                                                                 VerticalAlignment="Center" HorizontalAlignment="Center" Background="Transparent" Foreground="#888" BorderThickness="0"
-                                                                 Click="DeleteLibraryObject_Click" Tag="{Binding Name}"
-                                                                 ToolTipService.ToolTip="Delete from Library"/>
-                                                     </Grid>
-                                                 </DataTemplate>
-                                            </ListView.ItemTemplate>
-                                        </ListView>
+                            <!-- ROBOT 2 -->
+                            <Border Grid.Column="2" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource Space.8}">
+                                            <FontIcon x:Name="Robot2Icon" Glyph="&#xEBC5;" FontSize="24" Foreground="{StaticResource Brush.Text.Muted}"/>
+                                            <TextBlock Text="ROBOT 2" Style="{StaticResource Text.Headline3}"/>
+                                        </StackPanel>
+                                        <TextBlock x:Name="Robot2ActiveText" Text="WAITING" FontWeight="Bold" Foreground="{StaticResource Brush.Text.Muted}" Margin="0,8,0,0"/>
+                                    </StackPanel>
+                                    <Grid x:Name="Robot2StatusIndicator" Visibility="Collapsed" Grid.Column="1" VerticalAlignment="Center" Margin="12,0,0,0">
+                                        <Ellipse x:Name="Robot2HaloOuter" Width="44" Height="44" Stroke="{Binding ElementName=Robot2Icon, Path=Foreground}" StrokeThickness="1" Opacity="0.2" RenderTransformOrigin="0.5,0.5">
+                                            <Ellipse.RenderTransform><ScaleTransform/></Ellipse.RenderTransform>
+                                        </Ellipse>
+                                        <Ellipse x:Name="Robot2HaloInner" Width="32" Height="32" Stroke="{Binding ElementName=Robot2Icon, Path=Foreground}" StrokeThickness="2" Opacity="0.4"/>
+                                        <FontIcon Glyph="&#xE9D9;" FontSize="16" Foreground="{Binding ElementName=Robot2Icon, Path=Foreground}"/>
                                     </Grid>
                                 </Grid>
                             </Border>
                         </Grid>
-                    </Border>
-                </Grid>
 
+                        <!-- ── ROBOT CONTROLS ──────────────────────────────── -->
+                        <Grid Grid.Row="1" ColumnSpacing="8" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
 
-                            <!-- 5. NETWORK VIEW -->
-                <Grid x:Name="NetworkView" Visibility="Collapsed">
-                    <Border Padding="{StaticResource Padding.Page}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <Border Grid.Column="0" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="16,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <TextBlock Text="Robot 1" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource Brush.Primary}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Learning" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+                                        <ToggleSwitch x:Name="R1LearningToggle" OnContent="ON" OffContent="OFF" MinWidth="0" Margin="4,0,0,0" Toggled="R1LearningToggle_Toggled"/>
+                                    </StackPanel>
+                                    <Button x:Name="R1HomeButton" Grid.Column="1" Content="HOME" Style="{StaticResource Button.Filled}" Margin="0,0,8,0" Click="R1HomeButton_Click"/>
+                                    <Button x:Name="R1CalibrateButton" Grid.Column="2" Content="CALIBRATE" Click="R1CalibrateButton_Click"/>
+                                </Grid>
+                            </Border>
+
+                            <Border Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="16,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                        <TextBlock Text="Robot 2" FontSize="12" FontWeight="SemiBold" Foreground="#FFD279" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Learning" FontSize="12" Opacity="0.6" VerticalAlignment="Center"/>
+                                        <ToggleSwitch x:Name="R2LearningToggle" OnContent="ON" OffContent="OFF" MinWidth="0" Margin="4,0,0,0" Toggled="R2LearningToggle_Toggled"/>
+                                    </StackPanel>
+                                    <Button x:Name="R2HomeButton" Grid.Column="1" Content="HOME" Style="{StaticResource Button.Filled}" Margin="0,0,8,0" Click="R2HomeButton_Click"/>
+                                    <Button x:Name="R2CalibrateButton" Grid.Column="2" Content="CALIBRATE" Click="R2CalibrateButton_Click"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- ── ROBOT INFO ──────────────────────────────────── -->
+                        <Grid Grid.Row="2" ColumnSpacing="8" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="14,8">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel><TextBlock Text="STATUS" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/><TextBlock x:Name="R1StatusStr" Text="&#x2014;" FontSize="11" FontWeight="SemiBold"/></StackPanel>
+                                    <StackPanel Grid.Column="1"><TextBlock Text="RPi TEMP" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/><TextBlock x:Name="R1RpiTemp" Text="&#x2014;" FontSize="11"/></StackPanel>
+                                    <StackPanel Grid.Column="2"><TextBlock Text="CALIBRATION" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/><TextBlock x:Name="R1CalibStatus" Text="&#x2014;" FontSize="11"/></StackPanel>
+                                    <StackPanel Grid.Column="3"><TextBlock Text="MOTOR MAX" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/><TextBlock x:Name="R1MotorTemp" Text="&#x2014;" FontSize="11"/></StackPanel>
+                                    <StackPanel Grid.Column="4"><TextBlock Text="ERRORS" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/><TextBlock x:Name="R1HwErrors" Text="&#x2014;" FontSize="11"/></StackPanel>
+                                </Grid>
+                            </Border>
+                            <Border Grid.Column="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="14,8">
+                                <Grid ColumnSpacing="16">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel><TextBlock Text="STATUS" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/><TextBlock x:Name="R2StatusStr" Text="&#x2014;" FontSize="11" FontWeight="SemiBold"/></StackPanel>
+                                    <StackPanel Grid.Column="1"><TextBlock Text="RPi TEMP" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/><TextBlock x:Name="R2RpiTemp" Text="&#x2014;" FontSize="11"/></StackPanel>
+                                    <StackPanel Grid.Column="2"><TextBlock Text="CALIBRATION" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/><TextBlock x:Name="R2CalibStatus" Text="&#x2014;" FontSize="11"/></StackPanel>
+                                    <StackPanel Grid.Column="3"><TextBlock Text="MOTOR MAX" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/><TextBlock x:Name="R2MotorTemp" Text="&#x2014;" FontSize="11"/></StackPanel>
+                                    <StackPanel Grid.Column="4"><TextBlock Text="ERRORS" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,2"/><TextBlock x:Name="R2HwErrors" Text="&#x2014;" FontSize="11"/></StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- ── NETWORK LATENCY ─────────────────────────────── -->
+                        <Border Grid.Row="3" Background="{StaticResource Brush.Background.Card}"
+                                CornerRadius="{StaticResource Radius.Medium}" Padding="16,7" Margin="0,0,0,8">
                             <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0" VerticalAlignment="Center" HorizontalAlignment="Left">
+                                    <TextBlock Text="CURRENT" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,1"/>
+                                    <TextBlock x:Name="InternetLatencyText" Text="-- ms" FontSize="13" FontWeight="Bold"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <TextBlock Text="MIN" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,1"/>
+                                    <TextBlock x:Name="InternetMinText" Text="-- ms" FontSize="13" FontWeight="Bold"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <TextBlock Text="MAX" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,1"/>
+                                    <TextBlock x:Name="InternetMaxText" Text="-- ms" FontSize="13" FontWeight="Bold"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Right">
+                                    <TextBlock Text="AVG" FontSize="9" Opacity="0.45" CharacterSpacing="60" Margin="0,0,0,1"/>
+                                    <TextBlock x:Name="InternetAvgText" Text="-- ms" FontSize="13" FontWeight="Bold" Foreground="#00E5FF"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- ── SCENE ANALYZE BUTTONS ───────────────────────── -->
+                        <Grid Grid.Row="4" ColumnSpacing="8" Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="{StaticResource Brush.Background.Card}"
+                                    CornerRadius="{StaticResource Radius.Medium}" Padding="12,8">
+                                <Grid>
+                                    <StackPanel Spacing="4" HorizontalAlignment="Stretch">
+                                        <Button x:Name="GenerateObjectImagesBtn" Content="Analyze Scene Manually"
+                                                HorizontalAlignment="Stretch" Style="{StaticResource Button.Filled}"
+                                                Click="GenerateObjectImagesBtn_Click"/>
+                                        <TextBlock x:Name="GeminiCostText" Text="Estimated Gemini Cost: 0.0000 €"
+                                                   FontSize="11" Opacity="0.5" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <ProgressRing x:Name="GenerationProgress" IsActive="False" Visibility="Collapsed"
+                                                  HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                </Grid>
+                            </Border>
+                            <ToggleButton x:Name="AutoScanToggle" Grid.Column="1"
+                                          Content="Auto-Scan" Height="36" Click="AutoScanToggle_Click"/>
+                            <Border Grid.Column="2" Background="{StaticResource Brush.Background.Card}"
+                                    CornerRadius="{StaticResource Radius.Medium}" Padding="12,8">
+                                <Grid>
+                                    <StackPanel Spacing="4" HorizontalAlignment="Stretch">
+                                        <Button x:Name="GenerateBananaProImagesBtn"
+                                                Content="Transform to Transparent Assets"
+                                                HorizontalAlignment="Stretch" Style="{StaticResource Button.Filled}"
+                                                Click="GenerateBananaProImagesBtn_Click"/>
+                                        <TextBlock x:Name="BananaCostText" Text="Banana Cost: 0.00 €"
+                                                   FontSize="11" Opacity="0.5" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <ProgressRing x:Name="BananaProgress" IsActive="False" Visibility="Collapsed"
+                                                  HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0"/>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- ── LOGS  +  CAMERA PREVIEW (fills the wasted space) ── -->
+                        <Grid Grid.Row="5" ColumnSpacing="8" MinHeight="220">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>      <!-- Logs — fills available width -->
+                                <ColumnDefinition Width="260"/>    <!-- Camera preview — fixed compact width -->
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Hub Logs -->
+                            <Grid Grid.Column="0">
                                 <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="Auto"/>
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
-
-                                <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24" Visibility="Collapsed">
-                                    <Image Source="ms-appx:///Assets/AppLogo.png" Width="36" Height="36"/>
-                                    <TextBlock Text="Network &amp; Latency" Style="{StaticResource Text.Headline1}" VerticalAlignment="Center"/>
-                                </StackPanel>
-
-                                <!-- Speed Test Section -->
-                                <Border Grid.Row="1" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="{StaticResource Padding.Card}" Margin="0,0,0,24" HorizontalAlignment="Stretch">
-                                    <Grid ColumnSpacing="32">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="420"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        
-                                        <StackPanel Spacing="16">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <FontIcon Glyph="&#xE81E;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
-                                            <TextBlock Text="Internet Performance Test" Style="{StaticResource Text.Headline3}"/>
-                                        </StackPanel>
-                                            
-                                            <Grid ColumnSpacing="16">
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="Auto"/>
-                                                </Grid.RowDefinitions>
-                                                <Grid.ColumnDefinitions>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                    <ColumnDefinition Width="*"/>
-                                                </Grid.ColumnDefinitions>
-                                                
-                                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,0,16">
-                                                    <TextBlock Text="LATENCY" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
-                                                    <TextBlock Text="-- ms" FontSize="20" FontWeight="SemiBold" x:Name="InternetLatencyText" Margin="0,0,0,4"/>
-                                                    <StackPanel Orientation="Horizontal" Spacing="12">
-                                                        <StackPanel>
-                                                            <TextBlock Text="MIN" FontSize="9" Opacity="0.5"/>
-                                                            <TextBlock x:Name="InternetMinText" Text="--" FontSize="11" FontWeight="Bold"/>
-                                                        </StackPanel>
-                                                        <StackPanel>
-                                                            <TextBlock Text="MAX" FontSize="9" Opacity="0.5"/>
-                                                            <TextBlock x:Name="InternetMaxText" Text="--" FontSize="11" FontWeight="Bold"/>
-                                                        </StackPanel>
-                                                        <StackPanel>
-                                                            <TextBlock Text="AVG" FontSize="9" Opacity="0.5"/>
-                                                            <TextBlock x:Name="InternetAvgText" Text="--" FontSize="11" FontWeight="Bold" Foreground="#00E5FF"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </StackPanel>
-
-                                                 <StackPanel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3">
-                                                     <TextBlock Text="STATUS" Style="{StaticResource Text.Caption}" Opacity="0.7"/>
-                                                     <TextBlock Text="Idle" FontSize="16" FontWeight="SemiBold" x:Name="NetworkStatusText"/>
-                                                 </StackPanel>
-                                             </Grid>
-                                         </StackPanel>
-
-                                        <!-- Topology Nodes (replaces Speed History graph) -->
-                                        <Grid Grid.Column="1" ColumnSpacing="16">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-
-                                            <!-- Hub Node -->
-                                            <StackPanel Grid.Column="0" Spacing="8">
-                                                <TextBlock Text="LOCAL HUB" FontSize="10" FontWeight="Bold" Opacity="0.5"/>
-                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="12" CornerRadius="10">
-                                                    <StackPanel Spacing="5">
-                                                        <TextBlock x:Name="HubIpText" Text="Checking..." FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                        <TextBlock x:Name="HubLocText" Text="Locating Hub..." FontSize="10" Opacity="0.5" TextWrapping="Wrap"/>
-                                                        <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,3,0,0">
-                                                            <Ellipse Width="6" Height="6" Fill="#00CC6A"/>
-                                                            <TextBlock x:Name="HubRelayText" Text="CONNECTED" FontSize="10" FontWeight="SemiBold" Foreground="#00CC6A"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-
-                                            <!-- Expert Node -->
-                                            <StackPanel Grid.Column="1" Spacing="8">
-                                                <TextBlock Text="REMOTE EXPERT" FontSize="10" FontWeight="Bold" Opacity="0.5"/>
-                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="12" CornerRadius="10">
-                                                    <StackPanel Spacing="5">
-                                                        <TextBlock x:Name="QuestIpText" Text="Searching..." FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                        <TextBlock x:Name="QuestLocText" Text="--" FontSize="10" Opacity="0.5" TextWrapping="Wrap"/>
-                                                        <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,3,0,0">
-                                                            <Ellipse x:Name="QuestRelayDot" Width="6" Height="6" Fill="#808080"/>
-                                                            <TextBlock x:Name="QuestRelayText" Text="OFFLINE" FontSize="10" FontWeight="SemiBold" Foreground="#808080"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-
-                                            <!-- Robot 1 Node -->
-                                            <StackPanel Grid.Column="2" Spacing="8">
-                                                <TextBlock Text="ROBOT 1" FontSize="10" FontWeight="Bold" Opacity="0.5"/>
-                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="12" CornerRadius="10">
-                                                    <StackPanel Spacing="5">
-                                                        <TextBlock x:Name="R1IpText" Text="Offline" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                        <TextBlock x:Name="R1LocText" Text="LAN / Ethernet" FontSize="10" Opacity="0.5"/>
-                                                        <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,3,0,0">
-                                                            <Ellipse x:Name="R1RelayDot" Width="6" Height="6" Fill="#808080"/>
-                                                            <TextBlock x:Name="R1RelayText" Text="OFFLINE" FontSize="10" FontWeight="SemiBold" Foreground="#808080"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-
-                                            <!-- Robot 2 Node -->
-                                            <StackPanel Grid.Column="3" Spacing="8">
-                                                <TextBlock Text="ROBOT 2" FontSize="10" FontWeight="Bold" Opacity="0.5"/>
-                                                <Border Background="#10FFFFFF" BorderBrush="#1AFFFFFF" BorderThickness="1" Padding="12" CornerRadius="10">
-                                                    <StackPanel Spacing="5">
-                                                        <TextBlock x:Name="R2IpText" Text="Offline" FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                                         <TextBlock x:Name="R2LocText" Text="LAN / Ethernet" FontSize="10" Opacity="0.5"/>
-                                                        <StackPanel Orientation="Horizontal" Spacing="5" Margin="0,3,0,0">
-                                                            <Ellipse x:Name="R2RelayDot" Width="6" Height="6" Fill="#808080"/>
-                                                            <TextBlock x:Name="R2RelayText" Text="OFFLINE" FontSize="10" FontWeight="SemiBold" Foreground="#808080"/>
-                                                        </StackPanel>
-                                                    </StackPanel>
-                                                </Border>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Grid>
-                                </Border>
-
-                                <!-- Real-time Latency Graph -->
-                                <Border Grid.Row="2" Background="{StaticResource Brush.Background.Card}" CornerRadius="{StaticResource Radius.Medium}" Padding="32" Margin="0,0,0,24">
+                                <TextBlock Text="Hub Logs" Style="{StaticResource Text.Headline3}"
+                                           Margin="0,0,0,6"/>
+                                <Border Grid.Row="1" Background="Black"
+                                        CornerRadius="{StaticResource Radius.Small}"
+                                        Padding="{StaticResource Padding.Small}">
                                     <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="300"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <StackPanel Orientation="Horizontal" Spacing="24" Margin="0,0,0,24">
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <FontIcon Glyph="&#xE9D2;" FontSize="20" Foreground="{StaticResource Brush.Primary}"/>
-                                                <TextBlock Text="Latency Timeline (RTT)" Style="{StaticResource Text.Headline3}"/>
-                                            </StackPanel>
-                                            
-                                            <!-- Legend -->
-                                            <StackPanel Orientation="Horizontal" Spacing="16" VerticalAlignment="Center">
-                                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                                    <Rectangle Width="12" Height="12" Fill="#0078D7"/>
-                                                    <TextBlock Text="Remote Expert" FontSize="12" Opacity="0.8"/>
+                                        <ScrollViewer x:Name="LogScroll" ViewChanged="LogScroll_ViewChanged">
+                                            <RichTextBlock x:Name="ConsoleLog" IsTextSelectionEnabled="True"
+                                                           Foreground="#00FF00" FontFamily="Consolas" FontSize="12"/>
+                                        </ScrollViewer>
+                                        <Button x:Name="ScrollToBottomBtn" Click="ScrollToBottomBtn_Click"
+                                                Visibility="Collapsed" HorizontalAlignment="Center"
+                                                VerticalAlignment="Bottom" Margin="0,0,0,14"
+                                                Padding="0" CornerRadius="999"
+                                                Background="Transparent" BorderThickness="0">
+                                            <Border Background="#D0101022" CornerRadius="999" Padding="14,7"
+                                                    BorderBrush="#6600E5FF" BorderThickness="1">
+                                                <Border.Shadow><ThemeShadow/></Border.Shadow>
+                                                <StackPanel Orientation="Horizontal" Spacing="7" VerticalAlignment="Center">
+                                                    <FontIcon Glyph="&#xE74B;" FontSize="11" Foreground="#00E5FF"/>
+                                                    <TextBlock Text="LATEST" FontSize="11" FontWeight="Bold"
+                                                               Foreground="#00E5FF" VerticalAlignment="Center" CharacterSpacing="80"/>
                                                 </StackPanel>
-                                            </StackPanel>
-                                        </StackPanel>
-
-                                        <!-- Graph Area -->
-                                        <Grid Grid.Row="2" Margin="0,0,0,10">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="40"/>
-                                            </Grid.ColumnDefinitions>
-
-                                            <!-- â”€â”€ Plot column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
-                                            <Grid Grid.Column="0">
-                                                <!-- Y-Axis Labels (named so code-behind updates them) -->
-                                                <Grid VerticalAlignment="Stretch" HorizontalAlignment="Left" Width="40" Margin="0,0,10,0">
-                                                    <TextBlock x:Name="YLabel75"  FontSize="10" Opacity="0.4" VerticalAlignment="Top"/>
-                                                    <TextBlock x:Name="YLabel50"  FontSize="10" Opacity="0.4" VerticalAlignment="Top" Margin="0,75,0,0"/>
-                                                    <TextBlock x:Name="YLabel25"  FontSize="10" Opacity="0.4" VerticalAlignment="Top" Margin="0,150,0,0"/>
-                                                    <TextBlock x:Name="YLabel0"   FontSize="10" Opacity="0.4" VerticalAlignment="Top" Margin="0,225,0,0"/>
-                                                    <TextBlock Text="0ms"         FontSize="10" Opacity="0.4" VerticalAlignment="Bottom"/>
-                                                </Grid>
-
-                                                <!-- Grid Lines -->
-                                                <Canvas Margin="40,0,12,0" Opacity="0.08" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-                                                    <Line X1="0" Y1="0"   X2="2000" Y2="0"   Stroke="White" StrokeThickness="1"/>
-                                                    <Line X1="0" Y1="75"  X2="2000" Y2="75"  Stroke="White" StrokeThickness="1"/>
-                                                    <Line X1="0" Y1="150" X2="2000" Y2="150" Stroke="White" StrokeThickness="1"/>
-                                                    <Line X1="0" Y1="225" X2="2000" Y2="225" Stroke="White" StrokeThickness="1"/>
-                                                    <Line X1="0" Y1="300" X2="2000" Y2="300" Stroke="White" StrokeThickness="1"/>
-                                                </Canvas>
-
-                                                <!-- Plot Layers -->
-                                                <Canvas x:Name="LatencyCanvas" Margin="40,0,12,0" Background="Transparent" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-                                                    <Polyline x:Name="UnityPath" Stroke="#0078D7" StrokeThickness="2" StrokeLineJoin="Round"/>
-                                                    <Ellipse x:Name="PeakDot" Width="8" Height="8" Fill="#FF4B6EFF" Stroke="White" StrokeThickness="1.5"
-                                                             Visibility="Collapsed" Canvas.Left="0" Canvas.Top="0"/>
-                                                    <TextBlock x:Name="PeakLabel" Text="" FontSize="10" FontWeight="Bold" Foreground="#AACCFF"
-                                                               Visibility="Collapsed" Canvas.Left="0" Canvas.Top="0"/>
-                                                </Canvas>
-                                            </Grid>
-
-                                            <!-- â”€â”€ Scale slider column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ -->
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Stretch" HorizontalAlignment="Center" Spacing="4">
-                                                <TextBlock x:Name="ScaleLabel" Text="300ms" FontSize="9" Opacity="0.5" HorizontalAlignment="Center"/>
-                                                <Slider x:Name="LatencyScaleSlider"
-                                                        Orientation="Vertical"
-                                                        Minimum="10" Maximum="300" Value="150"
-                                                        TickFrequency="10" StepFrequency="5"
-                                                        Height="270"
-                                                        HorizontalAlignment="Center"
-                                                        ValueChanged="LatencyScaleSlider_ValueChanged"/>
-                                            </StackPanel>
-                                        </Grid>
-
-
-                                        <!-- Stats Panel -->
-                                        <Grid Grid.Row="4" Margin="40,16,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-
-                                            <!-- Quest Stats -->
-                                            <StackPanel Grid.Column="0" Spacing="4">
-                                                <TextBlock Text="QUEST LATENCY" FontSize="11" FontWeight="Bold" Opacity="0.6" Foreground="#0078D7"/>
-                                                <StackPanel Orientation="Horizontal" Spacing="16">
-                                                    <StackPanel>
-                                                        <TextBlock Text="MIN" FontSize="9" Opacity="0.4"/>
-                                                        <TextBlock x:Name="QuestMinText" Text="-- ms" FontSize="13"/>
-                                                    </StackPanel>
-                                                    <StackPanel>
-                                                        <TextBlock Text="MAX" FontSize="9" Opacity="0.4"/>
-                                                        <TextBlock x:Name="QuestMaxText" Text="-- ms" FontSize="13"/>
-                                                    </StackPanel>
-                                                    <StackPanel>
-                                                        <TextBlock Text="AVG" FontSize="9" Opacity="0.4"/>
-                                                        <TextBlock x:Name="QuestAvgText" Text="-- ms" FontSize="13" FontWeight="SemiBold"/>
-                                                    </StackPanel>
-                                                </StackPanel>
-                                            </StackPanel>
-
-                                        </Grid>
-                                        <!-- /Stats Panel -->
-
-                                        <!-- X-Axis Time Labels -->
-                                        <Grid Grid.Row="3" Margin="40,8,52,0" HorizontalAlignment="Stretch">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                                <ColumnDefinition Width="*"/>
-                                            </Grid.ColumnDefinitions>
-                                            <TextBlock Grid.Column="0" Text="âˆ’2 min" FontSize="9" Opacity="0.30" HorizontalAlignment="Left"/>
-                                            <TextBlock Grid.Column="1" Text="âˆ’90 s"  FontSize="9" Opacity="0.30" HorizontalAlignment="Center"/>
-                                            <TextBlock Grid.Column="2" Text="âˆ’60 s"  FontSize="9" Opacity="0.30" HorizontalAlignment="Center"/>
-                                            <TextBlock Grid.Column="3" Text="âˆ’30 s"  FontSize="9" Opacity="0.30" HorizontalAlignment="Center"/>
-                                            <TextBlock Grid.Column="4" Text="now"    FontSize="9" Opacity="0.30" HorizontalAlignment="Right"/>
-                                        </Grid>
-
+                                            </Border>
+                                        </Button>
                                     </Grid>
-                                    <!-- /Latency card inner Grid -->
+                                </Border>
+                            </Grid>
+
+                            <!-- Camera Preview + Library shortcut -->
+                            <Grid Grid.Column="1">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Text="Operator Camera" Style="{StaticResource Text.Headline3}"
+                                           Margin="0,0,0,6"/>
+
+                                <Border Grid.Row="1" Background="#0A0A0A" CornerRadius="8"
+                                        BorderBrush="#1E1E1E" BorderThickness="1">
+                                    <Image x:Name="ContextWebcamPreview" Stretch="Uniform"/>
                                 </Border>
 
+                                <!-- Library shortcut at bottom of camera column -->
+                                <Button Grid.Row="2" Click="OpenLibraryFolder_Click"
+                                        HorizontalAlignment="Stretch" Margin="0,6,0,0"
+                                        Background="Transparent" BorderBrush="#333333" BorderThickness="1"
+                                        Foreground="#AAAAAA" Padding="10,6">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE8B7;" FontSize="13" Foreground="#AAAAAA"/>
+                                        <TextBlock Text="Open Asset Folder" FontSize="12" Foreground="#AAAAAA"/>
+                                    </StackPanel>
+                                </Button>
                             </Grid>
-                        </ScrollViewer>
-                    </Border>
-                </Grid>
+                        </Grid>
 
+                    </Grid>
+                </Border>
+            </ScrollViewer>
 
+            <!-- ───────────────────────────────────────────────────────
+                 SETTINGS OVERLAY (slides in over the dashboard)
+                 ─────────────────────────────────────────────────────── -->
+            <Grid x:Name="SettingsOverlay" Visibility="Collapsed" Background="#E8090912">
+                <!-- Clicking the backdrop dismisses settings -->
+                <Rectangle Fill="Transparent" Tapped="SettingsOverlayBackdrop_Tapped"/>
+                <Border HorizontalAlignment="Right" Width="520"
+                        Background="{StaticResource Brush.Background.Card}"
+                        BorderBrush="#1AFFFFFF" BorderThickness="1,0,0,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
 
-
-                <!-- 7. 3D SCENE PREVIEW VIEW -->
-                <Grid x:Name="Preview3DView" Visibility="Collapsed">
-                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="24">
-                        <TextBlock Text="WEBXR DIGITAL TWIN" FontSize="18" FontWeight="SemiBold" Foreground="{StaticResource Brush.Primary}" HorizontalAlignment="Center"/>
-                        <TextBlock Text="The 3D preview engine has been detached from the Hub and is running as an external WebXR service." Opacity="0.7" HorizontalAlignment="Center"/>
-                        
-                        <Border Background="#15FFFFFF" CornerRadius="8" Padding="20">
-                            <TextBlock x:Name="Scene3dUrlText" FontFamily="Consolas" FontSize="18" IsTextSelectionEnabled="True" Foreground="#A9F" HorizontalAlignment="Center" Text="Starting server..."/>
+                        <!-- Settings header -->
+                        <Border Padding="20,14" BorderBrush="#1AFFFFFF" BorderThickness="0,0,0,1">
+                            <Grid>
+                                <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                    <FontIcon Glyph="&#xE713;" FontSize="18" Foreground="{StaticResource Brush.Primary}"/>
+                                    <TextBlock Text="Settings" Style="{StaticResource Text.Headline2}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <Button HorizontalAlignment="Right" Click="SettingsToggleBtn_Click"
+                                        Background="Transparent" BorderThickness="0" Padding="8"
+                                        ToolTipService.ToolTip="Close settings">
+                                    <FontIcon Glyph="&#xE711;" FontSize="14" Foreground="#AAAAAA"/>
+                                </Button>
+                            </Grid>
                         </Border>
 
-                        <StackPanel Orientation="Horizontal" Spacing="16" HorizontalAlignment="Center">
-                            <Button x:Name="CopyScene3dUrlBtn" Click="CopyScene3dUrlBtn_Click" Style="{StaticResource Button.Filled}" Padding="16,8">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <FontIcon Glyph="&#xE8C8;" FontSize="14"/>
-                                    <TextBlock Text="Copy URL"/>
-                                </StackPanel>
-                            </Button>
-                            <Button x:Name="OpenScene3dBtn" Click="OpenScene3dBtn_Click" Style="{StaticResource Button.Filled}" Padding="16,8">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <FontIcon Glyph="&#xE8A7;" FontSize="14"/>
-                                    <TextBlock Text="Open in Browser"/>
-                                </StackPanel>
-                            </Button>
-                        </StackPanel>
-                    </StackPanel>
-                </Grid>
+                        <!-- Settings content (reused from old SettingsView) -->
+                        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                            <StackPanel Spacing="{StaticResource Space.24}" Padding="20" MaxWidth="480">
 
-                <!-- 7. SETTINGS VIEW -->
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Orange LLM Proxy API Key" Style="{StaticResource Text.Body1}"/>
+                                    <PasswordBox x:Name="OrangeApiKeyInput" PlaceholderText="sk-..." HorizontalAlignment="Stretch"/>
+                                    <TextBlock Text="Required for Scene Understanding and Voice Transcription." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
 
+                                    <TextBlock Text="Orange / Whisper API URL" Style="{StaticResource Text.Body1}" Margin="0,10,0,0"/>
+                                    <TextBox x:Name="OrangeApiUrlInput" PlaceholderText="https://llmproxy.ai.orange" HorizontalAlignment="Stretch"/>
+                                    <TextBlock Text="Base URL for the Whisper speech-to-text endpoint." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,8"/>
 
+                                    <TextBlock Text="Google Gemini API Key" Style="{StaticResource Text.Body1}"/>
+                                    <PasswordBox x:Name="GeminiApiKeyInput" PlaceholderText="AIza..." HorizontalAlignment="Stretch"/>
+                                    <TextBlock Text="Required for Banana Pro 2 Generation." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,8"/>
 
-                <Grid x:Name="SettingsView" Visibility="Collapsed">
-                    <Border Padding="{StaticResource Padding.Page}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
-                        <StackPanel Spacing="{StaticResource Space.24}" MaxWidth="600" HorizontalAlignment="Left">
+                                    <TextBlock Text="Advanced Banana AI Config" Style="{StaticResource Text.Body1}" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                    <TextBlock Text="Google Gemini Model" Style="{StaticResource Text.Caption}" FontWeight="SemiBold"/>
+                                    <ComboBox x:Name="BananaModelComboBox" HorizontalAlignment="Stretch" SelectionChanged="BananaModelComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="Gemini 2.5 Flash Image ($0.039/img)"/>
+                                        <ComboBoxItem Content="Gemini 3.1 Flash Image Preview ($0.067/img)"/>
+                                        <ComboBoxItem Content="Gemini 3 Pro Image Preview ($0.134/img)"/>
+                                    </ComboBox>
 
-                            <!-- AI Settings -->
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Orange LLM Proxy API Key" Style="{StaticResource Text.Body1}"/>
-                                <PasswordBox x:Name="OrangeApiKeyInput" PlaceholderText="sk-..." Width="400" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Required for Context features (Scene Understanding) and Voice Transcription." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
+                                    <TextBlock Text="Asset Canvas Framing (%)" Style="{StaticResource Text.Caption}" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Slider x:Name="BananaScaleSlider" Width="280" Minimum="0.1" Maximum="1.0" StepFrequency="0.05" Value="{Binding CameraFovScale}"/>
+                                        <TextBlock x:Name="BananaScaleText" Text="60%" VerticalAlignment="Center"/>
+                                    </StackPanel>
 
-                                <TextBlock Text="Orange / Whisper API URL" Style="{StaticResource Text.Body1}" Margin="0,12,0,0"/>
-                                <TextBox x:Name="OrangeApiUrlInput" PlaceholderText="https://llmproxy.ai.orange" Width="400" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Base URL for the Whisper speech-to-text endpoint (no trailing slash)." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,16"/>
-                                
-                                <TextBlock Text="Google Gemini API Key" Style="{StaticResource Text.Body1}"/>
-                                <PasswordBox x:Name="GeminiApiKeyInput" PlaceholderText="AIza..." Width="400" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Required for Banana Pro 2 Generation." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,16"/>
+                                    <TextBlock Text="Custom Extraction Prompt" Style="{StaticResource Text.Caption}" FontWeight="SemiBold" Margin="0,8,0,0"/>
+                                    <TextBox x:Name="BananaPromptTextBox" HorizontalAlignment="Stretch" Height="100" TextWrapping="Wrap" AcceptsReturn="True"/>
+                                    <TextBlock Text="Customize how Gemini extracts objects. Supports {Object} and {Color}." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,8"/>
 
-                                <TextBlock Text="Advanced Banana AI Config" Style="{StaticResource Text.Body1}" FontWeight="SemiBold" Margin="0,8,0,0"/>
-
-                                <TextBlock Text="Google Gemini Model" Style="{StaticResource Text.Caption}" FontWeight="SemiBold"/>
-                                <ComboBox x:Name="BananaModelComboBox" Width="400" HorizontalAlignment="Left" SelectionChanged="BananaModelComboBox_SelectionChanged">
-                                    <ComboBoxItem Content="Gemini 2.5 Flash Image ($0.039/img)"/>
-                                    <ComboBoxItem Content="Gemini 3.1 Flash Image Preview ($0.067/img)"/>
-                                    <ComboBoxItem Content="Gemini 3 Pro Image Preview ($0.134/img)"/>
-                                </ComboBox>
-                                
-                                <TextBlock Text="Asset Canvas Framing (%)" Style="{StaticResource Text.Caption}" FontWeight="SemiBold" Margin="0,8,0,0"/>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Slider x:Name="BananaScaleSlider" Width="300" Minimum="0.1" Maximum="1.0" StepFrequency="0.05" Value="{Binding CameraFovScale}"/>
-                                    <TextBlock x:Name="BananaScaleText" Text="60%" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Tripo3D Cloud API Key" Style="{StaticResource Text.Body1}"/>
+                                    <PasswordBox x:Name="TripoApiKeyInput" PlaceholderText="tsk_..." HorizontalAlignment="Stretch"/>
+                                    <TextBlock Text="Required for 3D Model generation via Tripo3D cloud API." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,8"/>
                                 </StackPanel>
 
-                                <TextBlock Text="Custom Extraction Prompt" Style="{StaticResource Text.Caption}" FontWeight="SemiBold" Margin="0,8,0,0"/>
-                                <TextBox x:Name="BananaPromptTextBox" Width="600" Height="120" TextWrapping="Wrap" AcceptsReturn="True" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Customize how Gemini extracts the object. Supports {Object} and {Color} overrides." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,16"/>
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Relay Server Port" Style="{StaticResource Text.Body1}"/>
+                                    <TextBox x:Name="RelayPortInput" PlaceholderText="5000" HorizontalAlignment="Stretch"/>
+                                </StackPanel>
 
-                                <TextBlock Text="Tripo3D Cloud API Key" Style="{StaticResource Text.Body1}"/>
-                                <PasswordBox x:Name="TripoApiKeyInput" PlaceholderText="tsk_..." Width="400" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Required for 3D Model generation via Tripo3D cloud API." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,8"/>
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Robot 1 IP Address (ROS Bridge)" Style="{StaticResource Text.Body1}"/>
+                                    <TextBox x:Name="RobotIpInput" PlaceholderText="ws://169.254.200.200:9090" HorizontalAlignment="Stretch"/>
+                                </StackPanel>
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Robot 2 IP Address (ROS Bridge)" Style="{StaticResource Text.Body1}"/>
+                                    <TextBox x:Name="Robot2IpInput" PlaceholderText="ws://169.254.200.201:9090" HorizontalAlignment="Stretch"/>
+                                </StackPanel>
 
+                                <Button x:Name="SaveSettingsButton" Content="SAVE SETTINGS"
+                                        Style="{StaticResource Button.Filled}" HorizontalAlignment="Left"
+                                        Click="SaveSettingsButton_Click" Margin="0,8,0,32"/>
                             </StackPanel>
-
-                            <!-- Relay Settings -->
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Relay Server Port" Style="{StaticResource Text.Body1}"/>
-                                <TextBox x:Name="RelayPortInput" PlaceholderText="5000" MinWidth="300"/>
-                                <TextBlock Text="The internal port where the relay server listens." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
-                            </StackPanel>
-
-
-
-                            <!-- Robot Settings -->
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Robot 1 IP Address (ROS Bridge)" Style="{StaticResource Text.Body1}"/>
-                                <TextBox x:Name="RobotIpInput" PlaceholderText="ws://169.254.200.200:9090" MinWidth="300"/>
-                            </StackPanel>
-
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Robot 2 IP Address (ROS Bridge)" Style="{StaticResource Text.Body1}"/>
-                                <TextBox x:Name="Robot2IpInput" PlaceholderText="ws://169.254.200.201:9090" MinWidth="300"/>
-                            </StackPanel>
-
-
-
-                            <Button x:Name="SaveSettingsButton" Content="SAVE" Style="{StaticResource Button.Filled}" HorizontalAlignment="Left" Click="SaveSettingsButton_Click" Margin="0,16,0,32"/>
-
-                        </StackPanel>
                         </ScrollViewer>
-                    </Border>
-                </Grid>
+                    </Grid>
+                </Border>
             </Grid>
-        </NavigationView>
 
-        <!-- Hidden calibration stubs (named elements required by C# code-behind).
-             These are never visible — all UI is now in the HTML top-bar dropdown. -->
+        </Grid>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             HIDDEN STUBS — named elements still referenced by C#
+             Never rendered but must exist for compilation
+             ═══════════════════════════════════════════════════════════ -->
         <StackPanel Visibility="Collapsed" IsHitTestVisible="False">
-            <ComboBox x:Name="CalibCameraComboBox"
-                      SelectionChanged="CalibCameraComboBox_SelectionChanged"/>
-            <Button x:Name="StartCalibDetectionBtn"
-                    Click="StartCalibDetectionBtn_Click"/>
-            <ToggleSwitch x:Name="ShowCalibrationPlaneToggle"
-                          IsOn="True"
-                          Toggled="ShowCalibrationPlaneToggle_Toggled"/>
-            <Slider x:Name="CameraFeedOpacitySlider"
-                    Minimum="0" Maximum="1" Value="0.85"
-                    ValueChanged="CameraFeedOpacitySlider_ValueChanged"/>
+            <!-- Navigation stubs -->
+            <NavigationView x:Name="NavView" IsSettingsVisible="False">
+                <NavigationView.MenuItems>
+                    <NavigationViewItem Content="Dashboard" Tag="home"/>
+                    <NavigationViewItem Content="Context" Tag="context"/>
+                    <NavigationViewItem Content="3D Preview" Tag="preview3d"/>
+                </NavigationView.MenuItems>
+                <Grid/>
+            </NavigationView>
+            <!-- View stubs -->
+            <Grid x:Name="DashboardView"/>
+            <Grid x:Name="ContextView"/>
+            <Grid x:Name="Preview3DView"/>
+            <Grid x:Name="SettingsView"/>
+
+            <!-- Telemetry stubs -->
+            <TextBlock x:Name="TelemJoints"/>
+            <TextBlock x:Name="TelemJoints2"/>
+            <TextBlock x:Name="TelemFps"/>
+            <TextBlock x:Name="TelemTotalImages"/>
+            <TextBlock x:Name="TelemIKPos"/>
+            <TextBlock x:Name="TelemIKPos2"/>
+            <TextBlock x:Name="TelemIKRot"/>
+            <TextBlock x:Name="TelemIKRot2"/>
+            <TextBlock x:Name="TelemOperatorFps"/>
+            <TextBlock x:Name="TelemOperatorTotalImages"/>
+
+            <!-- Network stubs -->
+            <TextBlock x:Name="NetworkStatusText"/>
+            <TextBlock x:Name="HubIpText"/>
+            <TextBlock x:Name="HubLocText"/>
+            <TextBlock x:Name="HubRelayText"/>
+            <TextBlock x:Name="QuestIpText"/>
+            <TextBlock x:Name="QuestLocText"/>
+            <TextBlock x:Name="QuestRelayText"/>
+            <Ellipse  x:Name="QuestRelayDot" Width="1" Height="1"/>
+            <TextBlock x:Name="R1IpText"/>
+            <TextBlock x:Name="R1LocText"/>
+            <TextBlock x:Name="R1RelayText"/>
+            <Ellipse  x:Name="R1RelayDot" Width="1" Height="1"/>
+            <TextBlock x:Name="R2IpText"/>
+            <TextBlock x:Name="R2LocText"/>
+            <TextBlock x:Name="R2RelayText"/>
+            <Ellipse  x:Name="R2RelayDot" Width="1" Height="1"/>
+            <Canvas x:Name="LatencyCanvas" Width="1" Height="1">
+                <Polyline x:Name="UnityPath"/>
+                <Ellipse  x:Name="PeakDot" Width="1" Height="1"/>
+                <TextBlock x:Name="PeakLabel"/>
+            </Canvas>
+            <Slider x:Name="LatencyScaleSlider" Minimum="10" Maximum="300" Value="150"
+                    ValueChanged="LatencyScaleSlider_ValueChanged"/>
+            <TextBlock x:Name="ScaleLabel"/>
+            <TextBlock x:Name="YLabel75"/>
+            <TextBlock x:Name="YLabel50"/>
+            <TextBlock x:Name="YLabel25"/>
+            <TextBlock x:Name="YLabel0"/>
+            <TextBlock x:Name="QuestMinText"/>
+            <TextBlock x:Name="QuestMaxText"/>
+            <TextBlock x:Name="QuestAvgText"/>
+
+            <!-- Context view stubs (still used by C# camera feed code) -->
+            <GridView x:Name="DetectedObjectsList" SelectionMode="None">
+                <GridView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <StackPanel Margin="8" Opacity="{Binding PreviewOpacity}">
+                                <Button Click="AddSelectedObject_Click" Tag="{Binding Name}" Padding="0" Background="Transparent" BorderThickness="0">
+                                    <Border CornerRadius="8" BorderBrush="{Binding ColorBrush}" BorderThickness="3" Background="#0A0A0A" Width="200" Height="200">
+                                        <Image Source="{Binding CroppedImage}" Stretch="Uniform"/>
+                                    </Border>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </DataTemplate>
+                </GridView.ItemTemplate>
+            </GridView>
+            <GridView x:Name="SelectedObjectsList" SelectionMode="None">
+                <GridView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <StackPanel Margin="8">
+                                <Border CornerRadius="8" BorderBrush="{Binding ColorBrush}" BorderThickness="3" Background="#0A0A0A" Width="80" Height="80">
+                                    <Image Source="{Binding CroppedImage}" Stretch="Uniform"/>
+                                </Border>
+                            </StackPanel>
+                            <Button Content="&#xE711;" FontFamily="Segoe MDL2 Assets" FontSize="10"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top"
+                                    Margin="0,4,4,0" Width="20" Height="20" CornerRadius="10" Padding="0"
+                                    HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                    Background="#CC000000" Foreground="White" BorderThickness="0"
+                                    Click="RemoveSelectedObject_Click" Tag="{Binding Name}"/>
+                        </Grid>
+                    </DataTemplate>
+                </GridView.ItemTemplate>
+            </GridView>
+
+            <!-- Library view stubs -->
+            <Grid x:Name="NetworkView"/>
+            <TextBlock x:Name="NetworkStatusStub"/>
+
+            <!-- Calibration stubs -->
+            <ComboBox x:Name="CalibCameraComboBox" SelectionChanged="CalibCameraComboBox_SelectionChanged"/>
+            <Button x:Name="StartCalibDetectionBtn" Click="StartCalibDetectionBtn_Click"/>
+            <ToggleSwitch x:Name="ShowCalibrationPlaneToggle" IsOn="True" Toggled="ShowCalibrationPlaneToggle_Toggled"/>
+            <Slider x:Name="CameraFeedOpacitySlider" Minimum="0" Maximum="1" Value="0.85" ValueChanged="CameraFeedOpacitySlider_ValueChanged"/>
             <Image x:Name="CalibCameraPreview"/>
             <StackPanel x:Name="CalibOfflineState"/>
             <Border x:Name="CalibDetectionBanner" Visibility="Collapsed">
@@ -1206,8 +660,68 @@
                     <TextBlock x:Name="CalibDetectionStatus" Text="Grid not detected"/>
                 </StackPanel>
             </Border>
-            <ToggleSwitch x:Name="FreezeCalibToggle"
-                          Toggled="FreezeCalibToggle_Toggled"/>
+            <ToggleSwitch x:Name="FreezeCalibToggle" Toggled="FreezeCalibToggle_Toggled"/>
+
+            <!-- Library list (still used by C#) -->
+            <ListView x:Name="LibraryList" SelectionMode="None">
+                <ListView.ItemContainerStyle>
+                    <Style TargetType="ListViewItem">
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                    </Style>
+                </ListView.ItemContainerStyle>
+                <ListView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="100"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="200"/>
+                                <ColumnDefinition Width="150"/>
+                                <ColumnDefinition Width="80"/>
+                                <ColumnDefinition Width="60"/>
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Width="60" Height="60" Padding="0" Background="Transparent" BorderThickness="0">
+                                <Border CornerRadius="6" BorderBrush="{Binding ColorBrush}" BorderThickness="2" Background="#0A0A0A" Width="60" Height="60">
+                                    <Image Source="{Binding ImageSource}" Stretch="Uniform"/>
+                                </Border>
+                                <Button.Flyout>
+                                    <Flyout Placement="BottomEdgeAlignedLeft">
+                                        <Image Source="{Binding ImageSource}" Stretch="Uniform" MaxWidth="400" MaxHeight="400"/>
+                                    </Flyout>
+                                </Button.Flyout>
+                            </Button>
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" FontWeight="SemiBold" FontSize="16" Foreground="{Binding ColorBrush}"/>
+                            <TextBlock Grid.Column="2" Text="{Binding DateAdded}" VerticalAlignment="Center" Foreground="#888"/>
+                            <Button Grid.Column="3" Content="To 3D Model" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                    Style="{StaticResource Button.Filled}" Click="Generate3DModel_Click" Loaded="Generate3DModel_Loaded"/>
+                            <Button Grid.Column="4" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                    Background="Transparent" BorderThickness="0" Padding="4"
+                                    Click="Preview3DModel_Click" ToolTipService.ToolTip="View 3D Model">
+                                <TextBlock Text="&#xE8B9;" FontFamily="Segoe MDL2 Assets" FontSize="22" Foreground="#5599FF"
+                                           Loaded="Preview3DBtn_Loaded"/>
+                            </Button>
+                            <Button Grid.Column="5" Content="&#xE74D;" FontFamily="Segoe MDL2 Assets"
+                                    VerticalAlignment="Center" HorizontalAlignment="Center"
+                                    Background="Transparent" Foreground="#888" BorderThickness="0"
+                                    Click="DeleteLibraryObject_Click" Tag="{Binding Name}"/>
+                        </Grid>
+                    </DataTemplate>
+                </ListView.ItemTemplate>
+            </ListView>
+
+            <!-- Banana images list stub -->
+            <GridView x:Name="BananaImagesList" SelectionMode="None">
+                <GridView.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Margin="8">
+                            <TextBlock Text="{Binding Name}" FontWeight="Bold" FontSize="14" Foreground="{Binding ColorBrush}" Margin="0,0,0,4"/>
+                            <Border CornerRadius="8" BorderBrush="#333333" BorderThickness="1" Background="#0A0A0A" Width="200" Height="200">
+                                <Image Source="{Binding ImageSource}" Stretch="Uniform"/>
+                            </Border>
+                        </StackPanel>
+                    </DataTemplate>
+                </GridView.ItemTemplate>
+            </GridView>
         </StackPanel>
 
     </Grid>
