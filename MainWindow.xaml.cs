@@ -168,6 +168,7 @@ namespace RobotControllerApp
             RobotIpInput.Text = _settings.RobotIp;
             Robot2IpInput.Text = _settings.Robot2Ip;
             OrangeApiKeyInput.Password = _settings.OrangeApiKey;
+            OrangeApiUrlInput.Text = _settings.OrangeApiUrl;
             GeminiApiKeyInput.Password = _settings.GeminiApiKey;
             TripoApiKeyInput.Password = _settings.TripoApiKey;
             // CameraFovSlider.Value = _settings.CameraFovScale; // control removed from XAML
@@ -1040,8 +1041,13 @@ namespace RobotControllerApp
                 _settings.RobotIp = RobotIpInput.Text.Trim();
                 _settings.Robot2Ip = Robot2IpInput.Text.Trim();
                 _settings.OrangeApiKey = OrangeApiKeyInput.Password.Trim();
+                _settings.OrangeApiUrl = OrangeApiUrlInput.Text.Trim();
                 _settings.GeminiApiKey = GeminiApiKeyInput.Password.Trim();
                 _settings.TripoApiKey = TripoApiKeyInput.Password.Trim();
+
+                // Update running broadcast server's Whisper credentials live
+                _broadcastServer.WhisperApiKey = _settings.OrangeApiKey;
+                _broadcastServer.WhisperApiUrl = _settings.OrangeApiUrl;
 
                 if (BananaModelComboBox.SelectedIndex == 1) _settings.BananaModel = "gemini-3.1-flash-image-preview";
                 else if (BananaModelComboBox.SelectedIndex == 2) _settings.BananaModel = "gemini-3-pro-image-preview";
@@ -1415,6 +1421,8 @@ namespace RobotControllerApp
                 {
                     _broadcastServer.AssetsPath = assetsDir;
                     _broadcastServer.LibraryPath = LibraryPath;
+                    _broadcastServer.WhisperApiUrl = _settings.OrangeApiUrl;
+                    _broadcastServer.WhisperApiKey = _settings.OrangeApiKey;
 
                     // When a new remote browser connects, push the current state as a snapshot
                     _broadcastServer.OnClientConnected += async () =>
@@ -3405,6 +3413,25 @@ namespace RobotControllerApp
                 {
                     isSetJoints = true;
                     jointsJsCall = BuildSetRobotJointsJs(payload);
+                }
+
+                // Voice transcription from the WebXR panel —
+                // log the result and broadcast it to all connected clients so
+                // the Quest display and hub stay in sync.
+                if (type == "voiceTranscription")
+                {
+                    string transcribedText = payload.ValueKind == System.Text.Json.JsonValueKind.String
+                        ? payload.GetString() ?? ""
+                        : payload.GetRawText().Trim('"');
+
+                    if (!string.IsNullOrWhiteSpace(transcribedText))
+                    {
+                        Log($"[Voice] Transcription: {transcribedText}");
+                        // Broadcast the result so all connected browsers (Quest + hub) display it
+                        _ = _broadcastServer.BroadcastAsync("voiceTranscription",
+                            System.Text.Json.JsonSerializer.Serialize(transcribedText));
+                    }
+                    return; // No UI dispatch needed
                 }
 
                 DispatcherQueue.TryEnqueue(() =>

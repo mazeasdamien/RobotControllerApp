@@ -27,6 +27,9 @@ namespace RobotControllerApp.Services
         /// <summary>The Orange API Key.</summary>
         public string OrangeApiKey { get; set; } = "";
 
+        /// <summary>The Orange / Whisper API base URL.</summary>
+        public string OrangeApiUrl { get; set; } = "https://llmproxy.ai.orange";
+
         /// <summary>The Google Gemini API Key.</summary>
         public string GeminiApiKey { get; set; } = "";
 

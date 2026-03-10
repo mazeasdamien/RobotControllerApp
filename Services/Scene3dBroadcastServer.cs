@@ -8,6 +8,7 @@ using Microsoft.Extensions.Hosting;
 using System;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Net.Http;
 using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -42,6 +43,12 @@ namespace RobotControllerApp.Services
 
         /// <summary>Full path to the Library folder that contains .glb model files.</summary>
         public string LibraryPath { get; set; } = string.Empty;
+
+        /// <summary>Base URL of the Orange Whisper API (e.g. https://api.orange.com/ai).</summary>
+        public string WhisperApiUrl { get; set; } = string.Empty;
+
+        /// <summary>Bearer token / API key for the Orange Whisper API.</summary>
+        public string WhisperApiKey { get; set; } = string.Empty;
 
         // ── Events / Logging ─────────────────────────────────────────────────────
 
@@ -92,6 +99,13 @@ namespace RobotControllerApp.Services
                 {
                     options.AddDefaultPolicy(policy =>
                         policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+                });
+
+                // Allow up to 50 MB audio uploads for voice transcription
+                builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(opt =>
+                {
+                    opt.MultipartBodyLengthLimit = 50 * 1024 * 1024; // 50 MB
+                    opt.ValueLengthLimit = int.MaxValue;
                 });
 
                 var app = builder.Build();
@@ -177,6 +191,79 @@ namespace RobotControllerApp.Services
                 {
                     context.Response.Redirect("/preview.html");
                     return Task.CompletedTask;
+                });
+
+                // ── /transcribe — proxy audio to Orange Whisper API ───────────────
+                app.MapPost("/transcribe", async context =>
+                {
+                    if (!context.Request.HasFormContentType)
+                    {
+                        context.Response.StatusCode = 400;
+                        await context.Response.WriteAsync("Multipart form required");
+                        return;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(WhisperApiUrl) || string.IsNullOrWhiteSpace(WhisperApiKey))
+                    {
+                        context.Response.StatusCode = 503;
+                        await context.Response.WriteAsync("Whisper API not configured (set OrangeApiKey and WhisperApiUrl)");
+                        return;
+                    }
+
+                    IFormFile? audioFile = null;
+                    try
+                    {
+                        var form = await context.Request.ReadFormAsync();
+                        audioFile = form.Files.GetFile("file");
+                    }
+                    catch (Exception ex)
+                    {
+                        context.Response.StatusCode = 400;
+                        await context.Response.WriteAsync($"Form parse error: {ex.Message}");
+                        return;
+                    }
+
+                    if (audioFile == null || audioFile.Length == 0)
+                    {
+                        context.Response.StatusCode = 400;
+                        await context.Response.WriteAsync("No audio file received");
+                        return;
+                    }
+
+                    try
+                    {
+                        using var httpClient = new HttpClient();
+                        httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {WhisperApiKey}");
+
+                        using var multipart = new MultipartFormDataContent();
+
+                        // Copy the audio stream into a MemoryStream so it can be sent
+                        using var ms = new MemoryStream();
+                        await audioFile.CopyToAsync(ms);
+                        ms.Position = 0;
+
+                        var audioContent = new ByteArrayContent(ms.ToArray());
+                        audioContent.Headers.ContentType =
+                            new System.Net.Http.Headers.MediaTypeHeaderValue(
+                                audioFile.ContentType ?? "audio/webm");
+                        multipart.Add(audioContent, "file", audioFile.FileName ?? "audio.webm");
+                        multipart.Add(new StringContent("openai/whisper-1"), "model");
+
+                        var apiEndpoint = WhisperApiUrl.TrimEnd('/') + "/v1/audio/transcriptions";
+                        var response = await httpClient.PostAsync(apiEndpoint, multipart);
+
+                        string responseBody = await response.Content.ReadAsStringAsync();
+
+                        context.Response.StatusCode = (int)response.StatusCode;
+                        context.Response.ContentType = "application/json";
+                        await context.Response.WriteAsync(responseBody);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"Transcribe error: {ex.Message}");
+                        context.Response.StatusCode = 500;
+                        await context.Response.WriteAsync($"Transcription proxy error: {ex.Message}");
+                    }
                 });
 
                 Log($"3D Preview server started on http://*:{Port}  →  open http://YOUR_PC_IP:{Port}/ on the Quest");
