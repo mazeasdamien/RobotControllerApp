@@ -672,6 +672,23 @@ namespace RobotControllerApp
                                         if (ContextView.Visibility == Visibility.Visible) ContextWebcamPreview.Source = bitmap;
                                     }
 
+                                    if (!_feedFrozen)
+                                    {
+                                        string b64 = Convert.ToBase64String(frameBytes);
+                                        string js = $"if (window.updateCameraFeed) window.updateCameraFeed('data:image/jpeg;base64,{b64}');";
+                                        
+                                        if (_webViewReady)
+                                        {
+                                            _ = SceneWebView.ExecuteScriptAsync(js);
+                                        }
+                                        
+                                        if (_broadcastServer != null && _broadcastServer.ConnectedClients > 0)
+                                        {
+                                            string payloadJson = System.Text.Json.JsonSerializer.Serialize($"data:image/jpeg;base64,{b64}");
+                                            _ = _broadcastServer.BroadcastAsync("updateCameraFeed", payloadJson);
+                                        }
+                                    }
+
                                     _latestWebcamFrameBytes = frameBytes;
                                 }
                                 catch { }
@@ -3165,7 +3182,7 @@ namespace RobotControllerApp
             {
                 try
                 {
-                    if (!_isCalibFrozen && !_feedFrozen)
+                    if (!_feedFrozen)
                     {
                         string b64 = Convert.ToBase64String(jpeg);
                         string js = $"if (window.updateCameraFeed) window.updateCameraFeed('data:image/jpeg;base64,{b64}');";

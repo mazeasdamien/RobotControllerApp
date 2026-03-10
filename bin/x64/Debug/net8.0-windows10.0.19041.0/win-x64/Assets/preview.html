@@ -853,7 +853,6 @@
   <div id="fk-panel">
     <div id="fk-header" class="drag-handle">
       <div id="fk-header-left"> <span id="fk-header-text">Control Panel</span>
-        <span id="fk-live-pill">LIVE</span>
       </div>
       <button id="fk-collapse-btn" onclick="toggleFkPanel()" title="Collapse">▾</button>
     </div>
@@ -891,7 +890,7 @@
             oninput="onCalibFov(this.value)">
         </div>
         <div class="cp-slider-row">
-          <span class="cp-slider-label">Cam Opacity</span>
+          <span class="cp-slider-label">Live Feed Opacity</span>
           <input class="cp-slider" type="range" min="0" max="1" step="0.05" value="0.65"
             oninput="onCalibOpacity(this.value)">
         </div>
@@ -1187,11 +1186,11 @@
     // Add 80cm labels for width and length
     const labelX = makeTextSprite("X: 80 cm");
     labelX.position.set(TABLE_CX, 0.02, TABLE_CZ + TABLE_D / 2 + 0.02);
-    scene.add(labelX);
+    // scene.add(labelX);
 
     const labelZ = makeTextSprite("Y: 80 cm");
     labelZ.position.set(TABLE_CX + TABLE_W / 2 + 0.03, 0.02, TABLE_CZ);
-    scene.add(labelZ);
+    // scene.add(labelZ);
 
     // ── Marker Board Representation (Real scale ~ 30cm x 18.9cm) ──
     const boardMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
@@ -1792,7 +1791,7 @@
           const q = new THREE.Quaternion();
 
           let renderAngle = FK_ANGLES[i];
-          if (i === 1) renderAngle -= 45; // J2
+          if (i === 1) renderAngle -= 40; // J2
           if (i === 2) renderAngle += 75; // J3
 
           q.setFromAxisAngle(JOINT_AXES[i], THREE.MathUtils.degToRad(renderAngle));

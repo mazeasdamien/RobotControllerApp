@@ -69,3 +69,4 @@
 0:00:01 Tab1 FinishNav2
 0:00:01 Tab1 PageLoad
 0:00:11 Memory Pressure: Critical
+0:13:26 Microsoft.UnloadController.IsUnclosableApp_IsNotWebApp
