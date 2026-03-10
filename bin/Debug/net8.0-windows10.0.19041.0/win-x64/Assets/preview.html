@@ -961,8 +961,15 @@
     }
 
     @keyframes ptt-pulse {
-      0%, 100% { box-shadow: 0 0 14px rgba(255, 60, 60, 0.25); }
-      50%       { box-shadow: 0 0 28px rgba(255, 60, 60, 0.5); }
+
+      0%,
+      100% {
+        box-shadow: 0 0 14px rgba(255, 60, 60, 0.25);
+      }
+
+      50% {
+        box-shadow: 0 0 28px rgba(255, 60, 60, 0.5);
+      }
     }
 
     #ptt-mic-icon {
@@ -976,8 +983,13 @@
     }
 
     @keyframes mic-bounce {
-      from { transform: scaleY(0.88); }
-      to   { transform: scaleY(1.12); }
+      from {
+        transform: scaleY(0.88);
+      }
+
+      to {
+        transform: scaleY(1.12);
+      }
     }
 
     /* Transcription output area */
@@ -1019,8 +1031,13 @@
       letter-spacing: 0.02em;
     }
 
-    #voice-status.error { color: #ff6666; }
-    #voice-status.success { color: #00cc6a; }
+    #voice-status.error {
+      color: #ff6666;
+    }
+
+    #voice-status.success {
+      color: #00cc6a;
+    }
 
     #voice-copy-btn {
       width: 100%;
@@ -1038,7 +1055,9 @@
       display: none;
     }
 
-    #voice-copy-btn.visible { display: block; }
+    #voice-copy-btn.visible {
+      display: block;
+    }
 
     #voice-copy-btn:hover {
       background: rgba(200, 80, 255, 0.14);
@@ -1071,22 +1090,22 @@
       <!-- Quick actions row (formerly sidebar) -->
       <div id="cp-actions">
         <button class="cp-action-btn" id="sb-freeze-btn" onclick="toggleFreeze()">
-          <span>📷</span><span id="sb-freeze-label">&nbsp;Live Feed</span>
+          <span id="sb-freeze-label">Live Feed</span>
         </button>
         <button class="cp-action-btn" id="sb-calib-freeze-btn" onclick="toggleCalibFreeze()">
-          <span>🛑</span><span id="sb-calib-freeze-label">&nbsp;Calib Frozen</span>
+          <span id="sb-calib-freeze-label">Calib Frozen</span>
         </button>
         <button class="cp-action-btn" id="sb-vr-btn" onclick="toggleVR()">
-          <span id="sb-vr-icon">🥽</span><span id="sb-vr-label">&nbsp;Enter MR</span>
+          <span id="sb-vr-label">Enter MR</span>
         </button>
         <button class="cp-action-btn" id="sb-calib-guides-btn" onclick="toggleCalibrationPlane()">
-          <span>🎯</span><span id="sb-calib-guides-label">&nbsp;Hide Target</span>
+          <span id="sb-calib-guides-label">Hide Target</span>
         </button>
         <button class="cp-action-btn" onclick="toggleSceneBg()">
-          <span>🌓</span><span>&nbsp;White BG</span>
+          <span>White BG</span>
         </button>
         <button class="cp-action-btn cp-action-btn--reset" onclick="resetXrScene()" title="Snap robots back into view">
-          <span>📍</span><span>&nbsp;Reset Scene</span>
+          <span>Reset Scene</span>
         </button>
       </div>
 
@@ -1124,19 +1143,22 @@
   <div id="voice-panel">
     <div id="voice-header" class="drag-handle">
       <div id="voice-header-left">
-        <div id="voice-header-icon">🎙️</div>
         <span id="voice-header-text">Voice Input</span>
       </div>
       <button id="voice-collapse-btn" onclick="toggleVoicePanel()" title="Collapse">▾</button>
     </div>
     <div id="voice-body">
+      <select id="mic-select"
+        style="width:100%; margin-bottom: 10px; font-size: 11px; padding: 6px; border-radius: 6px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.4); color: var(--text); outline: none;">
+        <option value="">Default Microphone</option>
+      </select>
       <button id="ptt-btn" onclick="toggleRecording()">
         <span id="ptt-mic-icon">🎙️</span>
         <span id="ptt-label">Hold to Record</span>
       </button>
       <div id="voice-output"></div>
       <div id="voice-status"></div>
-      <button id="voice-copy-btn" onclick="copyTranscription()">📋 &nbsp;Copy to clipboard</button>
+
     </div>
   </div>
 
@@ -2020,7 +2042,7 @@
           const q = new THREE.Quaternion();
 
           let renderAngle = FK_ANGLES[i];
-          if (i === 1) renderAngle -= 40; // J2
+          if (i === 1) renderAngle -= 3; // J2
           if (i === 2) renderAngle += 75; // J3
 
           q.setFromAxisAngle(JOINT_AXES[i], THREE.MathUtils.degToRad(renderAngle));
@@ -2345,10 +2367,8 @@
                 const text = typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload);
                 const voiceOut = document.getElementById('voice-output');
                 const voiceStatus = document.getElementById('voice-status');
-                const copyBtn = document.getElementById('voice-copy-btn');
                 if (voiceOut) { voiceOut.textContent = text; voiceOut.classList.add('has-text'); }
-                if (voiceStatus) { voiceStatus.textContent = '✅ Transcription received'; voiceStatus.className = 'success'; }
-                if (copyBtn) copyBtn.classList.add('visible');
+                if (voiceStatus) { voiceStatus.textContent = 'Transcription received'; voiceStatus.className = 'success'; }
                 // Auto-expand voice panel so the user sees the result
                 const vp = document.getElementById('voice-panel');
                 if (vp) vp.classList.remove('collapsed');
@@ -2378,14 +2398,14 @@
     // ── Voice-to-Text Panel ───────────────────────────────────────────────────
     (function initVoicePanel() {
       let _mediaRecorder = null;
-      let _audioChunks   = [];
-      let _isRecording   = false;
+      let _audioChunks = [];
+      let _isRecording = false;
 
-      const pttBtn      = document.getElementById('ptt-btn');
-      const pttLabel    = document.getElementById('ptt-label');
+      const pttBtn = document.getElementById('ptt-btn');
+      const pttLabel = document.getElementById('ptt-label');
       const voiceOutput = document.getElementById('voice-output');
       const voiceStatus = document.getElementById('voice-status');
-      const copyBtn     = document.getElementById('voice-copy-btn');
+      const copyBtn = document.getElementById('voice-copy-btn');
 
       window.toggleVoicePanel = function () {
         document.getElementById('voice-panel').classList.toggle('collapsed');
@@ -2401,7 +2421,10 @@
 
       async function startRecording() {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          const micSelect = document.getElementById('mic-select');
+          const deviceId = micSelect ? micSelect.value : '';
+          const audioConstraints = deviceId ? { deviceId: { exact: deviceId } } : true;
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
 
           // Pick the best supported format compatible with server-side Whisper
           const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -2422,9 +2445,9 @@
 
           pttBtn.classList.add('recording');
           pttLabel.textContent = 'Recording… tap to stop';
-          setStatus('🔴 Recording — tap button to send', '');
+          setStatus('Recording — tap button to send', '');
         } catch (err) {
-          setStatus('⚠️ Microphone access denied: ' + err.message, 'error');
+          setStatus('Microphone access denied: ' + err.message, 'error');
           _isRecording = false;
         }
       }
@@ -2437,13 +2460,13 @@
         pttBtn.classList.remove('recording');
         pttBtn.classList.add('loading');
         pttLabel.textContent = 'Processing…';
-        setStatus('⏳ Sending to Whisper…', '');
+        setStatus('Sending to Whisper…', '');
       }
 
       async function uploadAudio() {
         if (_audioChunks.length === 0) {
           resetBtn();
-          setStatus('⚠️ No audio captured.', 'error');
+          setStatus('No audio captured.', 'error');
           return;
         }
 
@@ -2467,7 +2490,7 @@
 
           if (!resp.ok) {
             const errText = await resp.text();
-            setStatus(`⚠️ API error ${resp.status}: ${errText}`, 'error');
+            setStatus(`API error ${resp.status}: ${errText}`, 'error');
           } else {
             const data = await resp.json();
             const text = data.text || '';
@@ -2476,11 +2499,11 @@
               // Send to C# host so it can process the command
               if (window.sendCommandToHost) window.sendCommandToHost('voiceTranscription', text.trim());
             } else {
-              setStatus('⚠️ No speech detected.', 'error');
+              setStatus('No speech detected.', 'error');
             }
           }
         } catch (err) {
-          setStatus('⚠️ Network error: ' + err.message, 'error');
+          setStatus('Network error: ' + err.message, 'error');
         } finally {
           resetBtn();
         }
@@ -2489,8 +2512,7 @@
       function showTranscription(text) {
         voiceOutput.textContent = text;
         voiceOutput.classList.add('has-text');
-        copyBtn.classList.add('visible');
-        setStatus('✅ Transcription complete', 'success');
+        setStatus('Transcription complete', 'success');
       }
 
       function setStatus(msg, cls) {
@@ -2504,17 +2526,35 @@
         _isRecording = false;
       }
 
-      window.copyTranscription = function () {
-        const text = voiceOutput.textContent;
-        if (!text) return;
-        navigator.clipboard.writeText(text).then(() => {
-          setStatus('📋 Copied!', 'success');
-          setTimeout(() => setStatus('', ''), 2000);
-        }).catch(() => setStatus('⚠️ Copy failed.', 'error'));
-      };
-
       // Make voice panel draggable via its header
       makeDraggable(document.getElementById('voice-panel'), document.getElementById('voice-header'));
+
+      // Populate microphones dropdown
+      async function populateMicrophones() {
+        try {
+          // Temporarily request permission so we can read the device labels
+          const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          tempStream.getTracks().forEach(t => t.stop());
+
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioInputs = devices.filter(d => d.kind === 'audioinput');
+          const select = document.getElementById('mic-select');
+          if (select) {
+            select.innerHTML = '<option value="">Default Microphone</option>';
+            audioInputs.forEach(device => {
+              const option = document.createElement('option');
+              option.value = device.deviceId;
+              option.text = device.label || `Microphone ${select.options.length}`;
+              select.appendChild(option);
+            });
+          }
+        } catch (e) {
+          console.error("Failed to list microphones", e);
+        }
+      }
+      setTimeout(() => {
+        populateMicrophones();
+      }, 1000);
     })();
 
   </script>

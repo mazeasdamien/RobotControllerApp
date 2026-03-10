@@ -173,12 +173,7 @@ namespace RobotControllerApp
             TripoApiKeyInput.Password = _settings.TripoApiKey;
             // CameraFovSlider.Value = _settings.CameraFovScale; // control removed from XAML
 
-            // Restore camera robot radio button state
-            if (_settings.CameraRobot == 2)
-            {
-                CameraRobot1Radio.IsChecked = false;
-                CameraRobot2Radio.IsChecked = true;
-            }
+            // Restore camera robot radio button state (radio controls removed in XAML)
             UpdateVideoFeedTitle(_settings.CameraRobot);
 
             if (_settings.BananaModel == "gemini-3.1-flash-image-preview") BananaModelComboBox.SelectedIndex = 1;
@@ -261,16 +256,9 @@ namespace RobotControllerApp
                 // Convert radians → degrees for the FK panel display
                 var degAngles = joints.Select(r => (double)(r * 180.0 / Math.PI)).ToArray();
                 string anglesJson = System.Text.Json.JsonSerializer.Serialize(degAngles);
-
-                // ① Push to local WebView2
-                this.DispatcherQueue.TryEnqueue(async () =>
+                this.DispatcherQueue.TryEnqueue(() =>
                 {
                     TelemJoints.Text = "[" + string.Join(", ", joints.Select(j => j.ToString("0.00"))) + "]";
-                    if (_webViewReady)
-                    {
-                        string safeJson = anglesJson.Replace("\\", "\\\\").Replace("'", "\\'");
-                        await SceneWebView.ExecuteScriptAsync($"setRobotJoints('{safeJson}', 0);");
-                    }
                 });
 
                 // ② Broadcast to remote browser (Quest / LAN)
@@ -293,16 +281,9 @@ namespace RobotControllerApp
             {
                 var degAngles = joints.Select(r => (double)(r * 180.0 / Math.PI)).ToArray();
                 string anglesJson = System.Text.Json.JsonSerializer.Serialize(degAngles);
-
-                // ① Push to local WebView2
-                this.DispatcherQueue.TryEnqueue(async () =>
+                this.DispatcherQueue.TryEnqueue(() =>
                 {
                     TelemJoints2.Text = "[" + string.Join(", ", joints.Select(j => j.ToString("0.00"))) + "]";
-                    if (_webViewReady)
-                    {
-                        string safeJson = anglesJson.Replace("\\", "\\\\").Replace("'", "\\'");
-                        await SceneWebView.ExecuteScriptAsync($"setRobotJoints('{safeJson}', 1);");
-                    }
                 });
 
                 // ② Broadcast to remote browser
@@ -446,18 +427,7 @@ namespace RobotControllerApp
                     {
                         await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
                     }
-                    CameraImage.Source = bitmap;
-
-                    // Transition UI
-                    if (CameraImage.Visibility == Visibility.Collapsed)
-                    {
-                        CameraImage.Visibility = Visibility.Visible;
-                        CameraOfflineState.Visibility = Visibility.Collapsed;
-                        RobotFeedBadgeText.Text = "LIVE";
-                        RobotFeedBadgeText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
-                        RobotFeedBadge.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 180, 0, 0)); // Red background for LIVE
-                        RobotFeedDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 0, 0)); // Bright Red Dot
-                    }
+                    // UI feed was moved; skipping direct UI injection.
                 }
                 catch (Exception ex)
                 {
@@ -581,11 +551,7 @@ namespace RobotControllerApp
                 _cvCapture = null;
             }
 
-            LocalWebcamPreview.Source = null;
-            OperatorFeedBadgeText.Text = "OFFLINE";
-            OperatorFeedBadgeText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
-            OperatorFeedBadge.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 51, 51, 51));
-            OperatorFeedDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 136, 136, 136));
+            // OperatorFeedBadgeText and LocalWebcamPreview controls removed from UI
             TelemOperatorFps.Text = "0.0";
             _operatorFpsCount = 0;
 
@@ -647,13 +613,7 @@ namespace RobotControllerApp
 
                                 try
                                 {
-                                    if (OperatorFeedBadgeText.Text != "LIVE")
-                                    {
-                                        OperatorFeedBadgeText.Text = "LIVE";
-                                        OperatorFeedBadgeText.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
-                                        OperatorFeedBadge.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 180, 0, 0)); // Red background
-                                        OperatorFeedDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 0, 0)); // Bright Red Dot
-                                    }
+                                    // Operator UI badge removed
 
                                     if (updateCounters)
                                     {
@@ -663,25 +623,13 @@ namespace RobotControllerApp
 
                                     var bitmap = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
 
-                                    if (DashboardView.Visibility == Visibility.Visible || ContextView.Visibility == Visibility.Visible)
-                                    {
-                                        using (var ms = new System.IO.MemoryStream(frameBytes))
-                                        {
-                                            await bitmap.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
-                                        }
-                                        if (DashboardView.Visibility == Visibility.Visible) LocalWebcamPreview.Source = bitmap;
-                                        if (ContextView.Visibility == Visibility.Visible) ContextWebcamPreview.Source = bitmap;
-                                    }
+                                    // Context preview (if existent) or Local WebCam preview removed
+                                    if (ContextView.Visibility == Visibility.Visible) ContextWebcamPreview.Source = bitmap;
+                                    // }
 
                                     if (!_feedFrozen)
                                     {
                                         string b64 = Convert.ToBase64String(frameBytes);
-                                        string js = $"if (window.updateCameraFeed) window.updateCameraFeed('data:image/jpeg;base64,{b64}');";
-                                        
-                                        if (_webViewReady)
-                                        {
-                                            _ = SceneWebView.ExecuteScriptAsync(js);
-                                        }
                                         
                                         if (_broadcastServer != null && _broadcastServer.ConnectedClients > 0)
                                         {
@@ -717,7 +665,7 @@ namespace RobotControllerApp
             await Task.CompletedTask;
         }
 
-        /// <summary>Enumerate cameras and populate the ComboBox.</summary>
+        /// <summary>Enumerate cameras.</summary>
         private async Task LoadCameraList()
         {
             try
@@ -725,16 +673,11 @@ namespace RobotControllerApp
                 _videoDevices = await Windows.Devices.Enumeration.DeviceInformation
                     .FindAllAsync(Windows.Devices.Enumeration.DeviceClass.VideoCapture);
 
-                CameraComboBox.Items.Clear();
-
                 if (_videoDevices.Count == 0)
                 {
                     Log("[Webcam] No cameras found.");
                     return;
                 }
-
-                foreach (var device in _videoDevices)
-                    CameraComboBox.Items.Add(device.Name);
 
                 // Auto-select Creative camera if present, else first available
                 int defaultIdx = 0;
@@ -744,20 +687,13 @@ namespace RobotControllerApp
                     { defaultIdx = i; break; }
                 }
 
-                CameraComboBox.SelectedIndex = defaultIdx;
                 Log($"[Webcam] {_videoDevices.Count} camera(s) found. Selected: {_videoDevices[defaultIdx].Name}");
+                await StartCameraByIndex(defaultIdx);
             }
             catch (Exception ex)
             {
                 Log($"[Webcam] Failed to enumerate cameras: {ex.Message}");
             }
-        }
-
-
-        private async void CameraComboBox_SelectionChanged(object sender, Microsoft.UI.Xaml.Controls.SelectionChangedEventArgs e)
-        {
-            int idx = CameraComboBox.SelectedIndex;
-            if (idx >= 0) await StartCameraByIndex(idx);
         }
 
         private async void RefreshCamerasButton_Click(object sender, RoutedEventArgs e)
@@ -1190,15 +1126,11 @@ namespace RobotControllerApp
                 // Since it doesn't have an x:Name, we update via the camera icon color too
                 // We do have RobotFeedBadge/RobotFeedDot visible, and can update a tooltip.
                 // For a clearer UX: change the dot label to include the robot number
-                if (RobotFeedBadgeText != null)
-                {
-                    // The badge text reflects online/offline — we add robot number to the tooltip
-                }
+                // UI references removed from Dashboard
                 // Broadcast to local Scene3D WebView
                 if (_webViewReady)
                 {
-                    _ = SceneWebView.ExecuteScriptAsync(
-                        $"if(window.setCameraRobot) window.setCameraRobot({cameraRobot - 1});");
+                    // local WebView2 processing logic has been disabled
                 }
                 _ = _broadcastServer.BroadcastAsync("setCameraRobot",
                     System.Text.Json.JsonSerializer.Serialize(new { robotIdx = cameraRobot - 1 }));
@@ -1388,7 +1320,7 @@ namespace RobotControllerApp
                         Preview3DView.Visibility = Visibility.Visible;
                         if (CalibCameraComboBox.Items.Count == 0)
                             PopulateCalibCameraList();
-                        var initTask = InitSceneWebViewAsync();
+                        var startTask = StartScene3DServerAsync();
                         break;
                 }
             }
@@ -1399,39 +1331,16 @@ namespace RobotControllerApp
         private RobotControllerApp.Services.CameraPose? _savedPose;
         private readonly Scene3dBroadcastServer _broadcastServer = new();
 
-        private async Task InitSceneWebViewAsync()
+        private async Task StartScene3DServerAsync()
         {
-            if (_webViewReady)
-            {
-                await PushObjectsToSceneAsync();
-                return;
-            }
+            if (_broadcastServer.IsRunning) return;
             try
             {
-                await SceneWebView.EnsureCoreWebView2Async();
-                SceneWebView.CoreWebView2.Settings.AreDevToolsEnabled = false;
-                SceneWebView.CoreWebView2.Settings.IsStatusBarEnabled = false;
-
                 string assetsDir = System.IO.Path.Combine(
                     System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location) ?? "",
                     "Assets");
-
-                SceneWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                    "app.local", assetsDir, Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
-
-                SceneWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
-                    "library.local", LibraryPath, Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
-
-                SceneWebView.Source = new Uri("http://app.local/preview.html");
-                await Task.Delay(800);
+                
                 _webViewReady = true;
-
-                // ── Handle messages posted by the HTML page (e.g. freeze feed) ─
-                SceneWebView.CoreWebView2.WebMessageReceived += (_, e) =>
-                {
-                    try { HandleClientBrowserMessage(e.TryGetWebMessageAsString()); }
-                    catch { }
-                };
 
                 // ── Start broadcast server for LAN / Quest browser access ────
                 if (!_broadcastServer.IsRunning)
@@ -1467,13 +1376,9 @@ namespace RobotControllerApp
                     _ = Task.Run(() => _broadcastServer.StartAsync());
                     Log($"[Scene3D] Broadcast server starting on port {Scene3dBroadcastServer.DefaultPort}");
 
-                    // ── Relay browser → local WebView2 (two-way sync) ────────────
-                    // When any connected browser client sends a message (e.g. FK drag),
-                    // we inject it directly into our local WebView2 so the hub and
-                    // browser stay in sync in real time.
+                    // ── Relay browser → host (two-way sync) ──────────────────────
                     _broadcastServer.OnBrowserMessage += (raw) =>
                     {
-                        if (!_webViewReady) return;
                         try { HandleClientBrowserMessage(raw); }
                         catch { }
                     };
@@ -1490,9 +1395,6 @@ namespace RobotControllerApp
                     string poseJson = await Task.Run(() => File.ReadAllText(jsonPath));
                     _savedPose = System.Text.Json.JsonSerializer.Deserialize<RobotControllerApp.Services.CameraPose>(poseJson);
 
-                    poseJson = poseJson.Replace("\\", "\\\\").Replace("'", "\\'");
-                    await SceneWebView.ExecuteScriptAsync($"setCameraPose('{poseJson}');");
-
                     _lastValidPose = _savedPose;
                     _isCalibFrozen = true;
                     FreezeCalibToggle.IsOn = true;
@@ -1502,6 +1404,15 @@ namespace RobotControllerApp
                     CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                 }
+
+                // Wait up to 500 ms for the Kestrel server to fully start before pushing state
+                for (int i = 0; i < 10 && !_broadcastServer.IsRunning; i++)
+                    await Task.Delay(50);
+
+                // Push saved pose to any already-connected clients (won't be any yet on first
+                // launch, but this covers the "re-open tab" scenario where the server stays up)
+                if (_lastValidPose != null)
+                    await PushCameraPoseAsync(_lastValidPose);
 
                 await PushObjectsToSceneAsync();
             }
@@ -1513,7 +1424,8 @@ namespace RobotControllerApp
 
         private async Task PushObjectsToSceneAsync()
         {
-            if (!_webViewReady) return;
+            // _webViewReady guard removed — broadcast server is the primary 3D target
+            if (!_broadcastServer.IsRunning) return;
             try
             {
                 // Camera intrinsics from calibration service
@@ -1588,6 +1500,11 @@ namespace RobotControllerApp
                         ? $"/library/{libItem.ModelFileName}"
                         : "";
 
+                    // Inline crop photo (JPEG→base64) so WebXR can render result thumbnails
+                    string cropBase64 = obj.CropJpgBytes != null && obj.CropJpgBytes.Length > 0
+                        ? "data:image/jpeg;base64," + Convert.ToBase64String(obj.CropJpgBytes)
+                        : "";
+
                     return new
                     {
                         label = obj.Name,
@@ -1597,15 +1514,14 @@ namespace RobotControllerApp
                         sizeH,
                         angleRad = obj.AngleDegrees * Math.PI / 180.0,
                         modelUrl,
-                        modelUrlRemote
+                        modelUrlRemote,
+                        cropBase64
                     };
                 }).ToList();
 
                 string json = System.Text.Json.JsonSerializer.Serialize(items);
 
-                // ① Push to local WebView2
-                string safeJson = json.Replace("\\", "\\\\").Replace("'", "\\'");
-                await SceneWebView.ExecuteScriptAsync($"setDetectedObjects('{safeJson}');");
+                // ① Push to local WebView2 (Disabled)
 
                 // ② Broadcast to remote browser
                 _ = _broadcastServer.BroadcastAsync("setDetectedObjects", json);
@@ -1622,7 +1538,8 @@ namespace RobotControllerApp
 
         private async Task PushCameraPoseAsync(RobotControllerApp.Services.CameraPose pose)
         {
-            if (!_webViewReady) return;
+            // _webViewReady guard removed — broadcast server is the primary 3D target
+            if (!_broadcastServer.IsRunning) return;
             try
             {
                 var poseObj = new
@@ -1645,9 +1562,7 @@ namespace RobotControllerApp
                 };
                 string poseJson = System.Text.Json.JsonSerializer.Serialize(poseObj);
 
-                // ① Push to local WebView2
-                string safeJson = poseJson.Replace("\\", "\\\\").Replace("'", "\\'");
-                await SceneWebView.ExecuteScriptAsync($"setCameraPose('{safeJson}');");
+                // ① Push to local WebView2 (Disabled)
 
                 // ② Broadcast to remote browser
                 _ = _broadcastServer.BroadcastAsync("setCameraPose", poseJson);
@@ -1673,8 +1588,7 @@ namespace RobotControllerApp
         private void RefreshFeed_Click(object sender, RoutedEventArgs e)
         {
             Log("Refreshing camera feed connection...");
-            CameraImage.Visibility = Visibility.Collapsed;
-            CameraOfflineState.Visibility = Visibility.Visible;
+            // UI elements removed
         }
 
         // ── DEBUG PANEL ─────────────────────────────────────────────────────────
@@ -2361,8 +2275,9 @@ namespace RobotControllerApp
                         }
                     }
 
-                    // Live-sync to 3D preview if open (must run on UI thread for WebView2)
-                    if (_webViewReady) DispatcherQueue?.TryEnqueue(async () => await PushObjectsToSceneAsync());
+                    // Broadcast to all connected WebXR/browser clients (Quest, LAN, Chrome, etc.)
+                    // PushObjectsToSceneAsync checks _broadcastServer.IsRunning internally.
+                    await PushObjectsToSceneAsync();
                 }
                 else
                 {
@@ -3108,8 +3023,7 @@ namespace RobotControllerApp
         {
             if (_webViewReady)
             {
-                bool show = ShowCalibrationPlaneToggle.IsOn;
-                _ = SceneWebView.ExecuteScriptAsync($"if (window.toggleCalibrationPlane) window.toggleCalibrationPlane({(show ? "true" : "false")});");
+                // Local webview script execution disabled
             }
         }
 
@@ -3117,8 +3031,7 @@ namespace RobotControllerApp
         {
             if (_webViewReady)
             {
-                string js = $"if (window.setCameraFeedOpacity) window.setCameraFeedOpacity({e.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)});";
-                _ = SceneWebView.ExecuteScriptAsync(js);
+                // Local webview script execution disabled
             }
         }
 
@@ -3132,8 +3045,7 @@ namespace RobotControllerApp
 
             if (_webViewReady)
             {
-                string js = $"if (window.setCameraFovScale) window.setCameraFovScale({e.NewValue.ToString(System.Globalization.CultureInfo.InvariantCulture)});";
-                _ = SceneWebView.ExecuteScriptAsync(js);
+                // Local webview script execution disabled
             }
         }
 
@@ -3197,7 +3109,7 @@ namespace RobotControllerApp
                         
                         if (_webViewReady)
                         {
-                            _ = SceneWebView.ExecuteScriptAsync(js);
+                            // Local webview script execution disabled
                         }
                         
                         if (_broadcastServer != null && _broadcastServer.ConnectedClients > 0)
@@ -3339,12 +3251,7 @@ namespace RobotControllerApp
                 // Write synchronously on UI thread so it doesn't freeze or lock
                 File.WriteAllText(jsonPath, json);
 
-                // Live update the 3D scene ONLY if visible to prevent WebView2 deadlock
-                if (_webViewReady && Preview3DView.Visibility == Visibility.Visible)
-                {
-                    string poseJsonStr = json.Replace("\\", "\\\\").Replace("'", "\\'");
-                    _ = SceneWebView.ExecuteScriptAsync($"setCameraPose('{poseJsonStr}');");
-                }
+                // Local webview script execution disabled
 
                 _isCalibFrozen = true;
                 if (_calibService != null) _calibService.OnPose -= LivePosePusher;
@@ -3451,11 +3358,32 @@ namespace RobotControllerApp
                     return; // No UI dispatch needed
                 }
 
+                // Scan-scene command from WebXR panel — same as pressing the context-page button
+                if (type == "scanScene")
+                {
+                    Log("[Scene3D] Remote scan request received.");
+                    // Run on UI thread (AnalyzeSceneAsync accesses UI components)
+                    DispatcherQueue.TryEnqueue(async () =>
+                    {
+                        try
+                        {
+                            if (_latestWebcamFrameBytes == null || _latestWebcamFrameBytes.Length == 0)
+                            {
+                                Log("[Scene3D] Scan ignored — no camera frame available.");
+                                return;
+                            }
+                            await AnalyzeSceneAsync();
+                        }
+                        catch (Exception ex) { Log($"[Scene3D] Remote scan error: {ex.Message}"); }
+                    });
+                    return;
+                }
+
                 DispatcherQueue.TryEnqueue(() =>
                 {
                     if (isSetJoints && !string.IsNullOrEmpty(jointsJsCall))
                     {
-                        _ = SceneWebView.ExecuteScriptAsync(jointsJsCall);
+                        // Local webview script execution disabled
                     }
                     else if (isLiveFeed)
                     {

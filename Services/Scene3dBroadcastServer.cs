@@ -243,9 +243,11 @@ namespace RobotControllerApp.Services
                         ms.Position = 0;
 
                         var audioContent = new ByteArrayContent(ms.ToArray());
-                        audioContent.Headers.ContentType =
-                            new System.Net.Http.Headers.MediaTypeHeaderValue(
-                                audioFile.ContentType ?? "audio/webm");
+                        string cType = audioFile.ContentType ?? "audio/webm";
+                        int semiIndex = cType.IndexOf(';');
+                        if (semiIndex > 0) cType = cType.Substring(0, semiIndex);
+                        
+                        audioContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(cType);
                         multipart.Add(audioContent, "file", audioFile.FileName ?? "audio.webm");
                         multipart.Add(new StringContent("openai/whisper-1"), "model");
 

@@ -245,36 +245,35 @@
       }
     }
 
-    /* FK Panel — bottom-center, wider to use the space naturally */
+    /* FK / Control Panel — left side, fixed */
     #fk-panel {
-      position: absolute;
-      bottom: 16px;
-      left: 50%;
-      transform: translateX(-50%);
+      position: fixed;
+      top: 50%;
+      left: 16px;
+      transform: translateY(-50%);
       background: var(--glass-bg);
       border: 1px solid rgba(85, 153, 255, 0.18);
       border-radius: var(--radius-lg);
       backdrop-filter: var(--blur);
       color: var(--text);
       font-size: 12px;
-      width: 520px;
-      max-width: calc(100vw - 340px);
-      /* stay clear of right-side panel */
+      width: 230px;
       overflow: hidden;
-      resize: both;
-      min-width: 300px;
+      resize: vertical;
+      min-width: 200px;
       min-height: 100px;
       transition: max-height 0.38s cubic-bezier(0.4, 0, 0.2, 1);
-      max-height: 600px;
-      /* large enough to show all content */
+      max-height: 92vh;
       opacity: 1;
       user-select: none;
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(85, 153, 255, 0.06);
+      z-index: 30;
     }
 
     /* Collapsed state — only shows the header bar */
     #fk-panel.collapsed {
-      max-height: 44px;
+      max-height: 46px;
+      overflow: hidden;
     }
 
     #fk-header {
@@ -346,6 +345,17 @@
       transform: rotate(-90deg);
     }
 
+    #fk-collapse-btn {
+      font-size: 18px;
+      color: rgba(85, 153, 255, 0.7);
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.3s;
+      padding: 2px 4px;
+      line-height: 1;
+    }
+
     #fk-body {
       padding: 12px 14px 14px;
     }
@@ -381,11 +391,11 @@
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
     }
 
-    /* 2-column axis grid to use the wider bottom-center panel */
+    /* Single-column axis list for the narrower left panel */
     #fk-sliders {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 4px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     .fk-axis-row {
@@ -487,14 +497,13 @@
     /* ── Control Panel: quick action row ─────────────────────────── */
     #cp-actions {
       display: flex;
-      gap: 6px;
+      flex-direction: column;
+      gap: 5px;
       margin-bottom: 10px;
-      flex-wrap: wrap;
     }
 
     .cp-action-btn {
-      flex: 1;
-      min-width: 100px;
+      width: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -545,6 +554,227 @@
 
     .cp-action-btn--reset:hover {
       background: rgba(255, 140, 30, 0.16);
+    }
+
+    /* ── Context / Scene Panel ──────────────────────────────────── */
+    #ctx-panel {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--glass-bg);
+      border: 1px solid rgba(0, 204, 106, 0.18);
+      border-radius: var(--radius-lg);
+      backdrop-filter: var(--blur);
+      color: var(--text);
+      font-size: 12px;
+      width: 320px;
+      overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      max-height: 400px;
+      user-select: none;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 204, 106, 0.06);
+      z-index: 30;
+    }
+
+    #ctx-panel.collapsed {
+      max-height: 46px;
+      overflow: hidden;
+    }
+
+    #ctx-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 14px;
+      cursor: pointer;
+      background: linear-gradient(90deg, rgba(0, 204, 106, 0.08) 0%, transparent 100%);
+      border-bottom: 1px solid rgba(0, 204, 106, 0.10);
+      gap: 8px;
+      transition: background 0.2s;
+    }
+
+    #ctx-header:hover {
+      background: linear-gradient(90deg, rgba(0, 204, 106, 0.15) 0%, rgba(0, 204, 106, 0.03) 100%);
+    }
+
+    #ctx-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #ctx-header-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, rgba(0, 204, 106, 0.25), rgba(0, 180, 90, 0.08));
+      border: 1px solid rgba(0, 204, 106, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    #ctx-header-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: #55ddaa;
+      letter-spacing: 0.02em;
+    }
+
+    #ctx-collapse-btn {
+      font-size: 18px;
+      color: rgba(0, 204, 106, 0.7);
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.3s;
+      padding: 2px 4px;
+      line-height: 1;
+    }
+
+    #ctx-panel.collapsed #ctx-collapse-btn {
+      transform: rotate(-90deg);
+    }
+
+    #ctx-body {
+      padding: 12px 14px 14px;
+    }
+
+    .ctx-scan-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    #ctx-scan-btn {
+      flex: 1;
+      padding: 9px 0;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(0, 204, 106, 0.35);
+      background: rgba(0, 204, 106, 0.08);
+      color: #55ddaa;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s;
+    }
+
+    #ctx-scan-btn:hover {
+      background: rgba(0, 204, 106, 0.16);
+      border-color: rgba(0, 204, 106, 0.55);
+    }
+
+    #ctx-scan-btn.scanning {
+      background: rgba(0, 204, 106, 0.22);
+      border-color: rgba(0, 204, 106, 0.7);
+      animation: scan-pulse 1.1s infinite;
+    }
+
+    @keyframes scan-pulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 rgba(0, 204, 106, 0);
+      }
+
+      50% {
+        box-shadow: 0 0 12px rgba(0, 204, 106, 0.4);
+      }
+    }
+
+    #ctx-autoscan-btn {
+      padding: 9px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 160, 50, 0.3);
+      background: rgba(255, 140, 30, 0.07);
+      color: rgba(255, 200, 120, 0.85);
+      font-size: 11px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s;
+      white-space: nowrap;
+    }
+
+    #ctx-autoscan-btn:hover {
+      background: rgba(255, 140, 30, 0.16);
+    }
+
+    #ctx-autoscan-btn.active {
+      background: rgba(255, 140, 30, 0.22);
+      border-color: rgba(255, 180, 80, 0.65);
+      color: #ffc864;
+      animation: scan-pulse 1.3s infinite;
+    }
+
+    #ctx-status {
+      font-size: 10px;
+      color: var(--text-muted);
+      text-align: center;
+      min-height: 14px;
+      letter-spacing: 0.02em;
+      margin-top: 4px;
+    }
+
+    #ctx-status.scanning {
+      color: var(--green);
+    }
+
+    #ctx-status.error {
+      color: #ff6666;
+    }
+
+    /* Photo strip — scrollable row of cropped thumbnails */
+    #ctx-photos {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding: 6px 0 4px;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 204, 106, 0.3) transparent;
+      margin-top: 6px;
+    }
+
+    #ctx-photos:empty {
+      display: none;
+    }
+
+    .ctx-photo-card {
+      flex-shrink: 0;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid rgba(0, 204, 106, 0.18);
+      border-radius: 8px;
+      padding: 5px 5px 5px;
+      width: 80px;
+    }
+
+    .ctx-photo-card img {
+      width: 70px;
+      height: 70px;
+      object-fit: cover;
+      border-radius: 5px;
+    }
+
+    .ctx-photo-label {
+      font-size: 9px;
+      font-weight: 600;
+      color: #55ddaa;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
     }
 
     /* ── Control Panel: calibration sliders row ───────────────────── */
@@ -835,6 +1065,237 @@
       background: rgba(232, 232, 238, 0.95);
       border-color: rgba(0, 0, 0, 0.1);
     }
+
+    /* ── Voice Panel ──────────────────────────────────────── */
+    #voice-panel {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: var(--glass-bg);
+      border: 1px solid rgba(200, 80, 255, 0.18);
+      border-radius: var(--radius-lg);
+      backdrop-filter: var(--blur);
+      color: var(--text);
+      font-size: 12px;
+      width: 260px;
+      overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      max-height: 600px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(180, 80, 255, 0.05);
+      user-select: none;
+      z-index: 20;
+    }
+
+    #voice-panel.collapsed {
+      max-height: 46px;
+      overflow: hidden;
+    }
+
+    #voice-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 14px;
+      cursor: pointer;
+      background: linear-gradient(90deg, rgba(200, 80, 255, 0.08) 0%, transparent 100%);
+      border-bottom: 1px solid rgba(200, 80, 255, 0.10);
+      gap: 8px;
+      transition: background 0.2s;
+    }
+
+    #voice-header:hover {
+      background: linear-gradient(90deg, rgba(200, 80, 255, 0.14) 0%, rgba(200, 80, 255, 0.03) 100%);
+    }
+
+    #voice-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    #voice-header-icon {
+      width: 26px;
+      height: 26px;
+      border-radius: 7px;
+      background: linear-gradient(135deg, rgba(200, 80, 255, 0.25), rgba(180, 60, 230, 0.08));
+      border: 1px solid rgba(200, 80, 255, 0.35);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+
+    #voice-header-text {
+      font-size: 12px;
+      font-weight: 600;
+      color: #cc88ff;
+      letter-spacing: 0.02em;
+    }
+
+    #voice-collapse-btn {
+      font-size: 18px;
+      color: rgba(200, 80, 255, 0.7);
+      background: none;
+      border: none;
+      cursor: pointer;
+      transition: transform 0.3s;
+      padding: 2px 4px;
+      line-height: 1;
+    }
+
+    #voice-panel.collapsed #voice-collapse-btn {
+      transform: rotate(-90deg);
+    }
+
+    #voice-body {
+      padding: 14px;
+    }
+
+    /* Push-to-talk button */
+    #ptt-btn {
+      width: 100%;
+      padding: 14px 0;
+      border-radius: var(--radius-md);
+      border: 1.5px solid rgba(200, 80, 255, 0.35);
+      background: linear-gradient(135deg, rgba(200, 80, 255, 0.12), rgba(160, 50, 220, 0.06));
+      color: #cc88ff;
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s, box-shadow 0.18s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      letter-spacing: 0.03em;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #ptt-btn:hover {
+      background: linear-gradient(135deg, rgba(200, 80, 255, 0.2), rgba(160, 50, 220, 0.1));
+      border-color: rgba(200, 80, 255, 0.55);
+    }
+
+    #ptt-btn.recording {
+      background: linear-gradient(135deg, rgba(255, 60, 60, 0.2), rgba(200, 0, 0, 0.1));
+      border-color: rgba(255, 80, 80, 0.7);
+      color: #ff8888;
+      box-shadow: 0 0 18px rgba(255, 60, 60, 0.25);
+      animation: ptt-pulse 1.2s infinite;
+    }
+
+    #ptt-btn.loading {
+      opacity: 0.65;
+      cursor: wait;
+    }
+
+    @keyframes ptt-pulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 14px rgba(255, 60, 60, 0.25);
+      }
+
+      50% {
+        box-shadow: 0 0 28px rgba(255, 60, 60, 0.5);
+      }
+    }
+
+    #ptt-mic-icon {
+      font-size: 18px;
+      transition: transform 0.2s;
+      display: inline-block;
+    }
+
+    #ptt-btn.recording #ptt-mic-icon {
+      animation: mic-bounce 0.6s infinite alternate;
+    }
+
+    @keyframes mic-bounce {
+      from {
+        transform: scaleY(0.88);
+      }
+
+      to {
+        transform: scaleY(1.12);
+      }
+    }
+
+    /* Transcription output area */
+    #voice-output {
+      margin-top: 12px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(200, 80, 255, 0.12);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      font-size: 11.5px;
+      line-height: 1.55;
+      color: var(--text-dim);
+      min-height: 52px;
+      max-height: 140px;
+      overflow-y: auto;
+      word-break: break-word;
+      transition: border-color 0.3s;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(200, 80, 255, 0.3) transparent;
+    }
+
+    #voice-output:empty::before {
+      content: 'Press the button and speak…';
+      color: var(--text-muted);
+      font-style: italic;
+    }
+
+    #voice-output.has-text {
+      border-color: rgba(200, 80, 255, 0.28);
+      color: var(--text);
+    }
+
+    #voice-status {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 7px;
+      text-align: center;
+      min-height: 14px;
+      letter-spacing: 0.02em;
+    }
+
+    #voice-status.error {
+      color: #ff6666;
+    }
+
+    #voice-status.success {
+      color: #00cc6a;
+    }
+
+    #voice-copy-btn {
+      width: 100%;
+      margin-top: 8px;
+      padding: 6px 0;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(200, 80, 255, 0.18);
+      background: rgba(200, 80, 255, 0.06);
+      color: rgba(200, 150, 255, 0.75);
+      font-size: 11px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.2s, border-color 0.2s;
+      display: none;
+    }
+
+    #voice-copy-btn.visible {
+      display: block;
+    }
+
+    #voice-copy-btn:hover {
+      background: rgba(200, 80, 255, 0.14);
+      border-color: rgba(200, 80, 255, 0.35);
+      color: rgba(220, 180, 255, 0.9);
+    }
   </style>
 </head>
 
@@ -849,34 +1310,40 @@
     Scan the scene to detect objects
   </div>
 
-  <!-- FK Control Panel — bottom-center -->
+  <!-- FK Control Panel — left side -->
   <div id="fk-panel">
-    <div id="fk-header" class="drag-handle">
-      <div id="fk-header-left"> <span id="fk-header-text">Control Panel</span>
+    <div id="fk-header" onclick="toggleFkPanel()">
+      <div id="fk-header-left">
+        <div id="fk-header-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#88bbff" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
+          </svg>
+        </div>
+        <span id="fk-header-text">Control Panel</span>
       </div>
-      <button id="fk-collapse-btn" onclick="toggleFkPanel()" title="Collapse">▾</button>
+      <button id="fk-collapse-btn" title="Collapse">▾</button>
     </div>
     <div id="fk-body">
 
-      <!-- Quick actions row (formerly sidebar) -->
+      <!-- Quick actions row -->
       <div id="cp-actions">
         <button class="cp-action-btn" id="sb-freeze-btn" onclick="toggleFreeze()">
-          <span>📷</span><span id="sb-freeze-label">&nbsp;Live Feed</span>
+          <span id="sb-freeze-label">Live Feed</span>
         </button>
         <button class="cp-action-btn" id="sb-calib-freeze-btn" onclick="toggleCalibFreeze()">
-          <span>🛑</span><span id="sb-calib-freeze-label">&nbsp;Calib Frozen</span>
+          <span id="sb-calib-freeze-label">Calib Frozen</span>
         </button>
         <button class="cp-action-btn" id="sb-vr-btn" onclick="toggleVR()">
-          <span id="sb-vr-icon">🥽</span><span id="sb-vr-label">&nbsp;Enter MR</span>
+          <span id="sb-vr-label">Enter MR</span>
         </button>
         <button class="cp-action-btn" id="sb-calib-guides-btn" onclick="toggleCalibrationPlane()">
-          <span>🎯</span><span id="sb-calib-guides-label">&nbsp;Hide Target</span>
+          <span id="sb-calib-guides-label">Hide Target</span>
         </button>
         <button class="cp-action-btn" onclick="toggleSceneBg()">
-          <span>🌓</span><span>&nbsp;White BG</span>
-        </button>
-        <button class="cp-action-btn cp-action-btn--reset" onclick="resetXrScene()" title="Snap robots back into view">
-          <span>📍</span><span>&nbsp;Reset Scene</span>
+          <span>White BG</span>
         </button>
       </div>
 
@@ -910,9 +1377,67 @@
   </div>
   </div>
 
+  <!-- Voice-to-Text Panel — top-right -->
+  <div id="voice-panel">
+    <div id="voice-header" class="drag-handle" onclick="toggleVoicePanel()">
+      <div id="voice-header-left">
+        <div id="voice-header-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#cc88ff" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+            <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+            <line x1="12" y1="19" x2="12" y2="23" />
+            <line x1="8" y1="23" x2="16" y2="23" />
+          </svg>
+        </div>
+        <span id="voice-header-text">Voice Input</span>
+      </div>
+      <button id="voice-collapse-btn" title="Collapse">▾</button>
+    </div>
+    <div id="voice-body">
+      <select id="mic-select"
+        style="width:100%; margin-bottom: 10px; font-size: 11px; padding: 6px; border-radius: 6px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.4); color: var(--text); outline: none;">
+        <option value="">Default Microphone</option>
+      </select>
+      <button id="ptt-btn" onclick="toggleRecording()">
+        <span id="ptt-mic-icon">🎙️</span>
+        <span id="ptt-label">Hold to Record</span>
+      </button>
+      <div id="voice-output"></div>
+      <div id="voice-status"></div>
+
+    </div>
+  </div>
 
   <!-- XR Toast notification -->
   <div id="xr-toast"></div>
+
+  <!-- Context / Scene Panel — bottom-center -->
+  <div id="ctx-panel">
+    <div id="ctx-header" onclick="toggleCtxPanel()">
+      <div id="ctx-header-left">
+        <div id="ctx-header-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#55ddaa" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8" />
+            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            <line x1="11" y1="8" x2="11" y2="14" />
+            <line x1="8" y1="11" x2="14" y2="11" />
+          </svg>
+        </div>
+        <span id="ctx-header-text">Scene Context</span>
+      </div>
+      <button id="ctx-collapse-btn" title="Collapse">▾</button>
+    </div>
+    <div id="ctx-body">
+      <div class="ctx-scan-row">
+        <button id="ctx-scan-btn" onclick="triggerScan()">Scan Scene</button>
+        <button id="ctx-autoscan-btn" onclick="toggleAutoScan()">Auto Scan</button>
+      </div>
+      <div id="ctx-status"></div>
+      <div id="ctx-photos"></div>
+    </div>
+  </div>
 
   <!-- Live WS connection badge -->
   <div id="ws-badge">
@@ -1602,8 +2127,101 @@
       img.src = base64Url;
     };
 
+    // setDetectedObjects is defined fully in the Context Panel block below
+    // (it handles photo strip + 3D rendering + auto-scan chaining)
+
+    // ── Context / Scene Panel ─────────────────────────────────────────────────
+    let _scanInProgress = false;
+    let _autoScanActive = false;
+    let _autoScanPending = false;
+
+    window.toggleCtxPanel = function () {
+      document.getElementById('ctx-panel').classList.toggle('collapsed');
+    };
+
+    window.triggerScan = function () {
+      if (_scanInProgress) return;
+      _scanInProgress = true;
+      _autoScanPending = true;
+
+      const btn = document.getElementById('ctx-scan-btn');
+      const statusEl = document.getElementById('ctx-status');
+      if (btn) btn.classList.add('scanning');
+      if (statusEl) { statusEl.textContent = 'Scanning…'; statusEl.className = 'scanning'; }
+
+      // Send scan command to C# host (WebView2) or via WS (Quest / LAN)
+      window.sendCommandToHost('scanScene', true);
+
+      // Timeout fallback: if no result after 15s, unlock
+      setTimeout(() => {
+        if (_scanInProgress) {
+          _scanInProgress = false;
+          _autoScanPending = false;
+          if (btn) btn.classList.remove('scanning');
+          if (statusEl) { statusEl.textContent = 'Scan timed out.'; statusEl.className = 'error'; }
+        }
+      }, 15000);
+    };
+
+    // Render the photo strip in the context panel
+    function renderCtxPhotos(items) {
+      const strip = document.getElementById('ctx-photos');
+      if (!strip) return;
+      strip.innerHTML = '';
+      items.forEach(item => {
+        if (!item.cropBase64) return;
+        const card = document.createElement('div');
+        card.className = 'ctx-photo-card';
+        const img = document.createElement('img');
+        img.src = item.cropBase64;
+        img.alt = item.label;
+        const lbl = document.createElement('div');
+        lbl.className = 'ctx-photo-label';
+        lbl.textContent = item.label;
+        card.appendChild(img);
+        card.appendChild(lbl);
+        strip.appendChild(card);
+      });
+    }
+
+    // Intercept all setDetectedObjects calls to also update the context panel
     window.setDetectedObjects = function (jsonStr) {
-      try { renderObjects(JSON.parse(jsonStr)); } catch (e) { console.error(e); }
+      _scanInProgress = false;
+      const btn = document.getElementById('ctx-scan-btn');
+      const statusEl = document.getElementById('ctx-status');
+      if (btn) btn.classList.remove('scanning');
+      try {
+        const items = JSON.parse(jsonStr);
+        renderObjects(items);
+        renderCtxPhotos(items);
+
+        // Auto-expand context panel so user sees results
+        const ctxPanel = document.getElementById('ctx-panel');
+        if (ctxPanel) ctxPanel.classList.remove('collapsed');
+
+        if (statusEl) {
+          statusEl.textContent = items.length ? `${items.length} object(s) found` : 'No objects detected.';
+          statusEl.className = '';
+        }
+      } catch (e) { console.error(e); }
+
+      // Chain next scan if auto-scan is on
+      if (_autoScanActive) {
+        setTimeout(triggerScan, 400);
+      }
+    };
+
+    window.toggleAutoScan = function () {
+      _autoScanActive = !_autoScanActive;
+      const btn = document.getElementById('ctx-autoscan-btn');
+      const statusEl = document.getElementById('ctx-status');
+      if (btn) btn.classList.toggle('active', _autoScanActive);
+      if (_autoScanActive) {
+        if (statusEl) { statusEl.textContent = 'Auto-scan on'; statusEl.className = 'scanning'; }
+        if (!_scanInProgress) triggerScan();
+      } else {
+        if (statusEl) { statusEl.textContent = 'Auto-scan off'; statusEl.className = ''; }
+      }
     };
 
     window.setCameraPose = function (jsonStr) {
@@ -1791,7 +2409,7 @@
           const q = new THREE.Quaternion();
 
           let renderAngle = FK_ANGLES[i];
-          if (i === 1) renderAngle -= 30; // J2
+          if (i === 1) renderAngle -= 3; // J2
           if (i === 2) renderAngle += 75; // J3
 
           q.setFromAxisAngle(JOINT_AXES[i], THREE.MathUtils.degToRad(renderAngle));
@@ -2111,6 +2729,18 @@
                 }
                 break;
               }
+              case 'voiceTranscription': {
+                // Show the transcription sent from another client in the voice panel
+                const text = typeof msg.payload === 'string' ? msg.payload : JSON.stringify(msg.payload);
+                const voiceOut = document.getElementById('voice-output');
+                const voiceStatus = document.getElementById('voice-status');
+                if (voiceOut) { voiceOut.textContent = text; voiceOut.classList.add('has-text'); }
+                if (voiceStatus) { voiceStatus.textContent = 'Transcription received'; voiceStatus.className = 'success'; }
+                // Auto-expand voice panel so the user sees the result
+                const vp = document.getElementById('voice-panel');
+                if (vp) vp.classList.remove('collapsed');
+                break;
+              }
             }
           } catch (e) { console.warn('WS parse error', e); }
         };
@@ -2123,13 +2753,181 @@
 
         ws.onclose = () => {
           badge.classList.remove('live');
-          label.textContent = `Reconnecting in ${(retryDelay / 1000).toFixed(1)}s…`;
+          label.textContent = 'Reconnecting…';
           setTimeout(connect, retryDelay);
           retryDelay = Math.min(retryDelay * 1.5, 15000); // Exponential back-off, max 15s
         };
       }
 
       connect();
+    })();
+
+    // ── Voice-to-Text Panel ───────────────────────────────────────────────────
+    (function initVoicePanel() {
+      let _mediaRecorder = null;
+      let _audioChunks = [];
+      let _isRecording = false;
+
+      const pttBtn = document.getElementById('ptt-btn');
+      const pttLabel = document.getElementById('ptt-label');
+      const voiceOutput = document.getElementById('voice-output');
+      const voiceStatus = document.getElementById('voice-status');
+      const copyBtn = document.getElementById('voice-copy-btn');
+
+      window.toggleVoicePanel = function () {
+        document.getElementById('voice-panel').classList.toggle('collapsed');
+      };
+
+      window.toggleRecording = async function () {
+        if (_isRecording) {
+          stopRecording();
+        } else {
+          await startRecording();
+        }
+      };
+
+      async function startRecording() {
+        try {
+          const micSelect = document.getElementById('mic-select');
+          const deviceId = micSelect ? micSelect.value : '';
+          const audioConstraints = deviceId ? { deviceId: { exact: deviceId } } : true;
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints, video: false });
+
+          // Pick the best supported format compatible with server-side Whisper
+          const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+            ? 'audio/webm;codecs=opus'
+            : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '';
+
+          _mediaRecorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+          _audioChunks = [];
+          _isRecording = true;
+
+          _mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) _audioChunks.push(e.data); };
+          _mediaRecorder.onstop = () => {
+            stream.getTracks().forEach(t => t.stop());
+            uploadAudio();
+          };
+
+          _mediaRecorder.start();
+
+          pttBtn.classList.add('recording');
+          pttLabel.textContent = 'Recording… tap to stop';
+          setStatus('Recording — tap button to send', '');
+        } catch (err) {
+          setStatus('Microphone access denied: ' + err.message, 'error');
+          _isRecording = false;
+        }
+      }
+
+      function stopRecording() {
+        if (_mediaRecorder && _mediaRecorder.state !== 'inactive') {
+          _mediaRecorder.stop();
+        }
+        _isRecording = false;
+        pttBtn.classList.remove('recording');
+        pttBtn.classList.add('loading');
+        pttLabel.textContent = 'Processing…';
+        setStatus('Sending to Whisper…', '');
+      }
+
+      async function uploadAudio() {
+        if (_audioChunks.length === 0) {
+          resetBtn();
+          setStatus('No audio captured.', 'error');
+          return;
+        }
+
+        const blob = new Blob(_audioChunks, { type: _mediaRecorder.mimeType || 'audio/webm' });
+
+        const formData = new FormData();
+        formData.append('file', blob, 'voice.webm');
+
+        // POST to the broadcast server's /transcribe endpoint.
+        // When on the LAN/Quest (isRemote), use same host:port.
+        // When inside WebView2 (app.local), the server still runs on localhost:8181.
+        const baseUrl = (location.hostname === 'app.local' || location.hostname === '')
+          ? 'http://localhost:8181'
+          : `${location.protocol}//${location.host}`;
+
+        try {
+          const resp = await fetch(`${baseUrl}/transcribe`, {
+            method: 'POST',
+            body: formData
+          });
+
+          if (!resp.ok) {
+            const errText = await resp.text();
+            setStatus(`API error ${resp.status}: ${errText}`, 'error');
+          } else {
+            const data = await resp.json();
+            const text = data.text || '';
+            if (text.trim()) {
+              showTranscription(text.trim());
+              // Send to C# host so it can process the command
+              if (window.sendCommandToHost) window.sendCommandToHost('voiceTranscription', text.trim());
+            } else {
+              setStatus('No speech detected.', 'error');
+            }
+          }
+        } catch (err) {
+          setStatus('Network error: ' + err.message, 'error');
+        } finally {
+          resetBtn();
+        }
+      }
+
+      function showTranscription(text) {
+        voiceOutput.textContent = text;
+        voiceOutput.classList.add('has-text');
+        setStatus('Transcription complete', 'success');
+      }
+
+      function setStatus(msg, cls) {
+        voiceStatus.textContent = msg;
+        voiceStatus.className = cls ? `${cls}` : '';
+      }
+
+      function resetBtn() {
+        pttBtn.classList.remove('loading', 'recording');
+        pttLabel.textContent = 'Hold to Record';
+        _isRecording = false;
+      }
+
+      // Make voice panel draggable via its header
+      makeDraggable(document.getElementById('voice-panel'), document.getElementById('voice-header'));
+
+      // Populate microphones dropdown
+      async function populateMicrophones() {
+        try {
+          // Temporarily request permission so we can read the device labels
+          const tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          tempStream.getTracks().forEach(t => t.stop());
+
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const audioInputs = devices.filter(d => d.kind === 'audioinput');
+          const select = document.getElementById('mic-select');
+          if (select) {
+            select.innerHTML = '<option value="">Default Microphone</option>';
+            audioInputs.forEach(device => {
+              const option = document.createElement('option');
+              option.value = device.deviceId;
+              option.text = device.label || `Microphone ${select.options.length}`;
+              select.appendChild(option);
+            });
+
+            // Auto-select the Intel mic when available (common on Windows laptops in Chrome)
+            const intelOption = Array.from(select.options).find(o =>
+              o.text.toLowerCase().includes('intel')
+            );
+            if (intelOption) select.value = intelOption.value;
+          }
+        } catch (e) {
+          console.error("Failed to list microphones", e);
+        }
+      }
+      setTimeout(() => {
+        populateMicrophones();
+      }, 1000);
     })();
 
   </script>
