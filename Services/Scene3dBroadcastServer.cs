@@ -20,7 +20,7 @@ namespace RobotControllerApp.Services
 {
     /// <summary>
     /// Lightweight Kestrel server that:
-    ///   • Serves scene3d.html and all Assets over HTTP so any device on the LAN
+    ///   • Serves preview.html and all Assets over HTTP so any device on the LAN
     ///     (e.g. a Meta Quest) can open the 3D preview in its browser.
     ///   • Exposes a WebSocket endpoint at /scene3d-ws that pushes live scene
     ///     updates (camera pose, detected objects, camera feed) to every
@@ -37,7 +37,7 @@ namespace RobotControllerApp.Services
         public int Port      { get; set; } = DefaultPort;
         public int HttpsPort { get; set; } = DefaultHttpsPort;
 
-        /// <summary>Full path to the Assets folder that contains scene3d.html.</summary>
+        /// <summary>Full path to the Assets folder that contains preview.html.</summary>
         public string AssetsPath { get; set; } = string.Empty;
 
         /// <summary>Full path to the Library folder that contains .glb model files.</summary>
@@ -106,7 +106,7 @@ namespace RobotControllerApp.Services
                 mimeProvider.Mappings[".glb"] = "model/gltf-binary";
                 mimeProvider.Mappings[".gltf"] = "model/gltf+json";
 
-                // Assets directory — serves scene3d.html, ned.glb, SVGs, …
+                // Assets directory — serves preview.html, ned.glb, SVGs, …
                 app.UseStaticFiles(new StaticFileOptions
                 {
                     FileProvider = new PhysicalFileProvider(AssetsPath),
@@ -172,10 +172,10 @@ namespace RobotControllerApp.Services
                     }
                 });
 
-                // ── Root redirect → scene3d.html ──────────────────────────────────
+                // ── Root redirect → preview.html ──────────────────────────────────
                 app.MapGet("/", context =>
                 {
-                    context.Response.Redirect("/scene3d.html");
+                    context.Response.Redirect("/preview.html");
                     return Task.CompletedTask;
                 });
 
@@ -220,7 +220,7 @@ namespace RobotControllerApp.Services
         /// <summary>
         /// Broadcasts a typed JSON message to every connected browser.
         /// The envelope: { "type": "...", "payload": ... }
-        /// scene3d.html's WebSocket client dispatches on "type".
+        /// preview.html's WebSocket client dispatches on "type".
         /// </summary>
         public Task BroadcastAsync(string type, string payloadJson)
         {

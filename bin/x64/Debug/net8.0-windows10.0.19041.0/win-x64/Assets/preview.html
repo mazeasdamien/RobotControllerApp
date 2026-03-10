@@ -6,7 +6,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>3D Scene Preview</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
     body {
       background: rgb(10, 10, 12);
@@ -15,24 +19,26 @@
     }
 
 
-    canvas { display: block; }
+    canvas {
+      display: block;
+    }
 
     /* ── Design Tokens ─────────────────────────────────── */
     :root {
-      --glass-bg:    rgba(12, 12, 22, 0.82);
-      --glass-border: rgba(255,255,255,0.07);
-      --blur:        blur(18px);
-      --radius-lg:   14px;
-      --radius-md:   10px;
-      --radius-sm:   7px;
-      --accent:      #5599ff;
-      --accent-glow: rgba(85,153,255,0.25);
-      --accent2:     #ff8c42;
-      --green:       #00cc6a;
-      --red-soft:    rgba(255,80,80,0.85);
-      --text-muted:  rgba(255,255,255,0.38);
-      --text-dim:    rgba(255,255,255,0.62);
-      --text:        rgba(255,255,255,0.92);
+      --glass-bg: rgba(12, 12, 22, 0.82);
+      --glass-border: rgba(255, 255, 255, 0.07);
+      --blur: blur(18px);
+      --radius-lg: 14px;
+      --radius-md: 10px;
+      --radius-sm: 7px;
+      --accent: #5599ff;
+      --accent-glow: rgba(85, 153, 255, 0.25);
+      --accent2: #ff8c42;
+      --green: #00cc6a;
+      --red-soft: rgba(255, 80, 80, 0.85);
+      --text-muted: rgba(255, 255, 255, 0.38);
+      --text-dim: rgba(255, 255, 255, 0.62);
+      --text: rgba(255, 255, 255, 0.92);
     }
 
     /* ── HUD (top-left) ───────────────────────────────── */
@@ -49,7 +55,7 @@
       padding: 12px 16px 10px;
       backdrop-filter: var(--blur);
       width: 200px;
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
     }
 
     #hud .hud-header {
@@ -60,12 +66,16 @@
     }
 
     #hud .hud-icon {
-      width: 28px; height: 28px;
+      width: 28px;
+      height: 28px;
       border-radius: 8px;
       background: linear-gradient(135deg, #1a2a4a 0%, #0d1a35 100%);
-      border: 1px solid rgba(85,153,255,0.3);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px; flex-shrink: 0;
+      border: 1px solid rgba(85, 153, 255, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
     }
 
     #hud .hud-title {
@@ -88,8 +98,8 @@
     }
 
     #hud .hud-stat {
-      background: rgba(255,255,255,0.04);
-      border: 1px solid rgba(255,255,255,0.06);
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.06);
       border-radius: 6px;
       padding: 5px 10px;
       flex: 1;
@@ -122,12 +132,14 @@
     #hud .hint::before {
       content: '·';
       font-size: 14px;
-      color: rgba(255,255,255,0.25);
+      color: rgba(255, 255, 255, 0.25);
       line-height: 1;
     }
 
 
-    #legend-items { margin-top: 0; }
+    #legend-items {
+      margin-top: 0;
+    }
 
     #legend .lt {
       color: var(--text-muted);
@@ -148,7 +160,8 @@
     }
 
     .ld {
-      width: 8px; height: 8px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
       flex-shrink: 0;
       box-shadow: 0 0 4px currentColor;
@@ -157,9 +170,10 @@
     /* ── Empty state ──────────────────────────────────── */
     #no-objects {
       position: absolute;
-      top: 50%; left: 50%;
+      top: 50%;
+      left: 50%;
       transform: translate(-50%, -50%);
-      color: rgba(255,255,255,0.18);
+      color: rgba(255, 255, 255, 0.18);
       font-size: 13px;
       text-align: center;
       pointer-events: none;
@@ -194,7 +208,8 @@
     }
 
     #ws-badge .dot {
-      width: 7px; height: 7px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: #444;
       transition: background 0.4s, box-shadow 0.4s;
@@ -203,24 +218,31 @@
 
     #ws-badge.live .dot {
       background: var(--green);
-      box-shadow: 0 0 0 3px rgba(0,204,106,0.2);
+      box-shadow: 0 0 0 3px rgba(0, 204, 106, 0.2);
       animation: pulse-dot 2s infinite;
     }
 
     #ws-badge.live {
-      border-color: rgba(0,204,106,0.3);
-      box-shadow: 0 0 20px rgba(0,204,106,0.08);
+      border-color: rgba(0, 204, 106, 0.3);
+      box-shadow: 0 0 20px rgba(0, 204, 106, 0.08);
       color: var(--text-dim);
     }
 
     #ws-badge.error .dot {
       background: #ff4444;
-      box-shadow: 0 0 0 3px rgba(255,68,68,0.2);
+      box-shadow: 0 0 0 3px rgba(255, 68, 68, 0.2);
     }
 
     @keyframes pulse-dot {
-      0%, 100% { box-shadow: 0 0 0 3px rgba(0,204,106,0.2); }
-      50%       { box-shadow: 0 0 0 6px rgba(0,204,106,0.08); }
+
+      0%,
+      100% {
+        box-shadow: 0 0 0 3px rgba(0, 204, 106, 0.2);
+      }
+
+      50% {
+        box-shadow: 0 0 0 6px rgba(0, 204, 106, 0.08);
+      }
     }
 
     /* FK Panel — bottom-center, wider to use the space naturally */
@@ -230,23 +252,30 @@
       left: 50%;
       transform: translateX(-50%);
       background: var(--glass-bg);
-      border: 1px solid rgba(85,153,255,0.18);
+      border: 1px solid rgba(85, 153, 255, 0.18);
       border-radius: var(--radius-lg);
       backdrop-filter: var(--blur);
       color: var(--text);
       font-size: 12px;
       width: 520px;
-      max-width: calc(100vw - 340px); /* stay clear of right-side panel */
+      max-width: calc(100vw - 340px);
+      /* stay clear of right-side panel */
       overflow: hidden;
-      transition: max-height 0.38s cubic-bezier(0.4,0,0.2,1);
-      max-height: 600px; /* large enough to show all content */
+      resize: both;
+      min-width: 300px;
+      min-height: 100px;
+      transition: max-height 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+      max-height: 600px;
+      /* large enough to show all content */
       opacity: 1;
       user-select: none;
-      box-shadow: 0 12px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(85,153,255,0.06);
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(85, 153, 255, 0.06);
     }
 
     /* Collapsed state — only shows the header bar */
-    #fk-panel.collapsed { max-height: 44px; }
+    #fk-panel.collapsed {
+      max-height: 44px;
+    }
 
     #fk-header {
       display: flex;
@@ -254,14 +283,14 @@
       justify-content: space-between;
       padding: 11px 14px;
       cursor: pointer;
-      background: linear-gradient(90deg, rgba(85,153,255,0.08) 0%, transparent 100%);
-      border-bottom: 1px solid rgba(85,153,255,0.10);
+      background: linear-gradient(90deg, rgba(85, 153, 255, 0.08) 0%, transparent 100%);
+      border-bottom: 1px solid rgba(85, 153, 255, 0.10);
       gap: 8px;
       transition: background 0.2s;
     }
 
     #fk-header:hover {
-      background: linear-gradient(90deg, rgba(85,153,255,0.14) 0%, rgba(85,153,255,0.03) 100%);
+      background: linear-gradient(90deg, rgba(85, 153, 255, 0.14) 0%, rgba(85, 153, 255, 0.03) 100%);
     }
 
     #fk-header-left {
@@ -271,12 +300,16 @@
     }
 
     #fk-header-icon {
-      width: 26px; height: 26px;
+      width: 26px;
+      height: 26px;
       border-radius: 7px;
-      background: linear-gradient(135deg,rgba(85,153,255,0.25),rgba(85,153,255,0.08));
-      border: 1px solid rgba(85,153,255,0.3);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px; flex-shrink: 0;
+      background: linear-gradient(135deg, rgba(85, 153, 255, 0.25), rgba(85, 153, 255, 0.08));
+      border: 1px solid rgba(85, 153, 255, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
     }
 
     #fk-header-text {
@@ -291,32 +324,38 @@
       font-weight: 700;
       padding: 2px 7px;
       border-radius: 999px;
-      background: rgba(0,204,106,0.12);
-      border: 1px solid rgba(0,204,106,0.3);
+      background: rgba(0, 204, 106, 0.12);
+      border: 1px solid rgba(0, 204, 106, 0.3);
       color: #00cc6a;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       display: none;
     }
 
-    #fk-live-pill.visible { display: block; }
+    #fk-live-pill.visible {
+      display: block;
+    }
 
     #fk-toggle-icon {
       font-size: 9px;
-      color: rgba(85,153,255,0.5);
+      color: rgba(85, 153, 255, 0.5);
       transition: transform 0.3s;
     }
 
-    #fk-panel.collapsed #fk-collapse-btn { transform: rotate(-90deg); }
+    #fk-panel.collapsed #fk-collapse-btn {
+      transform: rotate(-90deg);
+    }
 
-    #fk-body { padding: 12px 14px 14px; }
+    #fk-body {
+      padding: 12px 14px 14px;
+    }
 
     /* Robot selector pills */
     .fk-robot-selector {
       display: flex;
       gap: 5px;
       margin-bottom: 12px;
-      background: rgba(0,0,0,0.25);
+      background: rgba(0, 0, 0, 0.25);
       border-radius: 8px;
       padding: 3px;
     }
@@ -336,10 +375,10 @@
     }
 
     .fk-robot-btn.active {
-      background: linear-gradient(135deg, rgba(85,153,255,0.28), rgba(85,153,255,0.12));
+      background: linear-gradient(135deg, rgba(85, 153, 255, 0.28), rgba(85, 153, 255, 0.12));
       color: #aaccff;
       font-weight: 600;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
     }
 
     /* 2-column axis grid to use the wider bottom-center panel */
@@ -366,7 +405,9 @@
       letter-spacing: 0.04em;
     }
 
-    .fk-slider-wrap { position: relative; }
+    .fk-slider-wrap {
+      position: relative;
+    }
 
     .fk-slider {
       -webkit-appearance: none;
@@ -374,27 +415,30 @@
       width: 100%;
       height: 3px;
       border-radius: 999px;
-      background: rgba(85,153,255,0.12);
+      background: rgba(85, 153, 255, 0.12);
       outline: none;
       cursor: pointer;
       transition: background 0.2s;
     }
 
-    .fk-slider:hover { background: rgba(85,153,255,0.2); }
+    .fk-slider:hover {
+      background: rgba(85, 153, 255, 0.2);
+    }
 
     .fk-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 15px; height: 15px;
+      width: 15px;
+      height: 15px;
       border-radius: 50%;
       background: radial-gradient(circle at 35% 35%, #88bbff, #3366cc);
-      box-shadow: 0 0 6px rgba(85,153,255,0.55), 0 2px 4px rgba(0,0,0,0.4);
+      box-shadow: 0 0 6px rgba(85, 153, 255, 0.55), 0 2px 4px rgba(0, 0, 0, 0.4);
       cursor: pointer;
-      border: 2px solid rgba(255,255,255,0.15);
+      border: 2px solid rgba(255, 255, 255, 0.15);
       transition: box-shadow 0.15s, transform 0.15s;
     }
 
     .fk-slider:active::-webkit-slider-thumb {
-      box-shadow: 0 0 12px rgba(85,153,255,0.8);
+      box-shadow: 0 0 12px rgba(85, 153, 255, 0.8);
       transform: scale(1.15);
     }
 
@@ -404,8 +448,8 @@
       color: #aaccff;
       text-align: right;
       font-variant-numeric: tabular-nums;
-      background: rgba(85,153,255,0.08);
-      border: 1px solid rgba(85,153,255,0.14);
+      background: rgba(85, 153, 255, 0.08);
+      border: 1px solid rgba(85, 153, 255, 0.14);
       border-radius: 5px;
       padding: 2px 6px;
     }
@@ -413,7 +457,7 @@
     /* Divider between sections */
     .fk-divider {
       height: 1px;
-      background: rgba(255,255,255,0.05);
+      background: rgba(255, 255, 255, 0.05);
       margin: 8px 0;
     }
 
@@ -422,9 +466,9 @@
       margin-top: 8px;
       padding: 7px 0;
       border-radius: var(--radius-sm);
-      border: 1px solid rgba(255,100,100,0.2);
-      background: rgba(255,60,60,0.06);
-      color: rgba(255,150,150,0.75);
+      border: 1px solid rgba(255, 100, 100, 0.2);
+      background: rgba(255, 60, 60, 0.06);
+      color: rgba(255, 150, 150, 0.75);
       font-size: 11px;
       font-weight: 500;
       font-family: inherit;
@@ -434,12 +478,128 @@
     }
 
     #fk-reset-btn:hover {
-      background: rgba(255,60,60,0.14);
-      border-color: rgba(255,100,100,0.35);
-      color: rgba(255,180,180,0.9);
+      background: rgba(255, 60, 60, 0.14);
+      border-color: rgba(255, 100, 100, 0.35);
+      color: rgba(255, 180, 180, 0.9);
     }
 
-    /* ── Right Sidebar ──────────────────────────────────── */
+
+    /* ── Control Panel: quick action row ─────────────────────────── */
+    #cp-actions {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .cp-action-btn {
+      flex: 1;
+      min-width: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      padding: 7px 10px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-dim);
+      font-size: 11px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.18s, border-color 0.18s;
+      white-space: nowrap;
+    }
+
+    .cp-action-btn:hover {
+      background: rgba(255, 255, 255, 0.09);
+      color: var(--text);
+    }
+
+    #sb-vr-btn {
+      border-color: rgba(120, 80, 255, 0.35);
+      background: rgba(90, 50, 220, 0.10);
+      color: rgba(200, 180, 255, 0.85);
+    }
+
+    #sb-vr-btn:hover {
+      background: rgba(90, 50, 220, 0.22);
+    }
+
+    #sb-vr-btn.active {
+      background: rgba(80, 40, 200, 0.3);
+      border-color: rgba(150, 110, 255, 0.8);
+    }
+
+    #sb-vr-btn.unsupported {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .cp-action-btn--reset {
+      border-color: rgba(255, 160, 50, 0.3);
+      background: rgba(255, 140, 30, 0.07);
+      color: rgba(255, 200, 120, 0.85);
+    }
+
+    .cp-action-btn--reset:hover {
+      background: rgba(255, 140, 30, 0.16);
+    }
+
+    /* ── Control Panel: calibration sliders row ───────────────────── */
+    #cp-sliders {
+      display: flex;
+      gap: 14px;
+      margin-bottom: 10px;
+    }
+
+    .cp-slider-row {
+      flex: 1;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .cp-slider-label {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .cp-slider-val {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .cp-slider {
+      -webkit-appearance: none;
+      appearance: none;
+      flex: 1 1 100%;
+      height: 3px;
+      border-radius: 999px;
+      background: rgba(85, 153, 255, 0.15);
+      outline: none;
+      cursor: pointer;
+    }
+
+    .cp-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 13px;
+      height: 13px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #88bbff, #3366cc);
+      cursor: pointer;
+      box-shadow: 0 0 5px rgba(85, 153, 255, 0.4);
+    }
+
+    /* ── (Sidebar CSS kept for reference / white-bg overrides) ──── */
     #sidebar {
       position: absolute;
       top: 16px;
@@ -453,18 +613,19 @@
       border-radius: var(--radius-lg);
       padding: 8px 6px;
       backdrop-filter: var(--blur);
-      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
       user-select: none;
       z-index: 10;
     }
+
     .sb-btn {
       display: flex;
       align-items: center;
       gap: 6px;
       padding: 7px 10px;
       border-radius: var(--radius-sm);
-      border: 1px solid rgba(255,255,255,0.07);
-      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      background: rgba(255, 255, 255, 0.03);
       color: var(--text-dim);
       font-size: 11px;
       font-weight: 500;
@@ -474,19 +635,37 @@
       text-align: left;
       width: 100%;
     }
-    .sb-btn:hover { background: rgba(255,255,255,0.07); color: var(--text); }
-    .sb-sep { height: 1px; background: rgba(255,255,255,0.05); margin: 2px 4px; }
-    .sb-icon { font-size: 14px; line-height: 1; flex-shrink: 0; }
-    .sb-label { flex: 1; }
+
+    .sb-btn:hover {
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text);
+    }
+
+    .sb-sep {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.05);
+      margin: 2px 4px;
+    }
+
+    .sb-icon {
+      font-size: 14px;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .sb-label {
+      flex: 1;
+    }
+
     #sb-vr-btn {
       display: flex;
       align-items: center;
       gap: 6px;
       padding: 8px 10px;
       border-radius: var(--radius-sm);
-      border: 1px solid rgba(120,80,255,0.3);
-      background: rgba(90,50,220,0.10);
-      color: rgba(200,180,255,0.85);
+      border: 1px solid rgba(120, 80, 255, 0.3);
+      background: rgba(90, 50, 220, 0.10);
+      color: rgba(200, 180, 255, 0.85);
       font-size: 11px;
       font-weight: 600;
       font-family: inherit;
@@ -494,15 +673,30 @@
       transition: background 0.18s, border-color 0.18s;
       width: 100%;
     }
-    #sb-vr-btn:hover  { background: rgba(90,50,220,0.22); border-color: rgba(150,110,255,0.6); }
-    #sb-vr-btn.active { background: rgba(80,40,200,0.3);  border-color: rgba(150,110,255,0.8); color: #ccbbff; }
-    #sb-vr-btn.unsupported { opacity: 0.45; cursor: not-allowed; }
+
+    #sb-vr-btn:hover {
+      background: rgba(90, 50, 220, 0.22);
+      border-color: rgba(150, 110, 255, 0.6);
+    }
+
+    #sb-vr-btn.active {
+      background: rgba(80, 40, 200, 0.3);
+      border-color: rgba(150, 110, 255, 0.8);
+      color: #ccbbff;
+    }
+
+    #sb-vr-btn.unsupported {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
     .sb-row {
       display: flex;
       flex-direction: column;
       gap: 4px;
       padding: 5px 10px 7px;
     }
+
     .sb-row-header {
       display: flex;
       justify-content: space-between;
@@ -510,27 +704,62 @@
       gap: 4px;
       flex-wrap: nowrap;
     }
-    
-    .sb-row-label { font-size: 9px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.05em; white-space: nowrap; flex: 1; text-transform: uppercase; white-space: nowrap; flex: 1; }
-    .sb-row-val   { font-size: 10px; font-weight: 700; color: var(--accent); white-space: nowrap; }
-    .sb-reset-btn { background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.1); border-radius: 5px; color: var(--text-muted); font-size: 12px; padding: 1px 5px; cursor: pointer; flex-shrink: 0; line-height: 1.6; }
-    .sb-reset-btn:hover { background: rgba(255,255,255,0.14); color: var(--text); }
+
+    .sb-row-label {
+      font-size: 9px;
+      font-weight: 600;
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+      white-space: nowrap;
+      flex: 1;
+      text-transform: uppercase;
+      white-space: nowrap;
+      flex: 1;
+    }
+
+    .sb-row-val {
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--accent);
+      white-space: nowrap;
+    }
+
+    .sb-reset-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 5px;
+      color: var(--text-muted);
+      font-size: 12px;
+      padding: 1px 5px;
+      cursor: pointer;
+      flex-shrink: 0;
+      line-height: 1.6;
+    }
+
+    .sb-reset-btn:hover {
+      background: rgba(255, 255, 255, 0.14);
+      color: var(--text);
+    }
+
     .sb-slider {
       -webkit-appearance: none;
+      appearance: none;
       width: 100%;
       height: 3px;
       border-radius: 999px;
-      background: rgba(85,153,255,0.15);
+      background: rgba(85, 153, 255, 0.15);
       outline: none;
       cursor: pointer;
     }
+
     .sb-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 13px; height: 13px;
+      width: 13px;
+      height: 13px;
       border-radius: 50%;
       background: radial-gradient(circle at 35% 35%, #88bbff, #3366cc);
       cursor: pointer;
-      box-shadow: 0 0 5px rgba(85,153,255,0.4);
+      box-shadow: 0 0 5px rgba(85, 153, 255, 0.4);
     }
 
     /* XR Toast */
@@ -539,8 +768,8 @@
       bottom: 80px;
       left: 50%;
       transform: translateX(-50%) translateY(12px);
-      background: rgba(20,20,35,0.92);
-      border: 1px solid rgba(255,255,255,0.12);
+      background: rgba(20, 20, 35, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       border-radius: 10px;
       padding: 10px 18px;
       color: var(--text);
@@ -555,14 +784,22 @@
       text-align: center;
       white-space: pre-line;
     }
-    #xr-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    #xr-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
 
     /* ── Draggable panel handles ──────────────────────────────────────── */
     .drag-handle {
       cursor: grab;
       touch-action: none;
     }
-    .drag-handle:active { cursor: grabbing; }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
     /* Subtle 3-dot grip icon shown in a thin strip */
     .drag-grip {
       display: flex;
@@ -577,17 +814,26 @@
       user-select: none;
       transition: opacity 0.15s;
     }
-    .drag-grip:hover { opacity: 0.7; }
-    .drag-grip:active { cursor: grabbing; opacity: 0.9; }
+
+    .drag-grip:hover {
+      opacity: 0.7;
+    }
+
+    .drag-grip:active {
+      cursor: grabbing;
+      opacity: 0.9;
+    }
 
     /* White-BG mode: panels stay readable, WinUI title buttons visible */
-    body.white-bg #hud, body.white-bg #sidebar {
-      background: rgba(240,240,245,0.9);
-      border-color: rgba(0,0,0,0.1);
+    body.white-bg #hud,
+    body.white-bg #sidebar {
+      background: rgba(240, 240, 245, 0.9);
+      border-color: rgba(0, 0, 0, 0.1);
     }
+
     body.white-bg #fk-panel {
-      background: rgba(232,232,238,0.95);
-      border-color: rgba(0,0,0,0.1);
+      background: rgba(232, 232, 238, 0.95);
+      border-color: rgba(0, 0, 0, 0.1);
     }
   </style>
 </head>
@@ -597,7 +843,8 @@
 
   <div id="no-objects">
     <svg width="44" height="44" viewBox="0 0 24 24" fill="white">
-      <path d="M12 2l-5.5 9h11L12 2zm0 3.84L14.77 10H9.23L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5S15.01 22 17.5 22s4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7a2.5 2.5 0 010-5 2.5 2.5 0 010 5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z" />
+      <path
+        d="M12 2l-5.5 9h11L12 2zm0 3.84L14.77 10H9.23L12 5.84zM17.5 13c-2.49 0-4.5 2.01-4.5 4.5S15.01 22 17.5 22s4.5-2.01 4.5-4.5-2.01-4.5-4.5-4.5zm0 7a2.5 2.5 0 010-5 2.5 2.5 0 010 5zM3 21.5h8v-8H3v8zm2-6h4v4H5v-4z" />
     </svg>
     Scan the scene to detect objects
   </div>
@@ -605,78 +852,65 @@
   <!-- FK Control Panel — bottom-center -->
   <div id="fk-panel">
     <div id="fk-header" class="drag-handle">
-      <div id="fk-header-left">        <span id="fk-header-text">Forward Kinematics</span>
+      <div id="fk-header-left"> <span id="fk-header-text">Control Panel</span>
         <span id="fk-live-pill">LIVE</span>
       </div>
       <button id="fk-collapse-btn" onclick="toggleFkPanel()" title="Collapse">▾</button>
     </div>
     <div id="fk-body">
+
+      <!-- Quick actions row (formerly sidebar) -->
+      <div id="cp-actions">
+        <button class="cp-action-btn" id="sb-freeze-btn" onclick="toggleFreeze()">
+          <span>📷</span><span id="sb-freeze-label">&nbsp;Live Feed</span>
+        </button>
+        <button class="cp-action-btn" id="sb-calib-freeze-btn" onclick="toggleCalibFreeze()">
+          <span>🛑</span><span id="sb-calib-freeze-label">&nbsp;Calib Frozen</span>
+        </button>
+        <button class="cp-action-btn" id="sb-vr-btn" onclick="toggleVR()">
+          <span id="sb-vr-icon">🥽</span><span id="sb-vr-label">&nbsp;Enter MR</span>
+        </button>
+        <button class="cp-action-btn" id="sb-calib-guides-btn" onclick="toggleCalibrationPlane()">
+          <span>🎯</span><span id="sb-calib-guides-label">&nbsp;Hide Target</span>
+        </button>
+        <button class="cp-action-btn" onclick="toggleSceneBg()">
+          <span>🌓</span><span>&nbsp;White BG</span>
+        </button>
+        <button class="cp-action-btn cp-action-btn--reset" onclick="resetXrScene()" title="Snap robots back into view">
+          <span>📍</span><span>&nbsp;Reset Scene</span>
+        </button>
+      </div>
+
+      <!-- Calibration mini-sliders -->
+      <div id="cp-sliders">
+        <div class="cp-slider-row">
+          <span class="cp-slider-label">FOV Scale</span>
+          <span class="cp-slider-val" id="calib-fov-val">0.45</span>
+          <button class="sb-reset-btn" onclick="resetCalibFov()" title="Reset">↺</button>
+          <input class="cp-slider" type="range" id="calib-fov-slider" min="0.10" max="1.5" step="0.01" value="0.45"
+            oninput="onCalibFov(this.value)">
+        </div>
+        <div class="cp-slider-row">
+          <span class="cp-slider-label">Cam Opacity</span>
+          <input class="cp-slider" type="range" min="0" max="1" step="0.05" value="0.65"
+            oninput="onCalibOpacity(this.value)">
+        </div>
+      </div>
+
+      <div class="fk-divider"></div>
+
+      <!-- Robot FK joint controls -->
       <div class="fk-robot-selector">
         <button class="fk-robot-btn active" id="fk-r1-btn" onclick="selectFkRobot(0)">Robot 1</button>
         <button class="fk-robot-btn" id="fk-r2-btn" onclick="selectFkRobot(1)">Robot 2</button>
-        
       </div>
       <div id="fk-sliders"></div>
       <div class="fk-divider"></div>
       <button id="fk-reset-btn" onclick="resetFk()">↺ &nbsp;Reset to Home</button>
     </div>
   </div>
-
-
-  <!-- Right Sidebar (MR, freeze, calibration) -->
-  <div id="sidebar">
-    <div class="drag-grip" id="sb-grip">⠿⠿⠿</div>
-
-    <!-- Live feed freeze -->
-    <button class="sb-btn" id="sb-freeze-btn" onclick="toggleFreeze()">
-      <span class="sb-icon">📷</span>
-      <span class="sb-label" id="sb-freeze-label">&nbsp;Live Feed</span>
-    </button>
-
-    <!-- Enter MR / VR -->
-    <button id="sb-vr-btn" onclick="toggleVR()">
-      <span id="sb-vr-icon">🥽</span>
-      <span id="sb-vr-label">&nbsp;Enter MR</span>
-    </button>
-
-    <div class="sb-sep"></div>
-
-    <!-- Background toggle -->
-    <button class="sb-btn" onclick="toggleSceneBg()" title="Toggle white background" style="border:none;">
-      <span class="sb-icon">🌓</span>
-      <span class="sb-label">White BG</span>
-    </button>
-
-    <div class="sb-sep"></div>
-
-    <!-- Reset scene position -->
-    <button class="sb-btn" onclick="resetXrScene()" title="Snap robots back in front of you" style="border-color:rgba(255,160,50,0.3);background:rgba(255,140,30,0.08);color:rgba(255,200,120,0.85);">
-      <span class="sb-icon">📍</span><span class="sb-label">Reset Scene</span>
-    </button>
-    <div class="sb-sep"></div>
-
-    <!-- FOV calibration -->
-    <div class="sb-row">
-      <div class="sb-row-header">
-        <span class="sb-row-label">FOV Scale</span>
-        <span class="sb-row-val" id="calib-fov-val">0.45</span>
-        <button class="sb-reset-btn" onclick="resetCalibFov()" title="Reset FOV">↺</button>
-      </div>
-      <input class="sb-slider" type="range" id="calib-fov-slider"
-        min="0.10" max="1.5" step="0.01" value="0.45"
-        oninput="onCalibFov(this.value)">
-    </div>
-
-    <!-- Camera opacity -->
-    <div class="sb-row">
-      <div class="sb-row-header">
-        <span class="sb-row-label">Cam Opacity</span>
-      </div>
-      <input class="sb-slider" type="range" min="0" max="1" step="0.05" value="0.65"
-        oninput="onCalibOpacity(this.value)">
-    </div>
-
   </div>
+
 
   <!-- XR Toast notification -->
   <div id="xr-toast"></div>
@@ -885,8 +1119,8 @@
           const col = mat.color;
           const isBlueBody = col.r < 0.35 && col.g > 0.3 && col.b > 0.55;
           if (isBlueBody) {
-            mat.roughness  = Math.min(mat.roughness,  0.55); // slightly glossy plastic
-            mat.metalness  = Math.max(mat.metalness,  0.0);
+            mat.roughness = Math.min(mat.roughness, 0.55); // slightly glossy plastic
+            mat.metalness = Math.max(mat.metalness, 0.0);
           }
 
           // ── Max anisotropy on every texture channel ──
@@ -971,9 +1205,20 @@
     axesHelper.position.y = 0.005; scene.add(axesHelper);
 
     // Toggle for calibration guides
-    window.toggleCalibrationPlane = function (show) {
-      boardMesh.visible = show;
-      axesHelper.visible = show;
+    window._guidesVisible = true;
+    window.toggleCalibrationPlane = function () {
+      window._guidesVisible = !window._guidesVisible;
+
+      const btn = document.getElementById('sb-calib-guides-btn');
+      const lbl = document.getElementById('sb-calib-guides-label');
+      if (btn) btn.style.opacity = window._guidesVisible ? '1' : '0.55';
+      if (lbl) lbl.textContent = window._guidesVisible ? '\u00a0Hide Target' : '\u00a0Show Target';
+
+      boardMesh.visible = window._guidesVisible;
+      axesHelper.visible = window._guidesVisible;
+
+      if (camCone) camCone.visible = window._guidesVisible;
+      if (camFrustumLines) camFrustumLines.visible = window._guidesVisible;
     };
 
     // ── Object group ──
@@ -1038,6 +1283,7 @@
           camCone.quaternion.copy(qFinal);
 
           camCone.castShadow = false;
+          camCone.visible = window._guidesVisible !== false;
           scene.add(camCone);
 
           // True Frustum lines
@@ -1134,6 +1380,7 @@
           const fGeo = new THREE.BufferGeometry().setFromPoints(lines);
           const fMat = new THREE.LineBasicMaterial({ color: 0xffc300, opacity: 0.45, transparent: true });
           camFrustumLines = new THREE.LineSegments(fGeo, fMat);
+          camFrustumLines.visible = window._guidesVisible !== false;
           scene.add(camFrustumLines);
         }
 
@@ -1175,9 +1422,12 @@
 
     function savePanelPositions() {
       const data = {};
-      ['fk-panel','sidebar'].forEach(id => {
+      ['fk-panel', 'sidebar'].forEach(id => {
         const el = document.getElementById(id);
-        if (el) data[id] = { left: el.style.left, top: el.style.top, right: el.style.right, bottom: el.style.bottom };
+        if (el) data[id] = {
+          left: el.style.left, top: el.style.top, right: el.style.right, bottom: el.style.bottom,
+          width: el.style.width, height: el.style.height
+        };
       });
       localStorage.setItem(PANEL_POS_KEY, JSON.stringify(data));
     }
@@ -1186,25 +1436,27 @@
       try {
         const data = JSON.parse(localStorage.getItem(PANEL_POS_KEY));
         if (!data) return;
-        ['hud','fk-panel','sidebar'].forEach(id => {
+        ['hud', 'fk-panel', 'sidebar'].forEach(id => {
           const el = document.getElementById(id);
-          const d  = data[id];
+          const d = data[id];
           if (!el || !d) return;
-          if (d.left)   { el.style.left   = d.left;   if (id==='fk-panel') { el.style.transform='none'; el.style.right=''; el.style.bottom=d.bottom||''; } }
-          if (d.top)    el.style.top    = d.top;
-          if (d.right && !d.left)  el.style.right  = d.right;
+          if (d.left) { el.style.left = d.left; if (id === 'fk-panel') { el.style.transform = 'none'; el.style.right = ''; el.style.bottom = d.bottom || ''; } }
+          if (d.top) el.style.top = d.top;
+          if (d.right && !d.left) el.style.right = d.right;
           if (d.bottom && !d.top) el.style.bottom = d.bottom;
+          if (d.width && id === 'fk-panel') el.style.width = d.width;
+          if (d.height && id === 'fk-panel') el.style.height = d.height;
         });
-      } catch(_){}
+      } catch (_) { }
     }
 
     function makeDraggable(panel, handle) {
       if (!panel || !handle) return; // element was removed from DOM
-      let startX=0, startY=0, startLeft=0, startTop=0, dragging=false;
+      let startX = 0, startY = 0, startLeft = 0, startTop = 0, dragging = false;
 
       function getXY(e) {
         return e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY }
-                         : { x: e.clientX,             y: e.clientY };
+          : { x: e.clientX, y: e.clientY };
       }
 
       function onStart(e) {
@@ -1215,56 +1467,79 @@
 
         // Compute absolute panel position (handles transforms like translateX(-50%))
         const rect = panel.getBoundingClientRect();
-        startLeft  = rect.left;
-        startTop   = rect.top;
+        startLeft = rect.left;
+        startTop = rect.top;
 
         // Clear CSS positioning shortcuts and lock to absolute px
-        panel.style.right     = '';
-        panel.style.bottom    = '';
-        panel.style.transform = 'none';
-        panel.style.left      = startLeft + 'px';
-        panel.style.top       = startTop  + 'px';
+        panel.style.right = '';
+        panel.style.bottom = '';
 
-        const {x, y} = getXY(e);
+        // Preserve any size CSS that was active before dragging cleared transform constraints
+        const currentWidth = panel.offsetWidth;
+        const currentHeight = panel.offsetHeight;
+
+        panel.style.transform = 'none';
+        panel.style.left = startLeft + 'px';
+        panel.style.top = startTop + 'px';
+        panel.style.width = currentWidth + 'px';
+
+        // Don't fix height if it's gracefully resizing by content unless user actually resized height
+        if (panel.style.height) panel.style.height = currentHeight + 'px';
+
+        const { x, y } = getXY(e);
         startX = x - startLeft;
         startY = y - startTop;
 
         document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup',   onEnd);
-        document.addEventListener('touchmove', onMove, {passive:false});
-        document.addEventListener('touchend',  onEnd);
+        document.addEventListener('mouseup', onEnd);
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onEnd);
       }
 
       function onMove(e) {
         if (!dragging) return;
         e.preventDefault();
-        const {x, y} = getXY(e);
-        const nx = Math.max(0, Math.min(window.innerWidth  - panel.offsetWidth,  x - startX));
+        const { x, y } = getXY(e);
+        const nx = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, x - startX));
         const ny = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, y - startY));
         panel.style.left = nx + 'px';
-        panel.style.top  = ny + 'px';
+        panel.style.top = ny + 'px';
       }
 
       function onEnd() {
         dragging = false;
         document.removeEventListener('mousemove', onMove);
-        document.removeEventListener('mouseup',   onEnd);
+        document.removeEventListener('mouseup', onEnd);
         document.removeEventListener('touchmove', onMove);
-        document.removeEventListener('touchend',  onEnd);
+        document.removeEventListener('touchend', onEnd);
         savePanelPositions();
       }
 
-      handle.addEventListener('mousedown',  onStart);
-      handle.addEventListener('touchstart', onStart, {passive:false});
+      handle.addEventListener('mousedown', onStart);
+      handle.addEventListener('touchstart', onStart, { passive: false });
     }
 
     // Init draggable after DOM is ready (already in module scope)
     (function initDraggable() {
       restorePanelPositions();
-      makeDraggable(document.getElementById('fk-panel'), document.getElementById('fk-header'));
-      makeDraggable(document.getElementById('sidebar'),  document.getElementById('sb-grip'));
+      const fkPanel = document.getElementById('fk-panel');
+      makeDraggable(fkPanel, document.getElementById('fk-header'));
+
+      // Auto-save size when the user manually resizes the panel
+      const resizeObserver = new ResizeObserver(() => savePanelPositions());
+      if (fkPanel) resizeObserver.observe(fkPanel);
     })();
     // ── Sidebar helpers ──────────────────────────────────────────────────
+
+    window.sendCommandToHost = function (type, value) {
+      const msg = JSON.stringify({ type: type, value: value });
+      if (window.chrome && window.chrome.webview) {
+        window.chrome.webview.postMessage(msg);
+      } else if (window._remoteWs && window._remoteWs.readyState === WebSocket.OPEN) {
+        window._remoteWs.send(msg);
+      }
+    };
+
     let _feedFrozen = false;
     window.toggleFreeze = function () {
       _feedFrozen = !_feedFrozen;
@@ -1272,8 +1547,19 @@
       const lbl = document.getElementById('sb-freeze-label');
       if (lbl) lbl.textContent = _feedFrozen ? '\u00a0Frozen' : '\u00a0Live Feed';
       if (btn) btn.style.opacity = _feedFrozen ? '0.55' : '1';
+      window.sendCommandToHost('freezeFeed', _feedFrozen);
     };
     window.isFeedFrozen = () => _feedFrozen;
+
+    let _calibFrozen = true;
+    window.toggleCalibFreeze = function () {
+      _calibFrozen = !_calibFrozen;
+      const btn = document.getElementById('sb-calib-freeze-btn');
+      const lbl = document.getElementById('sb-calib-freeze-label');
+      if (lbl) lbl.textContent = _calibFrozen ? '\u00a0Calib Frozen' : '\u00a0Calib Live';
+      if (btn) btn.style.opacity = _calibFrozen ? '0.55' : '1';
+      window.sendCommandToHost('freezeCalib', _calibFrozen);
+    };
 
     let _whiteBg = false;
     window.toggleSceneBg = function () {
@@ -1286,13 +1572,17 @@
       const el = document.getElementById('calib-fov-val');
       if (el) el.textContent = parseFloat(v).toFixed(2);
       if (window.setCameraFovScale) window.setCameraFovScale(parseFloat(v));
+      window.sendCommandToHost('fov', parseFloat(v));
     };
     window.resetCalibFov = () => {
       const sl = document.getElementById('calib-fov-slider');
       if (sl) { sl.value = 0.45; }
       window.onCalibFov(0.45);
     };
-    window.onCalibOpacity = (v) => { if (window.setCameraFeedOpacity) window.setCameraFeedOpacity(parseFloat(v)); };
+    window.onCalibOpacity = (v) => {
+      if (window.setCameraFeedOpacity) window.setCameraFeedOpacity(parseFloat(v));
+      window.sendCommandToHost('opacity', parseFloat(v));
+    };
 
     window.updateCameraFeed = function (base64Url) {
       if (_feedFrozen) return;
@@ -1328,10 +1618,10 @@
     };
 
     // Called when camera robot assignment changes (robotIdx: 0=R1, 1=R2)
-    window.setCameraRobot = function(robotIdx) {
+    window.setCameraRobot = function (robotIdx) {
       const label = robotIdx === 1 ? 'R2' : 'R1';
       const stat = document.getElementById('hud-robot-stat');
-      const val  = document.getElementById('hud-robot-val');
+      const val = document.getElementById('hud-robot-val');
       if (stat && val) {
         stat.style.display = '';
         val.textContent = label;
@@ -1500,7 +1790,12 @@
           // Reset to rest quaternion first, then apply rotation
           joint.quaternion.copy(joint.userData.restQ);
           const q = new THREE.Quaternion();
-          q.setFromAxisAngle(JOINT_AXES[i], THREE.MathUtils.degToRad(FK_ANGLES[i]));
+
+          let renderAngle = FK_ANGLES[i];
+          if (i === 1) renderAngle -= 45; // J2
+          if (i === 2) renderAngle += 75; // J3
+
+          q.setFromAxisAngle(JOINT_AXES[i], THREE.MathUtils.degToRad(renderAngle));
           joint.quaternion.multiply(q);
         });
       }
@@ -1554,9 +1849,9 @@
     // ─────────────────────────────────────────────────────────────────────
     // WebXR Mixed Reality  (AR passthrough Quest 3 / VR fallback)
     // ─────────────────────────────────────────────────────────────────────
-    let _xrSession  = null;
-    let _xrMode     = null;
-    let _savedBg    = null, _savedFog = null;
+    let _xrSession = null;
+    let _xrMode = null;
+    let _savedBg = null, _savedFog = null;
 
     // Controller groups  ─ kept at scene origin to cancel parent offset
     // (Three.js sets ctrl position in parent-local space; if scene.position.y = 0.75
@@ -1565,26 +1860,26 @@
     const _gripRoot = new THREE.Group(); // grip space (body meshes)
     scene.add(_ctrlRoot, _gripRoot);
 
-    const _xrCtrls  = [renderer.xr.getController(0),     renderer.xr.getController(1)];
-    const _xrGrips  = [renderer.xr.getControllerGrip(0), renderer.xr.getControllerGrip(1)];
-    const _gripState    = [false, false];
-    let   _grabbing     = false;
-    let   _grabMid      = new THREE.Vector3();
-    let   _grabDist     = 0;
-    let   _grabScenePos = new THREE.Vector3();
-    let   _grabScaleBase = 1;
-    const ANCHOR_KEY    = 'xr_table_anchor';
-    let   _xrAnchor     = null;
-    let   _xrRefSpace   = null;
+    const _xrCtrls = [renderer.xr.getController(0), renderer.xr.getController(1)];
+    const _xrGrips = [renderer.xr.getControllerGrip(0), renderer.xr.getControllerGrip(1)];
+    const _gripState = [false, false];
+    let _grabbing = false;
+    let _grabMid = new THREE.Vector3();
+    let _grabDist = 0;
+    let _grabScenePos = new THREE.Vector3();
+    let _grabScaleBase = 1;
+    const ANCHOR_KEY = 'xr_table_anchor';
+    let _xrAnchor = null;
+    let _xrRefSpace = null;
 
     (function initControllers() {
       const rayGeo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-3)
+        new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -3)
       ]);
-      const rayMat  = new THREE.LineBasicMaterial({ color:0x88aaff, transparent:true, opacity:0.65, depthTest:false });
+      const rayMat = new THREE.LineBasicMaterial({ color: 0x88aaff, transparent: true, opacity: 0.65, depthTest: false });
       const bodyGeo = new THREE.CylinderGeometry(0.018, 0.022, 0.10, 10);
-      const capGeo  = new THREE.SphereGeometry(0.022, 10, 6, 0, Math.PI*2, 0, Math.PI*0.5);
-      const bodyMat = new THREE.MeshStandardMaterial({ color:0x222233, roughness:0.7, metalness:0.3 });
+      const capGeo = new THREE.SphereGeometry(0.022, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.5);
+      const bodyMat = new THREE.MeshStandardMaterial({ color: 0x222233, roughness: 0.7, metalness: 0.3 });
 
       _xrCtrls.forEach((ctrl, i) => {
         ctrl.add(new THREE.Line(rayGeo, rayMat));
@@ -1596,10 +1891,10 @@
             const p0 = new THREE.Vector3().setFromMatrixPosition(_xrCtrls[0].matrixWorld);
             const p1 = new THREE.Vector3().setFromMatrixPosition(_xrCtrls[1].matrixWorld);
             _grabMid.addVectors(p0, p1).multiplyScalar(0.5);
-            _grabDist       = Math.max(p0.distanceTo(p1), 0.12);
+            _grabDist = Math.max(p0.distanceTo(p1), 0.12);
             _grabScenePos.copy(scene.position);
-            _grabScaleBase  = scene.scale.x;
-            _grabbing       = true;
+            _grabScaleBase = scene.scale.x;
+            _grabbing = true;
           }
         });
         ctrl.addEventListener('squeezeend', () => {
@@ -1629,43 +1924,43 @@
     function tickWorldGrab() {
       syncCtrlRoots();
       if (!_grabbing || !_gripState[0] || !_gripState[1]) return;
-      const p0  = new THREE.Vector3().setFromMatrixPosition(_xrCtrls[0].matrixWorld);
-      const p1  = new THREE.Vector3().setFromMatrixPosition(_xrCtrls[1].matrixWorld);
+      const p0 = new THREE.Vector3().setFromMatrixPosition(_xrCtrls[0].matrixWorld);
+      const p1 = new THREE.Vector3().setFromMatrixPosition(_xrCtrls[1].matrixWorld);
       const mid = new THREE.Vector3().addVectors(p0, p1).multiplyScalar(0.5);
       const rawDelta = mid.clone().sub(_grabMid);
       if (rawDelta.length() > 0.5) rawDelta.setLength(0.5); // safety clamp
       scene.position.copy(_grabScenePos).add(rawDelta);
       const dist = p0.distanceTo(p1);
       if (_grabDist > 0.01)
-        scene.scale.setScalar(THREE.MathUtils.clamp(_grabScaleBase*(dist/_grabDist), 0.05, 6));
+        scene.scale.setScalar(THREE.MathUtils.clamp(_grabScaleBase * (dist / _grabDist), 0.05, 6));
     }
 
     function saveAnchorPosition() {
-      const {x,y,z} = scene.position; const s = scene.scale.x;
-      localStorage.setItem(ANCHOR_KEY, JSON.stringify({x,y,z,s}));
+      const { x, y, z } = scene.position; const s = scene.scale.x;
+      localStorage.setItem(ANCHOR_KEY, JSON.stringify({ x, y, z, s }));
       if (_xrSession && _xrRefSpace) {
         try {
           renderer.xr.getFrame()?.createAnchor(
-            new XRRigidTransform({x,y,z,w:1}, {x:0,y:0,z:0,w:1}), _xrRefSpace
+            new XRRigidTransform({ x, y, z, w: 1 }, { x: 0, y: 0, z: 0, w: 1 }), _xrRefSpace
           ).then(a => {
             _xrAnchor = a;
             a.requestPersistentHandle?.()
-              .then(uuid => localStorage.setItem(ANCHOR_KEY+'_uuid', uuid))
-              .catch(()=>{});
-          }).catch(()=>{});
-        } catch(_){}
+              .then(uuid => localStorage.setItem(ANCHOR_KEY + '_uuid', uuid))
+              .catch(() => { });
+          }).catch(() => { });
+        } catch (_) { }
       }
     }
 
     async function restoreAnchorPosition(session) {
-      const uuid = localStorage.getItem(ANCHOR_KEY+'_uuid');
+      const uuid = localStorage.getItem(ANCHOR_KEY + '_uuid');
       if (uuid && session.restorePersistentAnchor) {
-        try { _xrAnchor = await session.restorePersistentAnchor(uuid); return; } catch(e){}
+        try { _xrAnchor = await session.restorePersistentAnchor(uuid); return; } catch (e) { }
       }
       try {
         const s = JSON.parse(localStorage.getItem(ANCHOR_KEY));
-        if (s) { scene.position.set(s.x??0, s.y??0.75, s.z??-0.5); scene.scale.setScalar(s.s??1); return; }
-      } catch(_){}
+        if (s) { scene.position.set(s.x ?? 0, s.y ?? 0.75, s.z ?? -0.5); scene.scale.setScalar(s.s ?? 1); return; }
+      } catch (_) { }
       scene.position.set(0, 0.75, -0.5); // default: robots at table height in front of user
     }
 
@@ -1674,35 +1969,35 @@
       if (!t) return;
       t.textContent = msg;
       t.classList.add('show');
-      setTimeout(() => t.classList.remove('show'), ms||6000);
+      setTimeout(() => t.classList.remove('show'), ms || 6000);
     }
 
     window.toggleVR = async function () {
       if (_xrSession) { await _xrSession.end(); return; }
       if (!window.isSecureContext) { showXrToast('WebXR needs HTTPS.'); return; }
-      if (!navigator.xr)           { showXrToast('navigator.xr not available.'); return; }
+      if (!navigator.xr) { showXrToast('navigator.xr not available.'); return; }
 
-      const arOk = await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
+      const arOk = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
       _xrMode = arOk ? 'immersive-ar' : 'immersive-vr';
       try {
         const session = await navigator.xr.requestSession(_xrMode, {
-          optionalFeatures: ['local-floor','bounded-floor','hand-tracking','dom-overlay','layers','anchors'],
+          optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'dom-overlay', 'layers', 'anchors'],
           domOverlay: { root: document.getElementById('sidebar') }
         });
         _xrSession = session;
 
-        const btn   = document.getElementById('sb-vr-btn');
-        const icon  = document.getElementById('sb-vr-icon');
+        const btn = document.getElementById('sb-vr-btn');
+        const icon = document.getElementById('sb-vr-icon');
         const label = document.getElementById('sb-vr-label');
-        if (btn)   btn.classList.add('active');
-        if (icon)  icon.textContent = '\u23f9\ufe0f';
-        if (label) label.textContent = _xrMode==='immersive-ar' ? '\u00a0Exit MR' : '\u00a0Exit VR';
+        if (btn) btn.classList.add('active');
+        if (icon) icon.textContent = '\u23f9\ufe0f';
+        if (label) label.textContent = _xrMode === 'immersive-ar' ? '\u00a0Exit MR' : '\u00a0Exit VR';
 
-        _savedBg  = scene.background;
+        _savedBg = scene.background;
         _savedFog = scene.fog;
         if (_xrMode === 'immersive-ar') {
           scene.background = null;
-          scene.fog        = null;
+          scene.fog = null;
           renderer.setClearColor(0x000000, 0);
         }
 
@@ -1711,36 +2006,36 @@
         await renderer.xr.setSession(session);
         renderer.xr.setReferenceSpaceType('local-floor');
         _xrRefSpace = renderer.xr.getReferenceSpace();
-        try { const l=session.renderState.layers?.[0]; if(l&&'fixedFoveation'in l) l.fixedFoveation=0; } catch(_){}
+        try { const l = session.renderState.layers?.[0]; if (l && 'fixedFoveation' in l) l.fixedFoveation = 0; } catch (_) { }
 
         await restoreAnchorPosition(session);
 
         session.addEventListener('end', () => {
           _xrSession = null;
           scene.background = _savedBg;
-          scene.fog        = _savedFog;
-          scene.position.set(0,0,0);
+          scene.fog = _savedFog;
+          scene.position.set(0, 0, 0);
           scene.scale.setScalar(1);
           renderer.setClearColor(0x000000, 1);
           _gripState[0] = _gripState[1] = false;
           _grabbing = false;
-          if (btn)   btn.classList.remove('active');
-          if (icon)  icon.textContent = '\ud83e\udd7d';
-          if (label) label.textContent = _xrMode==='immersive-ar' ? '\u00a0Enter MR' : '\u00a0Enter VR';
+          if (btn) btn.classList.remove('active');
+          if (icon) icon.textContent = '\ud83e\udd7d';
+          if (label) label.textContent = _xrMode === 'immersive-ar' ? '\u00a0Enter MR' : '\u00a0Enter VR';
         });
-      } catch(err) {
+      } catch (err) {
         console.warn('[XR]', err);
-        showXrToast('XR failed: '+(err.message||err));
+        showXrToast('XR failed: ' + (err.message || err));
       }
     };
 
     (async () => {
       const btn = document.getElementById('sb-vr-btn');
       const lbl = document.getElementById('sb-vr-label');
-      if (!navigator.xr) { if(btn){btn.classList.add('unsupported');btn.title='WebXR not available';} return; }
-      const arOk = await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
-      const vrOk = await navigator.xr.isSessionSupported('immersive-vr').catch(()=>false);
-      if (!arOk && !vrOk && btn) { btn.classList.add('unsupported'); btn.title='XR not supported - HTTPS required?'; }
+      if (!navigator.xr) { if (btn) { btn.classList.add('unsupported'); btn.title = 'WebXR not available'; } return; }
+      const arOk = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
+      const vrOk = await navigator.xr.isSessionSupported('immersive-vr').catch(() => false);
+      if (!arOk && !vrOk && btn) { btn.classList.add('unsupported'); btn.title = 'XR not supported - HTTPS required?'; }
       else if (lbl) lbl.textContent = arOk ? '\u00a0Enter MR' : '\u00a0Enter VR';
     })();
 
@@ -1775,11 +2070,15 @@
       let ws = null;
 
       function connect() {
-        const wsUrl = `ws://${location.host}/scene3d-ws`;
+        // Use wss:// on HTTPS (Cloudflare) to avoid mixed-content block; ws:// on plain HTTP (LAN)
+        const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
+        const wsUrl = `${wsProto}://${location.host}/scene3d-ws`;
+
         label.textContent = 'Connecting…';
         badge.classList.remove('live', 'error');
 
         ws = new WebSocket(wsUrl);
+        window._remoteWs = ws;
 
         ws.onopen = () => {
           retryDelay = 1500;

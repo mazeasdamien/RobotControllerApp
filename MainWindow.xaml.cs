@@ -1399,23 +1399,15 @@ namespace RobotControllerApp
                 SceneWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
                     "library.local", LibraryPath, Microsoft.Web.WebView2.Core.CoreWebView2HostResourceAccessKind.Allow);
 
-                SceneWebView.Source = new Uri("http://app.local/scene3d.html");
+                SceneWebView.Source = new Uri("http://app.local/preview.html");
                 await Task.Delay(800);
                 _webViewReady = true;
 
                 // ── Handle messages posted by the HTML page (e.g. freeze feed) ─
                 SceneWebView.CoreWebView2.WebMessageReceived += (_, e) =>
                 {
-                    try
-                    {
-                        var doc = System.Text.Json.JsonDocument.Parse(e.TryGetWebMessageAsString());
-                        if (doc.RootElement.TryGetProperty("type", out var t) && t.GetString() == "freezeFeed")
-                        {
-                            _feedFrozen = doc.RootElement.TryGetProperty("value", out var v) && v.GetBoolean();
-                            Log($"[Scene3D] Feed {(_feedFrozen ? "frozen" : "live")}");
-                        }
-                    }
-                    catch { /* ignore malformed messages */ }
+                    try { HandleClientBrowserMessage(e.TryGetWebMessageAsString()); }
+                    catch { }
                 };
 
                 // ── Start broadcast server for LAN / Quest browser access ────
@@ -1457,28 +1449,7 @@ namespace RobotControllerApp
                     _broadcastServer.OnBrowserMessage += (raw) =>
                     {
                         if (!_webViewReady) return;
-                        try
-                        {
-                            using var doc = System.Text.Json.JsonDocument.Parse(raw);
-                            var type = doc.RootElement.GetProperty("type").GetString();
-                            var payload = doc.RootElement.GetProperty("payload");
-
-                            string? jsCall = type switch
-                            {
-                                "setRobotJoints" => BuildSetRobotJointsJs(payload),
-                                "setCameraRobot" => null, // hub is the source of truth for camera robot
-                                _ => null
-                            };
-
-                            if (jsCall != null)
-                            {
-                                DispatcherQueue.TryEnqueue(async () =>
-                                {
-                                    try { await SceneWebView.ExecuteScriptAsync(jsCall); }
-                                    catch { }
-                                });
-                            }
-                        }
+                        try { HandleClientBrowserMessage(raw); }
                         catch { }
                     };
 
@@ -3194,19 +3165,29 @@ namespace RobotControllerApp
             {
                 try
                 {
+                    if (!_isCalibFrozen && !_feedFrozen)
+                    {
+                        string b64 = Convert.ToBase64String(jpeg);
+                        string js = $"if (window.updateCameraFeed) window.updateCameraFeed('data:image/jpeg;base64,{b64}');";
+                        
+                        if (_webViewReady)
+                        {
+                            _ = SceneWebView.ExecuteScriptAsync(js);
+                        }
+                        
+                        if (_broadcastServer != null && _broadcastServer.ConnectedClients > 0)
+                        {
+                            string payloadJson = System.Text.Json.JsonSerializer.Serialize($"data:image/jpeg;base64,{b64}");
+                            _ = _broadcastServer.BroadcastAsync("updateCameraFeed", payloadJson);
+                        }
+                    }
+
                     if (Preview3DView.Visibility == Visibility.Visible)
                     {
                         var bmp = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage();
                         using var ms = new System.IO.MemoryStream(jpeg);
                         await bmp.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
                         CalibCameraPreview.Source = bmp;
-
-                        if (_webViewReady && !_isCalibFrozen && !_feedFrozen)
-                        {
-                            string b64 = Convert.ToBase64String(jpeg);
-                            string js = $"if (window.updateCameraFeed) window.updateCameraFeed('data:image/jpeg;base64,{b64}');";
-                            _ = SceneWebView.ExecuteScriptAsync(js);
-                        }
                     }
 
                     if (ContextView.Visibility == Visibility.Visible)
@@ -3378,6 +3359,89 @@ namespace RobotControllerApp
 
         // ── 3D Preview URL card helpers ───────────────────────────────────────
 
+        private void HandleClientBrowserMessage(string jsonStr)
+        {
+            try
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(jsonStr);
+                if (!doc.RootElement.TryGetProperty("type", out var tProp)) return;
+                var type = tProp.GetString();
+
+                System.Text.Json.JsonElement payload = default;
+                if (!doc.RootElement.TryGetProperty("payload", out payload))
+                    doc.RootElement.TryGetProperty("value", out payload);
+
+                bool isLiveFeed = false;
+                bool isOpacity = false;
+                bool isFov = false;
+                bool isFreezeCalib = false;
+                bool isSetJoints = false;
+                
+                bool boolVal = false;
+                double numVal = 0;
+                string? jointsJsCall = null;
+                
+                if (type == "freezeFeed")
+                {
+                    isLiveFeed = true;
+                    boolVal = payload.ValueKind == System.Text.Json.JsonValueKind.True || (payload.ValueKind == System.Text.Json.JsonValueKind.String && payload.GetString() == "true");
+                }
+                else if (type == "opacity")
+                {
+                    isOpacity = true;
+                    if (payload.ValueKind == System.Text.Json.JsonValueKind.Number) numVal = payload.GetDouble();
+                }
+                else if (type == "fov")
+                {
+                    isFov = true;
+                    if (payload.ValueKind == System.Text.Json.JsonValueKind.Number) numVal = payload.GetDouble();
+                }
+                else if (type == "freezeCalib")
+                {
+                    isFreezeCalib = true;
+                    boolVal = payload.ValueKind == System.Text.Json.JsonValueKind.True || (payload.ValueKind == System.Text.Json.JsonValueKind.String && payload.GetString() == "true");
+                }
+                else if (type == "setRobotJoints" && payload.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+                {
+                    isSetJoints = true;
+                    jointsJsCall = BuildSetRobotJointsJs(payload);
+                }
+
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (isSetJoints && !string.IsNullOrEmpty(jointsJsCall))
+                    {
+                        _ = SceneWebView.ExecuteScriptAsync(jointsJsCall);
+                    }
+                    else if (isLiveFeed)
+                    {
+                         _feedFrozen = boolVal;
+                         Log($"[Scene3D] Feed {(_feedFrozen ? "frozen" : "live")}");
+                    }
+                    else if (isOpacity)
+                    {
+                         CameraFeedOpacitySlider.Value = numVal;
+                    }
+                    else if (isFov)
+                    {
+                         if (_settings != null && Math.Abs(_settings.CameraFovScale - numVal) > 0.001)
+                         {
+                             _settings.CameraFovScale = numVal;
+                             _settings.Save();
+                         }
+                    }
+                    else if (isFreezeCalib)
+                    {
+                         if (FreezeCalibToggle.IsOn != boolVal)
+                             FreezeCalibToggle.IsOn = boolVal;
+                         if (!boolVal && StartCalibDetectionBtn.Content?.ToString()?.StartsWith("■") != true)
+                             StartCalibDetectionBtn_Click(null!, null!);
+                    }
+                });
+            }
+            catch { }
+        }
+
         /// <summary>
         /// <summary>
         /// Builds a JS string that calls setRobotJoints in the local WebView2
@@ -3423,10 +3487,10 @@ namespace RobotControllerApp
         /// <summary>Detects the current LAN IP and updates the dashboard URL card.</summary>
         private void UpdateScene3dUrlCard()
         {
-            const string publicUrl = "https://scene3d.dmzs-lab.com/scene3d.html"; // Cloudflare tunnel (anywhere)
+            const string publicUrl = "https://scene3d.dmzs-lab.com/preview.html"; // Cloudflare tunnel (anywhere)
             var lanIp   = GetLocalLanIp();
             var lanPort = Scene3dBroadcastServer.DefaultPort; // 8181 HTTP (Cloudflare terminates TLS)
-            var lanUrl  = $"http://{lanIp}:{lanPort}/scene3d.html";
+            var lanUrl  = $"http://{lanIp}:{lanPort}/preview.html";
 
             // Show public URL as primary — fallback shows LAN for direct access
             var display = $"{publicUrl}\nLAN: {lanUrl}";
