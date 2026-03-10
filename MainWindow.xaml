@@ -348,19 +348,51 @@
                                             <RowDefinition Height="*"/>
                                         </Grid.RowDefinitions>
 
-                                        <!-- Header -->
+                                        <!-- Header: icon + title + camera selector + badge -->
                                         <Grid Margin="0,0,0,12">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
                                                 <ColumnDefinition Width="*"/>
                                                 <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="Auto"/>
                                             </Grid.ColumnDefinitions>
-                                            <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                                                <FontIcon Glyph="&#xE99A;" FontSize="16" Foreground="{StaticResource Brush.Primary}"/>
-                                                <TextBlock Text="ROBOT 1 VIDEO FEED" FontWeight="SemiBold" FontSize="12" VerticalAlignment="Center"/>
-                                            </StackPanel>
+                                            <!-- Icon -->
+                                            <FontIcon Grid.Column="0" Glyph="&#xE99A;" FontSize="14"
+                                                      Foreground="{StaticResource Brush.Primary}"
+                                                      VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                            <!-- Title -->
+                                            <TextBlock x:Name="RobotVideoFeedLabel"
+                                                       Grid.Column="1"
+                                                       Text="ROBOT 1 VIDEO FEED"
+                                                       FontWeight="SemiBold" FontSize="12"
+                                                       VerticalAlignment="Center"/>
+                                            <!-- Camera selector: R1 -->
+                                            <RadioButton x:Name="CameraRobot1Radio"
+                                                         Grid.Column="3"
+                                                         Content="R1"
+                                                         GroupName="CameraRobotGroup"
+                                                         IsChecked="True"
+                                                         Checked="CameraRobotRadio_Checked"
+                                                         Tag="1"
+                                                         FontSize="11"
+                                                         VerticalAlignment="Center"
+                                                         Margin="0,0,8,0"
+                                                         ToolTipService.ToolTip="Camera on Robot 1"/>
+                                            <!-- Camera selector: R2 -->
+                                            <RadioButton x:Name="CameraRobot2Radio"
+                                                         Grid.Column="4"
+                                                         Content="R2"
+                                                         GroupName="CameraRobotGroup"
+                                                         Checked="CameraRobotRadio_Checked"
+                                                         Tag="2"
+                                                         FontSize="11"
+                                                         VerticalAlignment="Center"
+                                                         Margin="0,0,10,0"
+                                                         ToolTipService.ToolTip="Camera on Robot 2"/>
                                             <!-- LIVE badge -->
-                                            <Border Grid.Column="2" CornerRadius="4" Padding="6,2"
+                                            <Border Grid.Column="5" CornerRadius="4" Padding="6,2"
                                                     x:Name="RobotFeedBadge"
                                                     Background="#333333" VerticalAlignment="Center">
                                                 <StackPanel Orientation="Horizontal" Spacing="5">
@@ -1218,58 +1250,69 @@
 
                 <!-- 7. 3D SCENE PREVIEW VIEW -->
                 <Grid x:Name="Preview3DView" Visibility="Collapsed">
-                    <WebView2 x:Name="SceneWebView" />
-                    
-                    <!-- Floating Calibration Panel -->
-                    <Expander HorizontalAlignment="Right" VerticalAlignment="Top" Margin="20,64,20,20" Padding="15" Width="280"
-                            Background="#D01A1A1A" CornerRadius="8" BorderBrush="#333333" BorderThickness="1" IsExpanded="True">
-                        <Expander.Header>
-                            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,0">
-                                <FontIcon Glyph="&#xE722;" FontSize="16" Foreground="{StaticResource Brush.Primary}" VerticalAlignment="Center"/>
-                                <TextBlock Text="Camera Calibration" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Expander.Header>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*"/>
+                        <RowDefinition Height="Auto"/>
+                    </Grid.RowDefinitions>
 
-                        <StackPanel Spacing="12">
-                            <ComboBox x:Name="CalibCameraComboBox" HorizontalAlignment="Stretch"
-                                      PlaceholderText="Select camera..." FontSize="12"
-                                      SelectionChanged="CalibCameraComboBox_SelectionChanged"/>
-                            
-                            <Button x:Name="StartCalibDetectionBtn" Content="Start Detection"
-                                    HorizontalAlignment="Stretch" IsEnabled="False"
-                                    Click="StartCalibDetectionBtn_Click"/>
-                                          
-                            <ToggleSwitch x:Name="ShowCalibrationPlaneToggle" 
-                                          Header="Show Target Plane" 
-                                          IsOn="True"
-                                          OnContent="ON" OffContent="OFF"
-                                          Toggled="ShowCalibrationPlaneToggle_Toggled" />
-                                          
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Feed Projection Opacity" FontSize="12" Foreground="#888"/>
-                                <Slider x:Name="CameraFeedOpacitySlider" Minimum="0" Maximum="1" Value="0.85" SmallChange="0.05" LargeChange="0.1" StepFrequency="0.05" ValueChanged="CameraFeedOpacitySlider_ValueChanged"/>
-                            </StackPanel>
-                                          
-                            <Border Background="#0A0A0A" CornerRadius="4" BorderBrush="#111" BorderThickness="1">
-                                <Grid>
-                                    <Image x:Name="CalibCameraPreview" Height="140" Stretch="Uniform"/>
-                                    <StackPanel x:Name="CalibOfflineState" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
-                                        <TextBlock Text="Offline" Foreground="#666" FontSize="11" HorizontalAlignment="Center"/>
-                                    </StackPanel>
-                                    <Border x:Name="CalibDetectionBanner" VerticalAlignment="Top" HorizontalAlignment="Stretch" Background="#CC000000" Padding="4" Visibility="Collapsed">
-                                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
-                                            <FontIcon x:Name="CalibDetectionIcon" Glyph="&#xE783;" FontSize="12" Foreground="#FF4444"/>
-                                            <TextBlock x:Name="CalibDetectionStatus" Text="Grid not detected" FontSize="11" Foreground="#FF4444"/>
-                                        </StackPanel>
-                                    </Border>
-                                </Grid>
-                            </Border>
+                    <WebView2 x:Name="SceneWebView" Grid.Row="0"/>
 
-                            <ToggleSwitch x:Name="FreezeCalibToggle" OnContent="Unfreeze Calib" OffContent="Freeze Calib"
-                                    HorizontalAlignment="Stretch" IsEnabled="False"
-                                    Toggled="FreezeCalibToggle_Toggled"/>
-                        </StackPanel>
-                    </Expander>
+                    <!-- URL bar — pinned at bottom of the 3D view (Grid.Row 1) -->
+                    <Border Grid.Row="1"
+                            Background="#D0101018"
+                            BorderBrush="#28FFFFFF" BorderThickness="0,1,0,0"
+                            Padding="12,7">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Label -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                        Spacing="6" VerticalAlignment="Center"
+                                        Margin="0,0,12,0">
+                                <FontIcon Glyph="&#xE943;" FontSize="13"
+                                          Foreground="{StaticResource Brush.Primary}"/>
+                                <TextBlock Text="3D PREVIEW" FontSize="9"
+                                           FontWeight="SemiBold" CharacterSpacing="80"
+                                           Opacity="0.55" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- URL text -->
+                            <TextBlock x:Name="Scene3dUrlText"
+                                       Grid.Column="1"
+                                       Text="Starting server…"
+                                       FontSize="12" FontFamily="Consolas"
+                                       Foreground="{StaticResource Brush.Primary}"
+                                       VerticalAlignment="Center"
+                                       TextWrapping="NoWrap"
+                                       IsTextSelectionEnabled="True"/>
+
+                            <!-- Copy -->
+                            <Button x:Name="CopyScene3dUrlBtn"
+                                    Grid.Column="2"
+                                    Content="&#xE8C8;"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    FontSize="13" Padding="8,4"
+                                    Margin="10,0,0,0"
+                                    ToolTipService.ToolTip="Copy URL"
+                                    Click="CopyScene3dUrlBtn_Click"/>
+
+                            <!-- Open in browser -->
+                            <Button x:Name="OpenScene3dBtn"
+                                    Grid.Column="3"
+                                    Content="&#xE8A7;"
+                                    FontFamily="Segoe MDL2 Assets"
+                                    FontSize="13" Padding="8,4"
+                                    Margin="4,0,0,0"
+                                    ToolTipService.ToolTip="Open in browser"
+                                    Click="OpenScene3dBtn_Click"/>
+                        </Grid>
+                    </Border>
+
                 </Grid>
 
                 <!-- 7. SETTINGS VIEW -->
@@ -1338,25 +1381,6 @@
 
 
 
-                            <!-- Camera Robot Selection -->
-                            <StackPanel Spacing="8">
-                                <TextBlock Text="Camera-Equipped Robot" Style="{StaticResource Text.Body1}"/>
-                                <TextBlock Text="Select which robot has the camera mounted on it. Changes take effect immediately." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
-                                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,4,0,0">
-                                    <RadioButton x:Name="CameraRobot1Radio"
-                                                 Content="Robot 1"
-                                                 GroupName="CameraRobotGroup"
-                                                 IsChecked="True"
-                                                 Checked="CameraRobotRadio_Checked"
-                                                 Tag="1"/>
-                                    <RadioButton x:Name="CameraRobot2Radio"
-                                                 Content="Robot 2"
-                                                 GroupName="CameraRobotGroup"
-                                                 Checked="CameraRobotRadio_Checked"
-                                                 Tag="2"/>
-                                </StackPanel>
-                            </StackPanel>
-
                             <Button x:Name="SaveSettingsButton" Content="SAVE" Style="{StaticResource Button.Filled}" HorizontalAlignment="Left" Click="SaveSettingsButton_Click" Margin="0,16,0,32"/>
 
                         </StackPanel>
@@ -1365,5 +1389,31 @@
                 </Grid>
             </Grid>
         </NavigationView>
+
+        <!-- Hidden calibration stubs (named elements required by C# code-behind).
+             These are never visible — all UI is now in the HTML top-bar dropdown. -->
+        <StackPanel Visibility="Collapsed" IsHitTestVisible="False">
+            <ComboBox x:Name="CalibCameraComboBox"
+                      SelectionChanged="CalibCameraComboBox_SelectionChanged"/>
+            <Button x:Name="StartCalibDetectionBtn"
+                    Click="StartCalibDetectionBtn_Click"/>
+            <ToggleSwitch x:Name="ShowCalibrationPlaneToggle"
+                          IsOn="True"
+                          Toggled="ShowCalibrationPlaneToggle_Toggled"/>
+            <Slider x:Name="CameraFeedOpacitySlider"
+                    Minimum="0" Maximum="1" Value="0.85"
+                    ValueChanged="CameraFeedOpacitySlider_ValueChanged"/>
+            <Image x:Name="CalibCameraPreview"/>
+            <StackPanel x:Name="CalibOfflineState"/>
+            <Border x:Name="CalibDetectionBanner" Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal">
+                    <FontIcon x:Name="CalibDetectionIcon" Glyph="&#xE783;"/>
+                    <TextBlock x:Name="CalibDetectionStatus" Text="Grid not detected"/>
+                </StackPanel>
+            </Border>
+            <ToggleSwitch x:Name="FreezeCalibToggle"
+                          Toggled="FreezeCalibToggle_Toggled"/>
+        </StackPanel>
+
     </Grid>
 </Window>

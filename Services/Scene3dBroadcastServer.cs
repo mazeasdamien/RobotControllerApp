@@ -9,6 +9,8 @@ using System;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Net.WebSockets;
+using System.Security.Cryptography;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Threading;
@@ -28,10 +30,12 @@ namespace RobotControllerApp.Services
     {
         // ── Public API ───────────────────────────────────────────────────────────
 
-        public const int DefaultPort = 8181;
+        public const int DefaultPort     = 8181;
+        public const int DefaultHttpsPort = 8182;
 
         /// <summary>Port the server will listen on. Must be set before StartAsync().</summary>
-        public int Port { get; set; } = DefaultPort;
+        public int Port      { get; set; } = DefaultPort;
+        public int HttpsPort { get; set; } = DefaultHttpsPort;
 
         /// <summary>Full path to the Assets folder that contains scene3d.html.</summary>
         public string AssetsPath { get; set; } = string.Empty;
@@ -43,6 +47,9 @@ namespace RobotControllerApp.Services
 
         public static event Action<string>? OnLog;
         private static void Log(string msg) => OnLog?.Invoke($"[Scene3D] {msg}");
+
+        /// <summary>Fired when a connected browser client sends a message (e.g. FK slider moved).</summary>
+        public event Action<string>? OnBrowserMessage;
 
         /// <summary>Fired when a new remote browser connects. Subscriber should push a full state snapshot.</summary>
         public event Func<Task>? OnClientConnected;
@@ -78,6 +85,7 @@ namespace RobotControllerApp.Services
                 builder.WebHost.ConfigureKestrel(options =>
                 {
                     options.ListenAnyIP(Port);
+                    options.ListenAnyIP(HttpsPort, lo => lo.UseHttps(BuildSelfSignedCert()));
                 });
 
                 builder.Services.AddCors(options =>
@@ -139,7 +147,7 @@ namespace RobotControllerApp.Services
                         catch { }
                     }
 
-                    // Keep the socket open — drain any incoming messages (ping/pong or controls)
+                    // Keep the socket open -- decode and forward any incoming messages (controls, FK, etc.)
                     var buffer = new byte[4096];
                     try
                     {
@@ -148,6 +156,11 @@ namespace RobotControllerApp.Services
                             var result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token);
                             if (result.MessageType == WebSocketMessageType.Close)
                                 break;
+                            if (result.MessageType == WebSocketMessageType.Text)
+                            {
+                                var msg = Encoding.UTF8.GetString(buffer, 0, result.Count);
+                                OnBrowserMessage?.Invoke(msg);
+                            }
                         }
                     }
                     catch (OperationCanceledException) { }
@@ -176,6 +189,21 @@ namespace RobotControllerApp.Services
             }
         }
 
+
+        private static X509Certificate2 BuildSelfSignedCert()
+        {
+            using var rsa = RSA.Create(2048);
+            var req = new CertificateRequest("CN=OrangeRobotHub", rsa, HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
+            req.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
+            req.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, false));
+            req.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(new OidCollection { new Oid("1.3.6.1.5.5.7.3.1") }, false));
+            var san = new SubjectAlternativeNameBuilder();
+            san.AddDnsName("localhost");
+            try { foreach (var ip in System.Net.Dns.GetHostAddresses(System.Net.Dns.GetHostName())) if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) san.AddIpAddress(ip); } catch { }
+            req.CertificateExtensions.Add(san.Build());
+            var cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(10));
+            return new X509Certificate2(cert.Export(X509ContentType.Pfx), (string?)null, X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.Exportable);
+        }
         public async Task StopAsync()
         {
             _cts?.Cancel();

@@ -1332,6 +1332,7 @@ namespace RobotControllerApp
             // Show selected view
             if (args.IsSettingsSelected)
             {
+                NavView.IsPaneOpen = true;
                 SettingsView.Visibility = Visibility.Visible;
             }
             else if (args.SelectedItem is NavigationViewItem item && item.Tag != null)
@@ -1339,21 +1340,28 @@ namespace RobotControllerApp
                 switch (item.Tag.ToString())
                 {
                     case "home":
+                        NavView.IsPaneOpen = true;
                         DashboardView.Visibility = Visibility.Visible;
                         break;
                     case "telemetry":
+                        NavView.IsPaneOpen = true;
                         TelemetryView.Visibility = Visibility.Visible;
                         break;
                     case "settings":
+                        NavView.IsPaneOpen = true;
                         SettingsView.Visibility = Visibility.Visible;
                         break;
                     case "network":
+                        NavView.IsPaneOpen = true;
                         NetworkView.Visibility = Visibility.Visible;
                         break;
                     case "context":
+                        NavView.IsPaneOpen = true;
                         ContextView.Visibility = Visibility.Visible;
                         break;
                     case "preview3d":
+                        // Collapse nav to icon-only → more room for the 3D canvas
+                        NavView.IsPaneOpen = false;
                         Preview3DView.Visibility = Visibility.Visible;
                         if (CalibCameraComboBox.Items.Count == 0)
                             PopulateCalibCameraList();
@@ -1364,6 +1372,7 @@ namespace RobotControllerApp
         }
 
         private bool _webViewReady = false;
+        private bool _feedFrozen  = false;
         private RobotControllerApp.Services.CameraPose? _savedPose;
         private readonly Scene3dBroadcastServer _broadcastServer = new();
 
@@ -1393,6 +1402,21 @@ namespace RobotControllerApp
                 SceneWebView.Source = new Uri("http://app.local/scene3d.html");
                 await Task.Delay(800);
                 _webViewReady = true;
+
+                // ── Handle messages posted by the HTML page (e.g. freeze feed) ─
+                SceneWebView.CoreWebView2.WebMessageReceived += (_, e) =>
+                {
+                    try
+                    {
+                        var doc = System.Text.Json.JsonDocument.Parse(e.TryGetWebMessageAsString());
+                        if (doc.RootElement.TryGetProperty("type", out var t) && t.GetString() == "freezeFeed")
+                        {
+                            _feedFrozen = doc.RootElement.TryGetProperty("value", out var v) && v.GetBoolean();
+                            Log($"[Scene3D] Feed {(_feedFrozen ? "frozen" : "live")}");
+                        }
+                    }
+                    catch { /* ignore malformed messages */ }
+                };
 
                 // ── Start broadcast server for LAN / Quest browser access ────
                 if (!_broadcastServer.IsRunning)
@@ -1425,6 +1449,41 @@ namespace RobotControllerApp
 
                     _ = Task.Run(() => _broadcastServer.StartAsync());
                     Log($"[Scene3D] Broadcast server starting on port {Scene3dBroadcastServer.DefaultPort}");
+
+                    // ── Relay browser → local WebView2 (two-way sync) ────────────
+                    // When any connected browser client sends a message (e.g. FK drag),
+                    // we inject it directly into our local WebView2 so the hub and
+                    // browser stay in sync in real time.
+                    _broadcastServer.OnBrowserMessage += (raw) =>
+                    {
+                        if (!_webViewReady) return;
+                        try
+                        {
+                            using var doc = System.Text.Json.JsonDocument.Parse(raw);
+                            var type = doc.RootElement.GetProperty("type").GetString();
+                            var payload = doc.RootElement.GetProperty("payload");
+
+                            string? jsCall = type switch
+                            {
+                                "setRobotJoints" => BuildSetRobotJointsJs(payload),
+                                "setCameraRobot" => null, // hub is the source of truth for camera robot
+                                _ => null
+                            };
+
+                            if (jsCall != null)
+                            {
+                                DispatcherQueue.TryEnqueue(async () =>
+                                {
+                                    try { await SceneWebView.ExecuteScriptAsync(jsCall); }
+                                    catch { }
+                                });
+                            }
+                        }
+                        catch { }
+                    };
+
+                    // Show the correct LAN URL in the dashboard card
+                    UpdateScene3dUrlCard();
                 }
 
 
@@ -2306,8 +2365,8 @@ namespace RobotControllerApp
                         }
                     }
 
-                    // Live-sync to 3D preview if open
-                    if (_webViewReady) _ = PushObjectsToSceneAsync();
+                    // Live-sync to 3D preview if open (must run on UI thread for WebView2)
+                    if (_webViewReady) DispatcherQueue?.TryEnqueue(async () => await PushObjectsToSceneAsync());
                 }
                 else
                 {
@@ -3142,7 +3201,7 @@ namespace RobotControllerApp
                         await bmp.SetSourceAsync(System.IO.WindowsRuntimeStreamExtensions.AsRandomAccessStream(ms));
                         CalibCameraPreview.Source = bmp;
 
-                        if (_webViewReady && !_isCalibFrozen)
+                        if (_webViewReady && !_isCalibFrozen && !_feedFrozen)
                         {
                             string b64 = Convert.ToBase64String(jpeg);
                             string js = $"if (window.updateCameraFeed) window.updateCameraFeed('data:image/jpeg;base64,{b64}');";
@@ -3316,5 +3375,92 @@ namespace RobotControllerApp
             CalibDetectionBanner.Visibility = Visibility.Collapsed;
             Log("[Calib] Detection stopped.");
         }
+
+        // ── 3D Preview URL card helpers ───────────────────────────────────────
+
+        /// <summary>
+        /// <summary>
+        /// Builds a JS string that calls setRobotJoints in the local WebView2
+        /// from a browser-relayed payload element.
+        /// </summary>
+        private static string BuildSetRobotJointsJs(System.Text.Json.JsonElement payload)
+        {
+            try
+            {
+                var angles = payload.GetProperty("angles");
+                int robotIdx = payload.TryGetProperty("robotIdx", out var ri) ? ri.GetInt32() : 0;
+                string anglesJson = angles.GetRawText();
+                // Escape for injection into a JS string argument
+                string safe = anglesJson.Replace("\\", "\\\\").Replace("'", "\\'");
+                return $"if(window.setRobotJoints) window.setRobotJoints('{safe}', {robotIdx});";
+            }
+            catch { return string.Empty; }
+        }
+
+        /// <summary>
+        /// Returns the best LAN IPv4 address — skips loopback and link-local (169.254.x.x).
+        /// Prefers private ranges (192.168.x / 172.x / 10.x) over others.
+        /// </summary>
+        private static string GetLocalLanIp()
+        {
+            try
+            {
+                var host = System.Net.Dns.GetHostEntry(System.Net.Dns.GetHostName());
+                var addrs = host.AddressList
+                    .Where(a => a.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                    .Select(a => a.ToString())
+                    .Where(s => !s.StartsWith("127.") && !s.StartsWith("169.254."))
+                    .ToList();
+
+                // Prefer private ranges
+                return addrs.FirstOrDefault(s =>
+                    s.StartsWith("192.168.") || s.StartsWith("10.") ||
+                    s.StartsWith("172.")) ?? addrs.FirstOrDefault() ?? "localhost";
+            }
+            catch { return "localhost"; }
+        }
+
+        /// <summary>Detects the current LAN IP and updates the dashboard URL card.</summary>
+        private void UpdateScene3dUrlCard()
+        {
+            const string publicUrl = "https://scene3d.dmzs-lab.com/scene3d.html"; // Cloudflare tunnel (anywhere)
+            var lanIp   = GetLocalLanIp();
+            var lanPort = Scene3dBroadcastServer.DefaultPort; // 8181 HTTP (Cloudflare terminates TLS)
+            var lanUrl  = $"http://{lanIp}:{lanPort}/scene3d.html";
+
+            // Show public URL as primary — fallback shows LAN for direct access
+            var display = $"{publicUrl}\nLAN: {lanUrl}";
+
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                Scene3dUrlText.Text = publicUrl; // primary clickable
+                Scene3dUrlText.Tag  = publicUrl;
+            });
+        }
+
+        private void CopyScene3dUrlBtn_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+        {
+            var url = Scene3dUrlText.Tag as string ?? Scene3dUrlText.Text;
+            if (string.IsNullOrEmpty(url)) return;
+
+            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
+            dp.SetText(url);
+            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
+
+            // Brief visual feedback on the button
+            CopyScene3dUrlBtn.Content = "\uE8FB"; // Checkmark icon
+            _ = Task.Delay(1500).ContinueWith(_ =>
+                DispatcherQueue.TryEnqueue(() => CopyScene3dUrlBtn.Content = "\uE8C8"));
+        }
+
+        private void OpenScene3dBtn_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
+        {
+            var url = Scene3dUrlText.Tag as string ?? Scene3dUrlText.Text;
+            if (string.IsNullOrEmpty(url)) return;
+
+            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); }
+            catch (Exception ex) { Log($"[Scene3D] Could not open browser: {ex.Message}"); }
+        }
     }
 }
+
