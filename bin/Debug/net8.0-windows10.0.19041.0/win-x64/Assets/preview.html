@@ -2020,7 +2020,7 @@
           const q = new THREE.Quaternion();
 
           let renderAngle = FK_ANGLES[i];
-          if (i === 1) renderAngle -= 30; // J2
+          if (i === 1) renderAngle -= 40; // J2
           if (i === 2) renderAngle += 75; // J3
 
           q.setFromAxisAngle(JOINT_AXES[i], THREE.MathUtils.degToRad(renderAngle));

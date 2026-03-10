@@ -1328,7 +1328,11 @@
                             <StackPanel Spacing="8">
                                 <TextBlock Text="Orange LLM Proxy API Key" Style="{StaticResource Text.Body1}"/>
                                 <PasswordBox x:Name="OrangeApiKeyInput" PlaceholderText="sk-..." Width="400" HorizontalAlignment="Left"/>
-                                <TextBlock Text="Required for Context features (Scene Understanding)." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,16"/>
+                                <TextBlock Text="Required for Context features (Scene Understanding) and Voice Transcription." Style="{StaticResource Text.Caption}" Opacity="0.6"/>
+
+                                <TextBlock Text="Orange / Whisper API URL" Style="{StaticResource Text.Body1}" Margin="0,12,0,0"/>
+                                <TextBox x:Name="OrangeApiUrlInput" PlaceholderText="https://llmproxy.ai.orange" Width="400" HorizontalAlignment="Left"/>
+                                <TextBlock Text="Base URL for the Whisper speech-to-text endpoint (no trailing slash)." Style="{StaticResource Text.Caption}" Opacity="0.6" Margin="0,0,0,16"/>
                                 
                                 <TextBlock Text="Google Gemini API Key" Style="{StaticResource Text.Body1}"/>
                                 <PasswordBox x:Name="GeminiApiKeyInput" PlaceholderText="AIza..." Width="400" HorizontalAlignment="Left"/>
