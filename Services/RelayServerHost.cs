@@ -3,7 +3,9 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.IO;
 using System.Net.WebSockets;
@@ -24,8 +26,8 @@ namespace RobotControllerApp.Services
         // Telemetry Events
         public static event Action<float[]>? OnJointsReceived;          // Robot 1
         public static event Action<float[]>? OnRobot2JointsReceived;    // Robot 2
-        public static event Action<int, int>? OnImageStatsUpdated; // FPS, Total
-        public static event Action<byte[]>? OnImageReceived; // Latest base64 decoded frame
+        public static event Action<int, int>? OnImageStatsUpdated;      // FPS, Total
+        public static event Action<byte[]>? OnImageReceived;            // Latest base64 decoded frame
         public static event Action<string>? OnUnityMessageReceived;
         public static event Action<string>? OnRobotStateReceived;
         public static event Action<string, float, float, string>? OnUnityTelemetryReceived; // location, rx_kbps, tx_kbps, public_ip
@@ -61,6 +63,9 @@ namespace RobotControllerApp.Services
             {
                 var builder = WebApplication.CreateBuilder();
 
+                // Supprime les logs verbeux natifs d'ASP.NET (requêtes HTTP etc.) pour ne pas polluer l'UI
+                builder.Logging.ClearProviders();
+
                 // Configure Kestrel to listen on all interfaces
                 builder.WebHost.ConfigureKestrel(options =>
                 {
@@ -82,7 +87,10 @@ namespace RobotControllerApp.Services
                 _app = app;
 
                 app.UseCors();
-                app.UseWebSockets();
+                app.UseWebSockets(new WebSocketOptions
+                {
+                    KeepAliveInterval = TimeSpan.FromSeconds(25)
+                });
 
                 var connectionManager = app.Services.GetRequiredService<ConnectionManager>();
                 CurrentManager = connectionManager;
@@ -136,18 +144,24 @@ namespace RobotControllerApp.Services
                         UnityClientIp = context.Connection.RemoteIpAddress?.ToString();
                         UnityClientConnected = true;
                         OnUnityConnectionChanged?.Invoke(true);
+
                         string cleanIp = UnityClientIp?.Replace("::ffff:", "") ?? "?";
                         Log($"🟢 [Relay] Remote Expert connected — {robotId}  ({cleanIp})");
 
-                        connectionManager.AddUnityClient(robotId, ws);
-                        await HandleUnityConnection(ws, robotId, connectionManager, token);
+                        try
+                        {
+                            connectionManager.AddUnityClient(robotId, ws);
+                            await HandleUnityConnection(ws, robotId, connectionManager, token);
+                        }
+                        finally
+                        {
+                            UnityClientConnected = false;
+                            OnUnityConnectionChanged?.Invoke(false);
+                            LastQuestLatencyMs = 0;
+                            connectionManager.RemoveUnityClient(robotId);
 
-                        UnityClientConnected = false;
-                        OnUnityConnectionChanged?.Invoke(false);
-                        LastQuestLatencyMs = 0;
-                        connectionManager.RemoveUnityClient(robotId);
-
-                        Log($"🔴 [Relay] Remote Expert disconnected — {robotId}");
+                            Log($"🔴 [Relay] Remote Expert disconnected — {robotId}");
+                        }
                     }
                     else
                     {
@@ -191,26 +205,27 @@ namespace RobotControllerApp.Services
                 app.MapGet("/models", () =>
                 {
                     string libraryPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "RobotControllerApp", "Library");
-                    if (!Directory.Exists(libraryPath)) return Results.Ok(new string[0]);
-                    
+                    if (!Directory.Exists(libraryPath)) return Results.Ok(Array.Empty<string>());
+
                     var files = Directory.GetFiles(libraryPath, "*.glb");
-                    var fileNames = new List<string>();
+                    var fileNames = new List<string>(files.Length);
                     foreach (var f in files) fileNames.Add(Path.GetFileName(f));
-                    
+
                     return Results.Ok(fileNames);
                 });
-
-                // Removed WhatsApp Endpoint
 
                 app.MapGet("/", () => "Robot Orange Hub Server - WebSocket endpoints: /robot?robotId=X, /unity?robotId=X");
                 app.MapGet("/status", () =>
                 {
-                    dynamic status = connectionManager.GetStatus();
+                    if (CurrentManager == null) return Results.NotFound();
+                    dynamic status = CurrentManager.GetStatus();
                     return Results.Ok(new { status = "Hub Active", clients = ((List<string>)status.RobotClients).Count });
                 });
 
                 Log($"[Hub] Server active on Port {Port}");
-                await app.RunAsync(token);
+
+                // Utilisation de StartAsync pour ne pas bloquer le thread appelant
+                await app.StartAsync(token);
             }
             catch (Exception ex)
             {
@@ -225,14 +240,17 @@ namespace RobotControllerApp.Services
             {
                 await _app.StopAsync();
                 await _app.DisposeAsync();
+                _app = null;
             }
         }
 
         // --- HANDLERS ---
 
-        static async Task HandleRobotConnection(WebSocket ws, string robotId, ConnectionManager manager, CancellationToken token)
+        private static async Task HandleRobotConnection(WebSocket ws, string robotId, ConnectionManager manager, CancellationToken token)
         {
-            var buffer = new byte[1024 * 1024]; // 1MB buffer
+            // Utilisation d'un ArrayPool pour éviter la fragmentation mémoire LOH (Large Object Heap)
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(65536);
+
             try
             {
                 while (ws.State == WebSocketState.Open && !token.IsCancellationRequested)
@@ -242,7 +260,8 @@ namespace RobotControllerApp.Services
                     do
                     {
                         result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token);
-                        ms.Write(buffer, 0, result.Count);
+                        if (result.MessageType == WebSocketMessageType.Close) break;
+                        if (result.Count > 0) ms.Write(buffer, 0, result.Count);
                     } while (!result.EndOfMessage);
 
                     if (result.MessageType == WebSocketMessageType.Close)
@@ -251,14 +270,23 @@ namespace RobotControllerApp.Services
                         break;
                     }
 
-                    var message = Encoding.UTF8.GetString(ms.ToArray());
+                    if (ms.Length == 0) continue;
+
+                    // Optimisation 0 copie si possible : lecture directe dans le buffer du MemoryStream
+                    string message;
+                    if (ms.TryGetBuffer(out ArraySegment<byte> segment))
+                    {
+                        message = Encoding.UTF8.GetString(segment.Array!, segment.Offset, segment.Count);
+                    }
+                    else
+                    {
+                        message = Encoding.UTF8.GetString(ms.ToArray());
+                    }
 
                     // --- LATENCY PING (Interception) ---
                     if (message.Contains("\"op\":\"ping\""))
                     {
-                        var pong = "{\"op\":\"pong\"}";
-                        var pongBytes = Encoding.UTF8.GetBytes(pong);
-                        await ws.SendAsync(new ArraySegment<byte>(pongBytes), WebSocketMessageType.Text, true, token);
+                        await manager.SendToRobotClient(robotId, "{\"op\":\"pong\"}");
                         continue; // Don't forward heartbeat to Unity/ROS
                     }
 
@@ -282,6 +310,7 @@ namespace RobotControllerApp.Services
                                     if (count < 6) positions[count++] = (float)p.GetDouble();
                                 }
                                 manager.UpdateJoints(positions);
+
                                 // Route to the correct robot's event
                                 bool isRobot2 = robotId.EndsWith("02") || robotId.EndsWith("_2");
                                 if (isRobot2) OnRobot2JointsReceived?.Invoke(positions);
@@ -333,8 +362,10 @@ namespace RobotControllerApp.Services
                             }
                         }
                         catch { }
-                    }
 
+                        // ─── IMPORTANT: Camera frames are NOT forwarded via WebSocket ───
+                        continue;
+                    }
 
                     // 4. Robot System State
                     if (message.Contains("robot_state", StringComparison.OrdinalIgnoreCase) && !message.Contains("gripper_state"))
@@ -343,18 +374,10 @@ namespace RobotControllerApp.Services
                     }
 
                     // Relay to Unity client
-                    // ─── IMPORTANT: Camera frames are NOT forwarded via WebSocket ───
-                    // Each JPEG frame is 50–200 KB of base64. At 10 FPS that is ~2 MB/s
-                    // which completely saturates the WebSocket and blocks all joint state
-                    // and command messages. Camera is served via the /image HTTP endpoint.
-                    if (message.Contains("compressed_video_stream", StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue; // Skip — camera is polled by Quest via HTTP /image
-                    }
-
                     await manager.SendToUnityClient(robotId, message);
                 }
             }
+            catch (OperationCanceledException) { }
             catch (WebSocketException)
             {
                 // Normal disconnect (abrupt)
@@ -363,23 +386,28 @@ namespace RobotControllerApp.Services
             {
                 Log($"[Robot Error] {ex.Message}");
             }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(buffer);
+            }
         }
 
-        static async Task HandleUnityConnection(WebSocket ws, string robotId, ConnectionManager manager, CancellationToken token)
+        private static async Task HandleUnityConnection(WebSocket ws, string robotId, ConnectionManager manager, CancellationToken token)
         {
-            var buffer = new byte[1024 * 1024]; // 1MB buffer
+            byte[] buffer = ArrayPool<byte>.Shared.Rent(65536);
             var pingWatch = new System.Diagnostics.Stopwatch();
 
             // Start local heartbeat to measure Quest latency
-            var pingTimer = new Timer(async _ =>
+            // Fix: Déplacement de l'envoi vers le manager pour utiliser les verrous et éviter les crashs 
+            // d'appels simultanés à ws.SendAsync.
+            using var pingTimer = new Timer(async _ =>
             {
-                if (ws.State == WebSocketState.Open)
+                if (ws.State == WebSocketState.Open && !token.IsCancellationRequested)
                 {
                     try
                     {
                         pingWatch.Restart();
-                        var ping = Encoding.UTF8.GetBytes("{\"op\":\"ping\"}");
-                        await ws.SendAsync(new ArraySegment<byte>(ping), WebSocketMessageType.Text, true, CancellationToken.None);
+                        await manager.SendToUnityClient(robotId, "{\"op\":\"ping\"}");
                     }
                     catch { }
                 }
@@ -394,7 +422,8 @@ namespace RobotControllerApp.Services
                     do
                     {
                         result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token);
-                        ms.Write(buffer, 0, result.Count);
+                        if (result.MessageType == WebSocketMessageType.Close) break;
+                        if (result.Count > 0) ms.Write(buffer, 0, result.Count);
                     } while (!result.EndOfMessage);
 
                     if (result.MessageType == WebSocketMessageType.Close)
@@ -403,7 +432,17 @@ namespace RobotControllerApp.Services
                         break;
                     }
 
-                    var message = Encoding.UTF8.GetString(ms.ToArray());
+                    if (ms.Length == 0) continue;
+
+                    string message;
+                    if (ms.TryGetBuffer(out ArraySegment<byte> segment))
+                    {
+                        message = Encoding.UTF8.GetString(segment.Array!, segment.Offset, segment.Count);
+                    }
+                    else
+                    {
+                        message = Encoding.UTF8.GetString(ms.ToArray());
+                    }
 
                     // Intercept Pong from Quest
                     if (message.Contains("\"op\":\"pong\""))
@@ -438,9 +477,15 @@ namespace RobotControllerApp.Services
                     await manager.SendToRobotClient(robotId, message);
                 }
             }
+            catch (OperationCanceledException) { }
+            catch (WebSocketException) { }
+            catch (Exception ex)
+            {
+                Log($"[Unity Error] {ex.Message}");
+            }
             finally
             {
-                pingTimer.Dispose();
+                ArrayPool<byte>.Shared.Return(buffer);
             }
         }
     }

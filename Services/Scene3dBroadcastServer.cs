@@ -4,16 +4,18 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.FileProviders;
-using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using System;
+using System.Buffers;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -21,66 +23,107 @@ namespace RobotControllerApp.Services
 {
     /// <summary>
     /// Lightweight Kestrel server that:
-    ///   • Serves preview.html and all Assets over HTTP so any device on the LAN
-    ///     (e.g. a Meta Quest) can open the 3D preview in its browser.
-    ///   • Exposes a WebSocket endpoint at /scene3d-ws that pushes live scene
-    ///     updates (camera pose, detected objects, camera feed) to every
-    ///     connected browser client in real-time.
+    ///   • Serves preview.html and all Assets over HTTP so any device on the LAN can open the 3D preview.
+    ///   • Exposes a thread-safe WebSocket endpoint at /scene3d-ws.
+    ///   • Acts as a zero-allocation proxy for the Whisper API.
     /// </summary>
     public class Scene3dBroadcastServer
     {
-        // ── Public API ───────────────────────────────────────────────────────────
+        // ── Shared HTTP Client (Prevents TCP Port Exhaustion) ───────────────────
+        private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromMinutes(2) };
 
-        public const int DefaultPort     = 8181;
+        // ── Public API ──────────────────────────────────────────────────────────
+        public const int DefaultPort = 8181;
         public const int DefaultHttpsPort = 8182;
 
-        /// <summary>Port the server will listen on. Must be set before StartAsync().</summary>
-        public int Port      { get; set; } = DefaultPort;
+        public int Port { get; set; } = DefaultPort;
         public int HttpsPort { get; set; } = DefaultHttpsPort;
 
-        /// <summary>Full path to the Assets folder that contains preview.html.</summary>
         public string AssetsPath { get; set; } = string.Empty;
-
-        /// <summary>Full path to the Library folder that contains .glb model files.</summary>
         public string LibraryPath { get; set; } = string.Empty;
 
-        /// <summary>Base URL of the Orange Whisper API (e.g. https://api.orange.com/ai).</summary>
         public string WhisperApiUrl { get; set; } = string.Empty;
-
-        /// <summary>Bearer token / API key for the Orange Whisper API.</summary>
         public string WhisperApiKey { get; set; } = string.Empty;
 
-        // ── Events / Logging ─────────────────────────────────────────────────────
-
+        // ── Events / Logging ────────────────────────────────────────────────────
         public static event Action<string>? OnLog;
         private static void Log(string msg) => OnLog?.Invoke($"[Scene3D] {msg}");
 
-        /// <summary>Fired when a connected browser client sends a message (e.g. FK slider moved).</summary>
         public event Action<string>? OnBrowserMessage;
-
-        /// <summary>Fired when a new remote browser connects. Subscriber should push a full state snapshot.</summary>
         public event Func<Task>? OnClientConnected;
 
-        // ── Internal state ────────────────────────────────────────────────────────
+        // ── Thread-Safe WebSocket Wrapper ───────────────────────────────────────
+        private class ConnectedClient : IAsyncDisposable
+        {
+            public string Id { get; }
+            private readonly WebSocket _socket;
+            private readonly SemaphoreSlim _sendLock = new(1, 1);
 
-        // All currently-connected Quest (or any) browser WebSocket clients.
-        private readonly ConcurrentDictionary<string, WebSocket> _clients = new();
+            public ConnectedClient(string id, WebSocket socket)
+            {
+                Id = id;
+                _socket = socket;
+            }
+
+            public async Task SendAsync(ArraySegment<byte> segment)
+            {
+                if (_socket.State != WebSocketState.Open) return;
+
+                // Semaphore guarantees only one thread writes to this socket at a time
+                await _sendLock.WaitAsync();
+                try
+                {
+                    if (_socket.State == WebSocketState.Open)
+                        await _socket.SendAsync(segment, WebSocketMessageType.Text, true, CancellationToken.None);
+                }
+                finally
+                {
+                    _sendLock.Release();
+                }
+            }
+
+            public WebSocketState State => _socket.State;
+
+            public async ValueTask DisposeAsync()
+            {
+                if (_socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
+                {
+                    try
+                    {
+                        await _sendLock.WaitAsync(TimeSpan.FromSeconds(1));
+                        await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Server shutting down", CancellationToken.None);
+                    }
+                    catch { }
+                    finally { _sendLock.Release(); }
+                }
+                _sendLock.Dispose();
+                _socket.Dispose();
+            }
+        }
+
+        private readonly ConcurrentDictionary<string, ConnectedClient> _clients = new();
 
         private WebApplication? _app;
         private CancellationTokenSource? _cts;
 
-        /// <summary>True once StartAsync has been called and the server is listening.</summary>
         public bool IsRunning => _app != null;
 
-        // ── Lifecycle ─────────────────────────────────────────────────────────────
+        // ── Lifecycle ───────────────────────────────────────────────────────────
 
         public async Task StartAsync()
         {
-            if (string.IsNullOrWhiteSpace(AssetsPath) || !Directory.Exists(AssetsPath))
+            if (IsRunning) return;
+
+            if (string.IsNullOrWhiteSpace(AssetsPath))
             {
-                Log($"Assets path not set or missing: '{AssetsPath}' — server will not start.");
+                Log("Assets path not set — server will not start.");
                 return;
             }
+
+            // Fix 404 issue: Must ensure directories exist BEFORE injecting PhysicalFileProvider
+            Directory.CreateDirectory(AssetsPath);
+            if (!string.IsNullOrWhiteSpace(LibraryPath))
+                Directory.CreateDirectory(LibraryPath);
 
             _cts = new CancellationTokenSource();
             var token = _cts.Token;
@@ -89,22 +132,35 @@ namespace RobotControllerApp.Services
             {
                 var builder = WebApplication.CreateBuilder();
 
+                // Silence native ASP.NET verbose logs from the WinUI Output window
+                builder.Logging.ClearProviders();
+
                 builder.WebHost.ConfigureKestrel(options =>
                 {
+                    options.Limits.MaxRequestBodySize = 50 * 1024 * 1024; // 50 MB
                     options.ListenAnyIP(Port);
-                    options.ListenAnyIP(HttpsPort, lo => lo.UseHttps(BuildSelfSignedCert()));
+                    try
+                    {
+                        options.ListenAnyIP(HttpsPort, lo => lo.UseHttps(BuildSelfSignedCert()));
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"HTTPS bind failed (Cert error?): {ex.Message}");
+                    }
                 });
 
                 builder.Services.AddCors(options =>
                 {
                     options.AddDefaultPolicy(policy =>
-                        policy.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod());
+                        policy.AllowAnyOrigin()
+                              .AllowAnyHeader()
+                              .AllowAnyMethod()
+                              .WithExposedHeaders("Upgrade", "Connection"));
                 });
 
-                // Allow up to 50 MB audio uploads for voice transcription
                 builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(opt =>
                 {
-                    opt.MultipartBodyLengthLimit = 50 * 1024 * 1024; // 50 MB
+                    opt.MultipartBodyLengthLimit = 50 * 1024 * 1024; // 50 MB limits
                     opt.ValueLengthLimit = int.MaxValue;
                 });
 
@@ -112,15 +168,13 @@ namespace RobotControllerApp.Services
                 _app = app;
 
                 app.UseCors();
-                app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(15) });
+                app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(25) });
 
                 // ── Static file serving ───────────────────────────────────────────
-                // Custom MIME types: .glb / .gltf are not in the default provider
                 var mimeProvider = new FileExtensionContentTypeProvider();
                 mimeProvider.Mappings[".glb"] = "model/gltf-binary";
                 mimeProvider.Mappings[".gltf"] = "model/gltf+json";
 
-                // Assets directory — serves preview.html, ned.glb, SVGs, …
                 app.UseStaticFiles(new StaticFileOptions
                 {
                     FileProvider = new PhysicalFileProvider(AssetsPath),
@@ -128,8 +182,7 @@ namespace RobotControllerApp.Services
                     ContentTypeProvider = mimeProvider
                 });
 
-                // Library directory — serves generated .glb models
-                if (!string.IsNullOrWhiteSpace(LibraryPath) && Directory.Exists(LibraryPath))
+                if (!string.IsNullOrWhiteSpace(LibraryPath))
                 {
                     app.UseStaticFiles(new StaticFileOptions
                     {
@@ -139,7 +192,7 @@ namespace RobotControllerApp.Services
                     });
                 }
 
-                // ── WebSocket endpoint for browser clients ────────────────────────
+                // ── WebSocket Endpoint ────────────────────────────────────────────
                 app.Map("/scene3d-ws", async context =>
                 {
                     if (!context.WebSockets.IsWebSocketRequest)
@@ -151,19 +204,21 @@ namespace RobotControllerApp.Services
 
                     using var ws = await context.WebSockets.AcceptWebSocketAsync();
                     string clientId = Guid.NewGuid().ToString("N")[..8];
-                    _clients[clientId] = ws;
-                    Log($"Quest browser connected — id={clientId}  ip={context.Connection.RemoteIpAddress}  total={_clients.Count}");
 
-                    // Push full state snapshot to the newly connected client
+                    var client = new ConnectedClient(clientId, ws);
+                    _clients.TryAdd(clientId, client);
+                    Log($"Browser connected — id={clientId} ip={context.Connection.RemoteIpAddress} total={_clients.Count}");
+
                     if (OnClientConnected != null)
                     {
-                        try { await OnClientConnected.Invoke(); }
-                        catch { }
+                        // Fire-and-forget to avoid blocking the receive loop
+                        _ = Task.Run(async () => { try { await OnClientConnected.Invoke(); } catch { } }, token);
                     }
 
-                    // Keep the socket open -- decode and forward any incoming messages (controls, FK, etc.)
-                    var buffer = new byte[65536]; // 64 KB receive buffer
-                    var messageBuffer = new System.IO.MemoryStream();
+                    // Buffer pooling prevents LOH fragmentation on frequent 64KB allocations
+                    byte[] buffer = ArrayPool<byte>.Shared.Rent(65536);
+                    using var messageBuffer = new MemoryStream();
+
                     try
                     {
                         while (ws.State == WebSocketState.Open && !token.IsCancellationRequested)
@@ -174,16 +229,19 @@ namespace RobotControllerApp.Services
                             {
                                 result = await ws.ReceiveAsync(new ArraySegment<byte>(buffer), token);
                                 if (result.MessageType == WebSocketMessageType.Close) break;
-                                if (result.Count > 0)
-                                    messageBuffer.Write(buffer, 0, result.Count);
+                                if (result.Count > 0) messageBuffer.Write(buffer, 0, result.Count);
+
                             } while (!result.EndOfMessage);
 
                             if (result.MessageType == WebSocketMessageType.Close) break;
 
                             if (result.MessageType == WebSocketMessageType.Text)
                             {
-                                var msg = Encoding.UTF8.GetString(messageBuffer.ToArray());
-                                OnBrowserMessage?.Invoke(msg);
+                                if (messageBuffer.TryGetBuffer(out ArraySegment<byte> segment))
+                                {
+                                    var msg = Encoding.UTF8.GetString(segment.Array!, segment.Offset, segment.Count);
+                                    OnBrowserMessage?.Invoke(msg);
+                                }
                             }
                         }
                     }
@@ -191,19 +249,27 @@ namespace RobotControllerApp.Services
                     catch (WebSocketException) { }
                     finally
                     {
+                        ArrayPool<byte>.Shared.Return(buffer);
                         _clients.TryRemove(clientId, out _);
-                        Log($"Quest browser disconnected — id={clientId}  remaining={_clients.Count}");
+                        await client.DisposeAsync();
+                        Log($"Browser disconnected — id={clientId} remaining={_clients.Count}");
                     }
                 });
 
-                // ── Root redirect → preview.html ──────────────────────────────────
                 app.MapGet("/", context =>
                 {
                     context.Response.Redirect("/preview.html");
                     return Task.CompletedTask;
                 });
 
-                // ── /transcribe — proxy audio to Orange Whisper API ───────────────
+                app.MapGet("/ping", async context =>
+                {
+                    context.Response.Headers.Append("X-Hub-Version", "1.0");
+                    context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
+                    await context.Response.WriteAsync($"{{\"ok\":true,\"clients\":{_clients.Count}}}");
+                });
+
+                // ── Zero-Allocation Transcribe Proxy ──────────────────────────────
                 app.MapPost("/transcribe", async context =>
                 {
                     if (!context.Request.HasFormContentType)
@@ -216,14 +282,14 @@ namespace RobotControllerApp.Services
                     if (string.IsNullOrWhiteSpace(WhisperApiUrl) || string.IsNullOrWhiteSpace(WhisperApiKey))
                     {
                         context.Response.StatusCode = 503;
-                        await context.Response.WriteAsync("Whisper API not configured (set OrangeApiKey and WhisperApiUrl)");
+                        await context.Response.WriteAsync("Whisper API not configured.");
                         return;
                     }
 
-                    IFormFile? audioFile = null;
+                    IFormFile? audioFile;
                     try
                     {
-                        var form = await context.Request.ReadFormAsync();
+                        var form = await context.Request.ReadFormAsync(context.RequestAborted);
                         audioFile = form.Files.GetFile("file");
                     }
                     catch (Exception ex)
@@ -242,33 +308,33 @@ namespace RobotControllerApp.Services
 
                     try
                     {
-                        using var httpClient = new HttpClient();
-                        httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {WhisperApiKey}");
+                        using var requestMsg = new HttpRequestMessage(HttpMethod.Post, WhisperApiUrl.TrimEnd('/') + "/v1/audio/transcriptions");
+                        requestMsg.Headers.Authorization = new AuthenticationHeaderValue("Bearer", WhisperApiKey);
 
                         using var multipart = new MultipartFormDataContent();
 
-                        // Copy the audio stream into a MemoryStream so it can be sent
-                        using var ms = new MemoryStream();
-                        await audioFile.CopyToAsync(ms);
-                        ms.Position = 0;
+                        // ZERO-COPY Streaming: Pipe stream directly to HTTP instead of copying to MemoryStream
+                        await using var audioStream = audioFile.OpenReadStream();
+                        using var audioContent = new StreamContent(audioStream);
 
-                        var audioContent = new ByteArrayContent(ms.ToArray());
                         string cType = audioFile.ContentType ?? "audio/webm";
                         int semiIndex = cType.IndexOf(';');
-                        if (semiIndex > 0) cType = cType.Substring(0, semiIndex);
-                        
-                        audioContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(cType);
+                        if (semiIndex > 0) cType = cType[..semiIndex];
+
+                        audioContent.Headers.ContentType = new MediaTypeHeaderValue(cType);
                         multipart.Add(audioContent, "file", audioFile.FileName ?? "audio.webm");
                         multipart.Add(new StringContent("openai/whisper-1"), "model");
 
-                        var apiEndpoint = WhisperApiUrl.TrimEnd('/') + "/v1/audio/transcriptions";
-                        var response = await httpClient.PostAsync(apiEndpoint, multipart);
+                        requestMsg.Content = multipart;
 
-                        string responseBody = await response.Content.ReadAsStringAsync();
+                        // Use ResponseHeadersRead to immediately stream the API response back
+                        using var response = await SharedHttpClient.SendAsync(requestMsg, HttpCompletionOption.ResponseHeadersRead, context.RequestAborted);
 
                         context.Response.StatusCode = (int)response.StatusCode;
-                        context.Response.ContentType = "application/json";
-                        await context.Response.WriteAsync(responseBody);
+                        context.Response.ContentType = response.Content.Headers.ContentType?.ToString() ?? "application/json";
+
+                        // Stream response directly to output
+                        await response.Content.CopyToAsync(context.Response.Body, context.RequestAborted);
                     }
                     catch (Exception ex)
                     {
@@ -279,7 +345,7 @@ namespace RobotControllerApp.Services
                 });
 
                 Log($"3D Preview server started on http://*:{Port}  →  open http://YOUR_PC_IP:{Port}/ on the Quest");
-                await app.RunAsync(token);
+                await app.StartAsync(token); // Run in background without blocking
             }
             catch (OperationCanceledException) { }
             catch (Exception ex)
@@ -288,7 +354,6 @@ namespace RobotControllerApp.Services
             }
         }
 
-
         private static X509Certificate2 BuildSelfSignedCert()
         {
             using var rsa = RSA.Create(2048);
@@ -296,16 +361,31 @@ namespace RobotControllerApp.Services
             req.CertificateExtensions.Add(new X509BasicConstraintsExtension(false, false, 0, false));
             req.CertificateExtensions.Add(new X509KeyUsageExtension(X509KeyUsageFlags.DigitalSignature, false));
             req.CertificateExtensions.Add(new X509EnhancedKeyUsageExtension(new OidCollection { new Oid("1.3.6.1.5.5.7.3.1") }, false));
+
             var san = new SubjectAlternativeNameBuilder();
             san.AddDnsName("localhost");
-            try { foreach (var ip in System.Net.Dns.GetHostAddresses(System.Net.Dns.GetHostName())) if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) san.AddIpAddress(ip); } catch { }
+            try
+            {
+                foreach (var ip in System.Net.Dns.GetHostAddresses(System.Net.Dns.GetHostName()))
+                    if (ip.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) san.AddIpAddress(ip);
+            }
+            catch { }
+
             req.CertificateExtensions.Add(san.Build());
-            var cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(10));
-            return new X509Certificate2(cert.Export(X509ContentType.Pfx), (string?)null, X509KeyStorageFlags.MachineKeySet | X509KeyStorageFlags.Exportable);
+            using var cert = req.CreateSelfSigned(DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddYears(10));
+
+            // EphemeralKeySet prevents Windows from cluttering the OS cert store with temp keys on every run
+            return new X509Certificate2(cert.Export(X509ContentType.Pfx), (string?)null, X509KeyStorageFlags.EphemeralKeySet);
         }
+
         public async Task StopAsync()
         {
             _cts?.Cancel();
+
+            var disposeTasks = _clients.Values.Select(c => c.DisposeAsync().AsTask());
+            await Task.WhenAll(disposeTasks);
+            _clients.Clear();
+
             if (_app != null)
             {
                 await _app.StopAsync();
@@ -314,42 +394,38 @@ namespace RobotControllerApp.Services
             }
         }
 
-        // ── Broadcast helpers (called from MainWindow) ────────────────────────────
+        // ── Broadcast helpers ────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Broadcasts a typed JSON message to every connected browser.
-        /// The envelope: { "type": "...", "payload": ... }
-        /// preview.html's WebSocket client dispatches on "type".
-        /// </summary>
         public Task BroadcastAsync(string type, string payloadJson)
         {
             if (_clients.IsEmpty) return Task.CompletedTask;
-
-            // Build { "type":"setCameraPose", "payload": <raw-json> }
             string envelope = $"{{\"type\":\"{type}\",\"payload\":{payloadJson}}}";
             return BroadcastRawAsync(envelope);
         }
 
         private async Task BroadcastRawAsync(string message)
         {
+            if (_clients.IsEmpty) return;
+
             byte[] bytes = Encoding.UTF8.GetBytes(message);
             var segment = new ArraySegment<byte>(bytes);
 
-            foreach (var (id, ws) in _clients)
+            // Parallel broadcast: Avoids Head-of-line blocking (One slow Wi-Fi client delaying the rest)
+            var tasks = _clients.Select(async kvp =>
             {
                 try
                 {
-                    if (ws.State == WebSocketState.Open)
-                        await ws.SendAsync(segment, WebSocketMessageType.Text, true, CancellationToken.None);
+                    await kvp.Value.SendAsync(segment);
                 }
                 catch
                 {
-                    _clients.TryRemove(id, out _);
+                    _clients.TryRemove(kvp.Key, out _);
                 }
-            }
+            });
+
+            await Task.WhenAll(tasks);
         }
 
-        /// <summary>Number of currently connected browser clients.</summary>
         public int ConnectedClients => _clients.Count;
     }
 }
