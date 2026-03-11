@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Buffers;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -52,51 +53,137 @@ namespace RobotControllerApp.Services
         public event Action<string>? OnBrowserMessage;
         public event Func<Task>? OnClientConnected;
 
-        // ── Thread-Safe WebSocket Wrapper ───────────────────────────────────────
+        // ── Thread-Safe WebSocket Wrapper ─────────────────────────────────────────
+        // Uses a "latest-wins" slot per message type for high-frequency streams
+        // (camera feed, robot joints, camera pose).  If a send is still in-flight
+        // when the next update arrives, the old update is DROPPED — never queued —
+        // so slow Wi-Fi clients (Quest, remote PC) stay real-time instead of
+        // replaying a growing backlog of stale frames.
         private class ConnectedClient : IAsyncDisposable
         {
             public string Id { get; }
             private readonly WebSocket _socket;
-            private readonly SemaphoreSlim _sendLock = new(1, 1);
+
+            // Reliable ordered channel for one-shot messages (scan results, model URLs …)
+            private readonly System.Threading.Channels.Channel<byte[]> _reliableChannel =
+                System.Threading.Channels.Channel.CreateUnbounded<byte[]>(
+                    new System.Threading.Channels.UnboundedChannelOptions { SingleReader = true });
+
+            // One slot per droppable stream type — always holds the *latest* payload only
+            private readonly ConcurrentDictionary<string, byte[]> _latestSlot = new();
+            private volatile int _latestPending = 0; // 1 = a droppable flush is already scheduled
+
+            // Message types safe to drop when the client is too slow to keep up
+            private static readonly HashSet<string> _droppableTypes =
+                new() { "updateCameraFeed", "setCameraPose", "setRobotJoints", "setCameraRobot" };
+
+            private readonly CancellationTokenSource _cts = new();
+            private readonly SemaphoreSlim _socketLock = new(1, 1);
 
             public ConnectedClient(string id, WebSocket socket)
             {
                 Id = id;
                 _socket = socket;
+                _ = Task.Run(ReliableSendLoopAsync); // dedicated loop for reliable messages
             }
 
-            public async Task SendAsync(ArraySegment<byte> segment)
+            // ── Public enqueue API ────────────────────────────────────────────────
+
+            /// <summary>
+            /// Enqueue a message. Droppable types keep only the latest value;
+            /// non-droppable types go into a reliable ordered channel.
+            /// </summary>
+            public void Enqueue(string type, byte[] bytes)
             {
                 if (_socket.State != WebSocketState.Open) return;
 
-                // Semaphore guarantees only one thread writes to this socket at a time
-                await _sendLock.WaitAsync();
+                if (_droppableTypes.Contains(type))
+                {
+                    // Overwrite whatever was waiting — older value is intentionally discarded
+                    _latestSlot[type] = bytes;
+
+                    // Schedule exactly one flush task if none is already running
+                    if (Interlocked.Exchange(ref _latestPending, 1) == 0)
+                        _ = Task.Run(FlushDroppableAsync);
+                }
+                else
+                {
+                    _reliableChannel.Writer.TryWrite(bytes);
+                }
+            }
+
+            // ── Legacy API used by BroadcastRawAsync ─────────────────────────────
+            public Task SendAsync(ArraySegment<byte> segment)
+            {
+                var bytes = new byte[segment.Count];
+                Buffer.BlockCopy(segment.Array!, segment.Offset, bytes, 0, segment.Count);
+                // Treat raw sends as reliable (called for one-shot messages)
+                _reliableChannel.Writer.TryWrite(bytes);
+                return Task.CompletedTask;
+            }
+
+            // ── Private send loops ────────────────────────────────────────────────
+
+            private async Task ReliableSendLoopAsync()
+            {
+                try
+                {
+                    await foreach (var bytes in _reliableChannel.Reader.ReadAllAsync(_cts.Token))
+                        await SendBytesDirectAsync(bytes);
+                }
+                catch (OperationCanceledException) { }
+            }
+
+            private async Task FlushDroppableAsync()
+            {
+                // Drain all pending latest-slots in one pass
+                foreach (var key in _latestSlot.Keys.ToArray())
+                {
+                    if (_latestSlot.TryRemove(key, out var bytes))
+                        await SendBytesDirectAsync(bytes);
+                }
+
+                // Allow next arrival to schedule another flush
+                Interlocked.Exchange(ref _latestPending, 0);
+
+                // If new items arrived while we were flushing, go again
+                if (!_latestSlot.IsEmpty && Interlocked.Exchange(ref _latestPending, 1) == 0)
+                    await FlushDroppableAsync();
+            }
+
+            private async Task SendBytesDirectAsync(byte[] bytes)
+            {
+                if (_socket.State != WebSocketState.Open) return;
+                await _socketLock.WaitAsync(_cts.Token).ConfigureAwait(false);
                 try
                 {
                     if (_socket.State == WebSocketState.Open)
-                        await _socket.SendAsync(segment, WebSocketMessageType.Text, true, CancellationToken.None);
+                        await _socket.SendAsync(new ArraySegment<byte>(bytes),
+                            WebSocketMessageType.Text, true, _cts.Token);
                 }
-                finally
-                {
-                    _sendLock.Release();
-                }
+                catch { }
+                finally { _socketLock.Release(); }
             }
 
             public WebSocketState State => _socket.State;
 
             public async ValueTask DisposeAsync()
             {
+                _cts.Cancel();
+                _reliableChannel.Writer.TryComplete();
                 if (_socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
                 {
                     try
                     {
-                        await _sendLock.WaitAsync(TimeSpan.FromSeconds(1));
-                        await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Server shutting down", CancellationToken.None);
+                        await _socketLock.WaitAsync(TimeSpan.FromSeconds(1));
+                        await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure,
+                            "Server shutting down", CancellationToken.None);
                     }
                     catch { }
-                    finally { _sendLock.Release(); }
+                    finally { _socketLock.Release(); }
                 }
-                _sendLock.Dispose();
+                _socketLock.Dispose();
+                _cts.Dispose();
                 _socket.Dispose();
             }
         }
@@ -396,34 +483,37 @@ namespace RobotControllerApp.Services
 
         // ── Broadcast helpers ────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Broadcasts a typed message to all connected clients.
+        /// Droppable types (camera feed, pose, joints) use the latest-wins slot;
+        /// all others are sent reliably in order.
+        /// </summary>
         public Task BroadcastAsync(string type, string payloadJson)
         {
             if (_clients.IsEmpty) return Task.CompletedTask;
             string envelope = $"{{\"type\":\"{type}\",\"payload\":{payloadJson}}}";
-            return BroadcastRawAsync(envelope);
+            byte[] bytes = Encoding.UTF8.GetBytes(envelope);
+
+            foreach (var kvp in _clients)
+            {
+                try { kvp.Value.Enqueue(type, bytes); }
+                catch { _clients.TryRemove(kvp.Key, out _); }
+            }
+
+            return Task.CompletedTask;
         }
 
-        private async Task BroadcastRawAsync(string message)
+        // Kept for any internal callers that pass raw envelopes (treated as reliable)
+        private Task BroadcastRawAsync(string message)
         {
-            if (_clients.IsEmpty) return;
-
+            if (_clients.IsEmpty) return Task.CompletedTask;
             byte[] bytes = Encoding.UTF8.GetBytes(message);
-            var segment = new ArraySegment<byte>(bytes);
-
-            // Parallel broadcast: Avoids Head-of-line blocking (One slow Wi-Fi client delaying the rest)
-            var tasks = _clients.Select(async kvp =>
+            foreach (var kvp in _clients)
             {
-                try
-                {
-                    await kvp.Value.SendAsync(segment);
-                }
-                catch
-                {
-                    _clients.TryRemove(kvp.Key, out _);
-                }
-            });
-
-            await Task.WhenAll(tasks);
+                try { kvp.Value.Enqueue("_raw", bytes); }
+                catch { _clients.TryRemove(kvp.Key, out _); }
+            }
+            return Task.CompletedTask;
         }
 
         public int ConnectedClients => _clients.Count;

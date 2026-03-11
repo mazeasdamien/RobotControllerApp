@@ -51,6 +51,14 @@ namespace RobotControllerApp
         public string ImageFileName { get; set; } = "";
         public string ModelFileName { get; set; } = "";
         public string DateAdded { get; set; } = "";
+
+        // ── Correction offsets to compensate for AI generation errors ──
+        // Rotations are in radians (e.g. 1.5708 = 90°)
+        public double OffsetRx { get; set; } = 0;
+        public double OffsetRy { get; set; } = 0;
+        public double OffsetRz { get; set; } = 0;
+        /// <summary>Multiplied on top of the auto-scale. 1.0 = no change.</summary>
+        public double OffsetScale { get; set; } = 1.0;
     }
 
     public class LibraryItemViewModel
@@ -59,6 +67,10 @@ namespace RobotControllerApp
         public SolidColorBrush ColorBrush { get; set; } = new SolidColorBrush(Microsoft.UI.Colors.White);
         public string DateAdded { get; set; } = "";
         public BitmapImage? ImageSource { get; set; }
+        /// <summary>True when the image file actually exists on disk.</summary>
+        public bool HasImage { get; set; } = false;
+        /// <summary>True when a 3D model file is recorded AND exists on disk.</summary>
+        public bool HasModel { get; set; } = false;
     }
 
     public sealed partial class MainWindow : Window
@@ -171,6 +183,8 @@ namespace RobotControllerApp
             SelectedObjectsList.ItemsSource = _selectedForBanana;
             BananaImagesList.ItemsSource = _bananaImages;
             LibraryList.ItemsSource = _libraryItems;
+            _libraryItems.CollectionChanged += (_, _) =>
+                LibraryCountBadge.Text = $"{_libraryItems.Count} asset{(_libraryItems.Count == 1 ? "" : "s")}";
 
             _ = LoadLibraryAsync();
 
@@ -322,11 +336,15 @@ namespace RobotControllerApp
                                 vm.ColorBrush = new SolidColorBrush(uiColor);
                             }
                             string imgPath = Path.Combine(LibraryPath, item.ImageFileName);
-                            if (File.Exists(imgPath))
+                            vm.HasImage = File.Exists(imgPath);
+                            if (vm.HasImage)
                             {
                                 byte[] bytes = await File.ReadAllBytesAsync(imgPath);
                                 vm.ImageSource = await LoadImageFromBytesAsync(bytes);
                             }
+
+                            vm.HasModel = !string.IsNullOrEmpty(item.ModelFileName)
+                                          && File.Exists(Path.Combine(LibraryPath, item.ModelFileName));
                         }
                         catch { }
                         _libraryItems.Add(vm);
@@ -382,7 +400,8 @@ namespace RobotControllerApp
 
         private void UpdateTotalCostDisplay()
         {
-            double total = _totalGeminiCost + _totalBananaCost + _totalTripo3dCost;
+            // Scan uses Orange proxy — not tracked. Only Banana + Tripo3D are paid.
+            double total = _totalBananaCost + _totalTripo3dCost;
             if (TotalCostText != null) TotalCostText.Text = $"{total:0.0000} €";
             _ = SaveCostsAsync();
         }
@@ -656,55 +675,51 @@ namespace RobotControllerApp
 
             try
             {
-                string apiKey = _settings.GeminiApiKey;
-                string url = $"https://generativelanguage.googleapis.com/v1beta/models/gemini-robotics-er-1.5-preview:generateContent?key={apiKey}";
+                // Use Orange LLM proxy with gemini-2.5-flash-lite (OpenAI-compatible endpoint)
+                string orangeApiKey = _settings.OrangeApiKey;
+                string orangeBaseUrl = (string.IsNullOrWhiteSpace(_settings.OrangeApiUrl)
+                    ? "https://llmproxy.ai.orange"
+                    : _settings.OrangeApiUrl.TrimEnd('/'));
+                string url = $"{orangeBaseUrl}/v1/chat/completions";
+
                 string base64Image = Convert.ToBase64String(_latestWebcamFrameBytes);
                 string prompt = string.IsNullOrWhiteSpace(_settings.BananaPromptTemplate) ? DefaultBananaPrompt : _settings.BananaPromptTemplate;
 
                 var requestBody = new
                 {
-                    contents = new[] { new { parts = new object[] {
-                        new { inlineData = new { mimeType = "image/jpeg", data = base64Image } },
-                        new { text = prompt }
-                    } } },
-                    generationConfig = new { temperature = 0.5, thinkingConfig = new { thinkingBudget = 0 } }
+                    model = "vertex_ai/gemini-2.5-flash-lite",
+                    temperature = 0.3,
+                    messages = new object[] {
+                        new {
+                            role = "user",
+                            content = new object[] {
+                                new { type = "image_url", image_url = new { url = $"data:image/jpeg;base64,{base64Image}" } },
+                                new { type = "text", text = prompt }
+                            }
+                        }
+                    }
                 };
 
                 using var request = new HttpRequestMessage(HttpMethod.Post, url)
                 {
                     Content = new StringContent(JsonSerializer.Serialize(requestBody), System.Text.Encoding.UTF8, "application/json")
                 };
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", orangeApiKey);
 
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
                 using var response = await SharedHttpClient.SendAsync(request, cts.Token);
                 string responseString = await response.Content.ReadAsStringAsync(cts.Token);
 
+
                 if (response.IsSuccessStatusCode)
                 {
                     using var doc = JsonDocument.Parse(responseString);
 
-                    if (doc.RootElement.TryGetProperty("usageMetadata", out var usageProp))
-                    {
-                        double pTokens = usageProp.TryGetProperty("promptTokenCount", out var pt) ? pt.GetDouble() : 0.0;
-                        double cTokens = usageProp.TryGetProperty("candidatesTokenCount", out var ct) ? ct.GetDouble() : 0.0;
-                        double costUsd = (pTokens / 1_000_000.0 * 0.30) + (cTokens / 1_000_000.0 * 2.50);
-                        DispatcherQueue.TryEnqueue(() =>
-                        {
-                            _totalGeminiCost += costUsd * 0.94;
-                            if (GeminiCostText != null) GeminiCostText.Text = $"Robotics-ER Cost: {_totalGeminiCost:0.00000} €";
-                            UpdateTotalCostDisplay();
-                        });
-                    }
-
+                    // OpenAI-compatible response: choices[0].message.content
                     string? messageContent = null;
-                    if (doc.RootElement.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
-                    {
-                        var firstCandidate = candidates[0];
-                        if (firstCandidate.TryGetProperty("content", out var cContent) && cContent.TryGetProperty("parts", out var cParts) && cParts.GetArrayLength() > 0)
-                        {
-                            messageContent = cParts[0].TryGetProperty("text", out var textProp) ? textProp.GetString() : null;
-                        }
-                    }
+                    if (doc.RootElement.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                        messageContent = choices[0].GetProperty("message").GetProperty("content").GetString();
+
 
                     var newDetectedObjects = new List<DetectedObjectViewModel>();
 
@@ -828,7 +843,7 @@ namespace RobotControllerApp
                 }
                 else
                 {
-                    Log($"[Scene3D] Gemini API error: {responseString[..Math.Min(200, responseString.Length)]}");
+                    Log($"[Scene3D] Orange proxy error: {responseString[..Math.Min(200, responseString.Length)]}");
                     _ = _broadcastServer.BroadcastAsync("setDetectedObjects", "[]");
                     if (AutoScanToggle?.IsChecked != true)
                     {
@@ -955,7 +970,7 @@ namespace RobotControllerApp
                 try
                 {
                     string modelName = string.IsNullOrEmpty(_settings.BananaModel) ? "gemini-2.5-flash-image" : _settings.BananaModel;
-                    string url = $"https://generativelanguage.googleapis.com/v1alpha/models/{modelName}:generateContent?key={_settings.GeminiApiKey}";
+                    string url = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={_settings.GeminiApiKey}";
                     double frameScale = _settings.BananaFramingScale > 0 ? _settings.BananaFramingScale * 100 : 60;
                     string customPromptPart = string.IsNullOrWhiteSpace(_settings.BananaPromptTemplate) ? "preserving 100% of its original shape, text, labels, proportions, and perspective" : _settings.BananaPromptTemplate;
 
@@ -974,6 +989,11 @@ namespace RobotControllerApp
                                         new { inlineData = new { mimeType = "image/jpeg", data = base64Image } }
                                     }
                                 }
+                            },
+                            // CRITICAL: without responseModalities Gemini returns text, not an image
+                            generationConfig = new
+                            {
+                                responseModalities = new[] { "IMAGE", "TEXT" }
                             }
                         };
 
@@ -987,48 +1007,64 @@ namespace RobotControllerApp
 
                         if (response.IsSuccessStatusCode)
                         {
-                            using var doc = JsonDocument.Parse(responseString);
-                            if (doc.RootElement.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
+                            bool imageFound = false;
+                            try
                             {
-                                var parts = candidates[0].GetProperty("content").GetProperty("parts");
-                                if (parts.GetArrayLength() > 0 && parts[0].TryGetProperty("inlineData", out var inlineData))
+                                using var doc = JsonDocument.Parse(responseString);
+                                if (doc.RootElement.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
                                 {
-                                    string? b64 = inlineData.GetProperty("data").GetString();
-                                    if (!string.IsNullOrEmpty(b64))
+                                    var parts = candidates[0].GetProperty("content").GetProperty("parts");
+                                    // Iterate all parts to find inlineData (same pattern as RunBananaEnhancementAsync)
+                                    foreach (var part in parts.EnumerateArray())
                                     {
-                                        byte[] pngBytes = Convert.FromBase64String(b64);
-                                        string fileName = Guid.NewGuid().ToString() + ".png";
-                                        string filePath = Path.Combine(LibraryPath, fileName);
-                                        await File.WriteAllBytesAsync(filePath, pngBytes);
-
-                                        var uiColor = obj.ColorBrush.Color;
-                                        string hexColor = $"#{uiColor.R:X2}{uiColor.G:X2}{uiColor.B:X2}";
-
-                                        DispatcherQueue.TryEnqueue(async () =>
+                                        if (part.TryGetProperty("inlineData", out var inlineData))
                                         {
-                                            var bitmap = await LoadImageFromBytesAsync(pngBytes);
-                                            _bananaImages.Add(new GeneratedBananaImageModel { Name = obj.Name, ColorBrush = obj.ColorBrush, ImageSource = bitmap });
+                                            string? b64 = inlineData.GetProperty("data").GetString();
+                                            if (!string.IsNullOrEmpty(b64))
+                                            {
+                                                imageFound = true;
+                                                byte[] pngBytes = Convert.FromBase64String(b64);
+                                                string fileName = Guid.NewGuid().ToString() + ".png";
+                                                string filePath = Path.Combine(LibraryPath, fileName);
+                                                await File.WriteAllBytesAsync(filePath, pngBytes);
 
-                                            var newConfig = new LibraryItemConfig { Name = obj.Name, ColorHex = hexColor, ImageFileName = fileName, DateAdded = DateTime.Now.ToString("g") };
+                                                var uiColor = obj.ColorBrush.Color;
+                                                string hexColor = $"#{uiColor.R:X2}{uiColor.G:X2}{uiColor.B:X2}";
 
-                                            _libraryConfig.Insert(0, newConfig);
-                                            await SaveLibraryAsync();
+                                                DispatcherQueue.TryEnqueue(async () =>
+                                                {
+                                                    var bitmap = await LoadImageFromBytesAsync(pngBytes);
+                                                    _bananaImages.Add(new GeneratedBananaImageModel { Name = obj.Name, ColorBrush = obj.ColorBrush, ImageSource = bitmap });
 
-                                            _libraryItems.Insert(0, new LibraryItemViewModel { Name = obj.Name, ColorBrush = obj.ColorBrush, DateAdded = newConfig.DateAdded, ImageSource = bitmap });
+                                                    var newConfig = new LibraryItemConfig { Name = obj.Name, ColorHex = hexColor, ImageFileName = fileName, DateAdded = DateTime.Now.ToString("g") };
 
-                                            double framingScaleUsd = _settings.BananaFramingScale > 0 ? _settings.BananaFramingScale * 0.01 : 0;
-                                            _totalBananaCost += (GetBananaModelPricePerImage() + framingScaleUsd) * 0.94;
-                                            UpdateTotalCostDisplay();
+                                                    _libraryConfig.Insert(0, newConfig);
+                                                    await SaveLibraryAsync();
 
-                                            obj.IsAlreadyInLibrary = true;
-                                            int objIdx = _detectedObjects.IndexOf(obj);
-                                            if (objIdx >= 0) _detectedObjects[objIdx] = obj; // trigger UI refresh
+                                                    _libraryItems.Insert(0, new LibraryItemViewModel { Name = obj.Name, ColorBrush = obj.ColorBrush, DateAdded = newConfig.DateAdded, ImageSource = bitmap });
 
-                                            _selectedForBanana.Remove(obj);
-                                            UpdateBananaCost();
-                                        });
+                                                    double framingScaleUsd = _settings.BananaFramingScale > 0 ? _settings.BananaFramingScale * 0.01 : 0;
+                                                    _totalBananaCost += (GetBananaModelPricePerImage() + framingScaleUsd) * 0.94;
+                                                    UpdateTotalCostDisplay();
+
+                                                    obj.IsAlreadyInLibrary = true;
+                                                    int objIdx = _detectedObjects.IndexOf(obj);
+                                                    if (objIdx >= 0) _detectedObjects[objIdx] = obj; // trigger UI refresh
+
+                                                    _selectedForBanana.Remove(obj);
+                                                    UpdateBananaCost();
+                                                });
+                                                break; // found the image part — done
+                                            }
+                                        }
                                     }
+                                    if (!imageFound)
+                                        Log($"[Banana] No image in response for '{obj.Name}'. Parts: {parts.GetRawText()[..Math.Min(300, parts.GetRawText().Length)]}");
                                 }
+                            }
+                            catch (JsonException jex)
+                            {
+                                Log($"[Banana] JSON parse error for '{obj.Name}': {jex.Message}. Response: {responseString[..Math.Min(200, responseString.Length)]}");
                             }
                         }
                         else
@@ -1059,8 +1095,135 @@ namespace RobotControllerApp
             });
         }
 
+        // ── Banana image enhancement (Gemini) — run before Tripo for best 3D quality ──
+        /// <summary>
+        /// Calls the Gemini image-generation model to produce a clean, white-background
+        /// square image of the object — exactly what Tripo3D needs for high-quality meshes.
+        /// Returns the enhanced PNG bytes, or <see langword="null"/> if the
+        /// Gemini key is not set or the call fails (caller must abort Tripo3D).
+        /// </summary>
+        private async Task<byte[]?> RunBananaEnhancementAsync(byte[] originalBytes, string objectLabel, Action<string>? progressCallback = null)
+        {
+            if (string.IsNullOrWhiteSpace(_settings.GeminiApiKey))
+            {
+                progressCallback?.Invoke("⚠️ Banana skipped (no Gemini key)");
+                return null;
+            }
+
+            try
+            {
+                progressCallback?.Invoke("🍌 Enhancing image…");
+
+                // Model ID confirmed from official Google Cloud docs (March 2025):
+                // https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash-image
+                // Works on the standard Gemini REST API with a regular API key.
+                string modelName = string.IsNullOrEmpty(_settings.BananaModel)
+                    ? "gemini-2.5-flash-image"
+                    : _settings.BananaModel;
+                string url = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={_settings.GeminiApiKey}";
+
+                string base64Image = Convert.ToBase64String(originalBytes);
+
+                // "Magic Prompt" — Step 3 of the wrapper pattern:
+                // 1. Un-warp the top-down camera perspective → Tripo gets an eye-level photo
+                // 2. Strict "NO SHADOWS" directive → prevents Tripo from baking shadows into the mesh base
+                // 3. White background → clean box.min.y calculation in Three.js
+                string customPromptPart = string.IsNullOrWhiteSpace(_settings.BananaPromptTemplate)
+                    ? "preserving 100% of its original shape, text, labels, proportions, and perspective. " +
+                      "CRITICAL: Digitally un-warp and rotate the object so it appears perfectly upright " +
+                      "and photographed straight-on at eye level, counteracting any top-down camera angle. " +
+                      "ABSOLUTELY NO SHADOWS of any kind — not under the object, not beside it. Shadows corrupt 3D reconstruction."
+                    : _settings.BananaPromptTemplate;
+
+                double frameScale = _settings.BananaFramingScale > 0 ? _settings.BananaFramingScale * 100 : 60;
+
+                string promptText =
+                    $"Extract the physical {objectLabel} shown in this image {customPromptPart}. " +
+                    $"Subtly enhance the object's colors so they look natural and realistic, completely faithful to the original. " +
+                    $"Remove all other objects (hands, tools, furniture, floors, table surface). " +
+                    $"Place the object on a clean, plain WHITE background with ABSOLUTELY NO SHADOWS underneath it. " +
+                    $"Provide a 1:1 square output where the {objectLabel} occupies about {frameScale}% of the canvas.";
+
+                var payload = new
+                {
+                    contents = new[] {
+                        new {
+                            role = "user",
+                            parts = new object[] {
+                                new { text = promptText },
+                                new { inlineData = new { mimeType = "image/jpeg", data = base64Image } }
+                            }
+                        }
+                    },
+                    // CRITICAL: without responseModalities Gemini only returns text — no image is generated!
+                    generationConfig = new
+                    {
+                        responseModalities = new[] { "IMAGE", "TEXT" }
+                    }
+                };
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, url)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json")
+                };
+
+                using var response = await SharedHttpClient.SendAsync(request);
+                if (!response.IsSuccessStatusCode)
+                {
+                    var err = await response.Content.ReadAsStringAsync();
+                    Log($"[Banana] HTTP {(int)response.StatusCode} for '{objectLabel}': {err}");
+                    progressCallback?.Invoke($"\u274C Banana HTTP {(int)response.StatusCode}");
+                    return null;
+                }
+
+                var responseString = await response.Content.ReadAsStringAsync();
+                Log($"[Banana] Raw response for '{objectLabel}': {responseString[..Math.Min(400, responseString.Length)]}");
+
+                using var doc = JsonDocument.Parse(responseString);
+                if (doc.RootElement.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
+                {
+                    var parts = candidates[0].GetProperty("content").GetProperty("parts");
+                    // Gemini image response: iterate parts to find one with inlineData
+                    foreach (var part in parts.EnumerateArray())
+                    {
+                        if (part.TryGetProperty("inlineData", out var inlineData))
+                        {
+                            string? b64 = inlineData.GetProperty("data").GetString();
+                            if (!string.IsNullOrEmpty(b64))
+                            {
+                                var enhanced = Convert.FromBase64String(b64);
+
+                                // Track cost
+                                double framingScaleUsd = _settings.BananaFramingScale > 0 ? _settings.BananaFramingScale * 0.01 : 0;
+                                _totalBananaCost += (GetBananaModelPricePerImage() + framingScaleUsd) * 0.94;
+                                DispatcherQueue.TryEnqueue(() => UpdateTotalCostDisplay());
+
+                                progressCallback?.Invoke("\u2705 Banana done");
+                                return enhanced;
+                            }
+                        }
+                    }
+                    // Parts present but no image — log what came back
+                    Log($"[Banana] Response had no inlineData for '{objectLabel}'. Parts: {parts.GetRawText()[..Math.Min(300, parts.GetRawText().Length)]}");
+                }
+                else
+                {
+                    Log($"[Banana] No candidates in response for '{objectLabel}': {responseString[..Math.Min(300, responseString.Length)]}");
+                }
+
+                progressCallback?.Invoke("\u274C Banana returned no image");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                Log($"[Banana] Enhancement failed for '{objectLabel}': {ex.Message} — aborting");
+                progressCallback?.Invoke("❌ Banana error");
+                return null;
+            }
+        }
+
         // ── Single core Tripo3D workflow (reused by WS and UI) ──
-        private async Task<string> GenerateTripoModelCoreAsync(byte[] imageBytes, string safeName, Action<string>? progressCallback = null)
+        private async Task<(string fileName, double tripoCost)> GenerateTripoModelCoreAsync(byte[] imageBytes, string safeName, Action<string>? progressCallback = null)
         {
             if (string.IsNullOrWhiteSpace(_settings.TripoApiKey)) throw new InvalidOperationException("Tripo3D API key is missing in settings.");
 
@@ -1095,6 +1258,7 @@ namespace RobotControllerApp
             string taskId = taskDoc.RootElement.GetProperty("data").GetProperty("task_id").GetString() ?? throw new Exception("task_id missing.");
 
             string? glbUrl = null;
+            double actualCost = 0;
             for (int i = 0; i < 120; i++)
             {
                 await Task.Delay(2000);
@@ -1114,6 +1278,9 @@ namespace RobotControllerApp
                 {
                     var output = data.GetProperty("output");
                     glbUrl = output.TryGetProperty("model", out var m) ? m.GetString() : (output.TryGetProperty("pbr_model", out var pbr) ? pbr.GetString() : (output.TryGetProperty("base_model", out var bm) ? bm.GetString() : null));
+                    // Read the actual balance_cost the API deducted for this task
+                    if (data.TryGetProperty("balance_cost", out var bc))
+                        actualCost = bc.ValueKind == JsonValueKind.Number ? bc.GetDouble() : 0;
                     break;
                 }
                 else if (status is "failed" or "cancelled" or "banned" or "expired") throw new Exception($"Tripo3D task {status}");
@@ -1126,7 +1293,7 @@ namespace RobotControllerApp
             string glbFileName = $"{safeName}_3DModel.glb";
             await File.WriteAllBytesAsync(Path.Combine(LibraryPath, glbFileName), glbBytes);
 
-            return glbFileName;
+            return (glbFileName, actualCost);
         }
 
         private async void Generate3DModel_Click(object sender, RoutedEventArgs e)
@@ -1155,17 +1322,29 @@ namespace RobotControllerApp
                 bool generationSuccess = false;
                 try
                 {
-                    byte[] imgBytes = await File.ReadAllBytesAsync(Path.Combine(LibraryPath, configData.ImageFileName));
+                    byte[] rawImgBytes = await File.ReadAllBytesAsync(Path.Combine(LibraryPath, configData.ImageFileName));
                     string safeName = GetSafeFileName(item.Name);
 
-                    string glbFileName = await GenerateTripoModelCoreAsync(imgBytes, safeName, msg => DispatcherQueue.TryEnqueue(() => btn.Content = msg));
+                    // Phase 1 — Banana: enhance the OpenCV crop to a clean white-bg square
+                    byte[]? imgBytes = await RunBananaEnhancementAsync(rawImgBytes, item.Name,
+                        msg => DispatcherQueue.TryEnqueue(() => btn.Content = msg));
+
+                    if (imgBytes == null)
+                    {
+                        // Banana returned no image — do NOT proceed to Tripo3D
+                        DispatcherQueue.TryEnqueue(() => btn.Content = "❌ Banana failed");
+                        return;
+                    }
+
+                    // Phase 2 — Tripo3D: generate the 3D model from the enhanced image
+                    var (glbFileName, tripoCost) = await GenerateTripoModelCoreAsync(imgBytes, safeName, msg => DispatcherQueue.TryEnqueue(() => btn.Content = msg));
 
                     DispatcherQueue.TryEnqueue(async () =>
                     {
                         configData.ModelFileName = glbFileName;
                         await SaveLibraryAsync();
                         generationSuccess = true;
-                        _totalTripo3dCost += 0.19;
+                        _totalTripo3dCost += tripoCost;
                         UpdateTotalCostDisplay();
                     });
                 }
@@ -1326,6 +1505,42 @@ namespace RobotControllerApp
             catch { }
         }
 
+        private void OpenLibraryJson_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (!File.Exists(LibraryJsonPath)) return;
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = LibraryJsonPath,
+                    UseShellExecute = true   // opens with default .json handler (VS Code / Notepad etc.)
+                });
+            }
+            catch { }
+        }
+
+        /// <summary>Shows the red ⚠ overlay on the thumbnail if the image file is missing on disk.</summary>
+        private void ThumbnailMissing_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement el && el.DataContext is LibraryItemViewModel vm)
+                el.Visibility = vm.HasImage ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        /// <summary>Shows the orange '⚠ Missing' badge when JSON records a model but the GLB is gone from disk.</summary>
+        private void ModelMissing_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is FrameworkElement el && el.DataContext is LibraryItemViewModel vm)
+            {
+                // Show "Missing" only when JSON has a model name BUT the file is gone.
+                // The "✓ Model" badge (Preview3DBtn_Loaded) shows when HasModel=true.
+                var cfg = _libraryConfig?.FirstOrDefault(c =>
+                    string.Equals(c.Name, vm.Name, StringComparison.OrdinalIgnoreCase));
+                bool jsonHasModel = cfg != null && !string.IsNullOrEmpty(cfg.ModelFileName);
+                el.Visibility = (jsonHasModel && !vm.HasModel) ? Visibility.Visible : Visibility.Collapsed;
+            }
+        }
+
+
         // ════════════════════════════════════════════════════════════════════════
         // LOGS, UTILS & APP SETTINGS
         // ════════════════════════════════════════════════════════════════════════
@@ -1482,9 +1697,7 @@ namespace RobotControllerApp
 
                 _settings.BananaModel = BananaModelComboBox.SelectedIndex switch
                 {
-                    1 => "gemini-3.1-flash-image-preview",
-                    2 => "gemini-3-pro-image-preview",
-                    _ => "gemini-2.5-flash-image"
+                    _ => "gemini-2.5-flash-image"   // confirmed official model ID
                 };
 
                 _settings.BananaPromptTemplate = BananaPromptTextBox.Text;
@@ -1527,8 +1740,6 @@ namespace RobotControllerApp
             if (_settings == null || BananaModelComboBox == null) return;
             _settings.BananaModel = BananaModelComboBox.SelectedIndex switch
             {
-                1 => "gemini-3.1-flash-image-preview",
-                2 => "gemini-3-pro-image-preview",
                 _ => "gemini-2.5-flash-image"
             };
             UpdateBananaCost();
@@ -1699,13 +1910,19 @@ namespace RobotControllerApp
                         modelUrlRemote,
                         cropBase64,
                         hasModel = !string.IsNullOrEmpty(modelUrlRemote),
-                        isInLibrary = obj.IsAlreadyInLibrary
+                        isInLibrary = obj.IsAlreadyInLibrary,
+                        // Correction offsets so Three.js can re-orient poorly-generated models
+                        offsetRx    = libItem?.OffsetRx    ?? 0.0,
+                        offsetRy    = libItem?.OffsetRy    ?? 0.0,
+                        offsetRz    = libItem?.OffsetRz    ?? 0.0,
+                        offsetScale = libItem?.OffsetScale ?? 1.0
                     };
                 }).ToList();
 
                 _ = _broadcastServer.BroadcastAsync("setDetectedObjects", JsonSerializer.Serialize(items));
 
-                var costs = new { scanEur = Math.Round(_totalGeminiCost, 5), bananaEur = Math.Round(_totalBananaCost, 4), tripoEur = Math.Round(_totalTripo3dCost, 4), totalEur = Math.Round(_totalGeminiCost + _totalBananaCost + _totalTripo3dCost, 4) };
+                // Scan (Orange proxy) is free — only Banana + Tripo costs tracked
+                var costs = new { scanEur = 0.0, bananaEur = Math.Round(_totalBananaCost, 4), tripoEur = Math.Round(_totalTripo3dCost, 4), totalEur = Math.Round(_totalBananaCost + _totalTripo3dCost, 4) };
                 _ = _broadcastServer.BroadcastAsync("setScanCosts", JsonSerializer.Serialize(costs));
 
                 if (_lastValidPose != null) await PushCameraPoseAsync(_lastValidPose);
@@ -2099,6 +2316,28 @@ namespace RobotControllerApp
                     return;
                 }
 
+                // ── IK joint teleoperation (from browser IK gizmo) ──────────────────
+                if (type == "ik_joints" && doc.RootElement.TryGetProperty("payload", out var ikPayload))
+                {
+                    if (ikPayload.TryGetProperty("angles", out var anglesProp))
+                    {
+                        int robotIdx = ikPayload.TryGetProperty("robotIdx", out var ri) ? ri.GetInt32() : 0;
+
+                        // Browser sends degrees → convert to radians for ROS
+                        var anglesRad = anglesProp.EnumerateArray()
+                            .Select(e => e.GetDouble() * Math.PI / 180.0)
+                            .ToArray();
+
+                        if (anglesRad.Length == 6)
+                        {
+                            var bridge = robotIdx == 0 ? _robotBridge : _robotBridge2;
+                            if (bridge.IsConnected)
+                                _ = bridge.SendDirectToRobotAsync(BuildIkJointCommand(anglesRad));
+                        }
+                    }
+                    return;
+                }
+
                 if (type == "scanScene")
                 {
                     Log("[Scene3D] Remote scan request received.");
@@ -2126,23 +2365,59 @@ namespace RobotControllerApp
                         try
                         {
                             string b64Data = cropB64.Contains(',') ? cropB64.Split(',')[1] : cropB64;
-                            byte[] imgBytes = Convert.FromBase64String(b64Data);
+                            byte[] rawBytes = Convert.FromBase64String(b64Data);
                             string safeName = GetSafeFileName(label);
 
-                            string glbUrl = await GenerateTripoModelCoreAsync(imgBytes, safeName, msg => Log($"[Scene3D-3D] {label}: {msg}"));
+                            // Phase 1 — Banana: enhance the OpenCV crop
+                            Log($"[Scene3D-3D] '{label}' — running Banana enhancement…");
+                            byte[]? imgBytes = await RunBananaEnhancementAsync(rawBytes, label,
+                                msg =>
+                                {
+                                    Log($"[Scene3D-3D] {label}: {msg}");
+                                    _ = _broadcastServer.BroadcastAsync("setGen3DProgress", JsonSerializer.Serialize(new { label, status = msg }));
+                                });
+
+                            if (imgBytes == null)
+                            {
+                                // Banana returned no image — do NOT send to Tripo3D
+                                Log($"[Scene3D-3D] '{label}' — Banana returned no image, aborting 3D generation.");
+                                await _broadcastServer.BroadcastAsync("setGen3DProgress", JsonSerializer.Serialize(new { label, status = "❌ Banana failed" }));
+                                return;
+                            }
+
+                            // Save banana image to library folder so the asset library can display it
+                            string bananaFileName = $"{safeName}_banana.png";
+                            string bananaPath = Path.Combine(LibraryPath, bananaFileName);
+                            await File.WriteAllBytesAsync(bananaPath, imgBytes);
+                            Log($"[Scene3D-3D] '{label}' banana image saved: {bananaFileName}");
+                            await _broadcastServer.BroadcastAsync("setBananaImage", JsonSerializer.Serialize(new { label, imageUrl = $"/library/{Uri.EscapeDataString(bananaFileName)}" }));
+
+                            // Phase 2 — Tripo3D: generate the 3D mesh
+                            var (glbFileName, tripoCost) = await GenerateTripoModelCoreAsync(imgBytes, safeName,
+                                msg =>
+                                {
+                                    Log($"[Scene3D-3D] {label}: {msg}");
+                                    _ = _broadcastServer.BroadcastAsync("setGen3DProgress", JsonSerializer.Serialize(new { label, status = msg }));
+                                });
 
                             DispatcherQueue.TryEnqueue(() =>
                             {
                                 var cfg = _libraryConfig.FirstOrDefault(c => string.Equals(c.Name, label, StringComparison.OrdinalIgnoreCase));
-                                if (cfg != null) cfg.ModelFileName = glbUrl;
+                                if (cfg != null) { cfg.ModelFileName = glbFileName; if (string.IsNullOrEmpty(cfg.ImageFileName)) cfg.ImageFileName = bananaFileName; }
                                 _ = SaveLibraryAsync();
-                                _totalTripo3dCost += 0.19; UpdateTotalCostDisplay();
-                                Log($"[Scene3D-3D] '{label}' GLB saved.");
+                                _totalTripo3dCost += tripoCost; UpdateTotalCostDisplay();
+                                Log($"[Scene3D-3D] '{label}' GLB saved. Tripo cost: {tripoCost:0.0000} credits");
                             });
 
-                            await _broadcastServer.BroadcastAsync("setModelGlb", JsonSerializer.Serialize(new { label, glbUrl = $"http://library.local/{Uri.EscapeDataString(glbUrl)}" }));
+                            string glbServeUrl = $"/library/{Uri.EscapeDataString(glbFileName)}";
+                            await _broadcastServer.BroadcastAsync("setModelGlb", JsonSerializer.Serialize(new { label, glbUrl = glbServeUrl }));
+                            await _broadcastServer.BroadcastAsync("refreshLibrary", "{}");
                         }
-                        catch (Exception ex) { Log($"[Scene3D-3D] Error generating 3D for '{label}': {ex.Message}"); }
+                        catch (Exception ex)
+                        {
+                            Log($"[Scene3D-3D] Error generating 3D for '{label}': {ex.Message}");
+                            _ = _broadcastServer.BroadcastAsync("setGen3DProgress", JsonSerializer.Serialize(new { label, status = $"❌ Error" }));
+                        }
                     });
                     return;
                 }
