@@ -883,7 +883,7 @@
     }
 
     #voice-output:empty::before {
-      content: 'Press the button and speak…';
+      content: 'Press Space (or the button) and speak…';
       color: var(--text-muted);
       font-style: italic;
     }
@@ -1043,10 +1043,9 @@
         style="width:100%; margin-bottom: 10px; font-size: 11px; padding: 6px; border-radius: 6px; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.25); color: var(--text); outline: none;">
         <option value="">Default Microphone</option>
       </select>
-      <button id="ptt-btn" onmousedown="startHoldRecord(event)" onmouseup="stopHoldRecord(event)"
-        onmouseleave="stopHoldRecord(event)" ontouchstart="startHoldRecord(event)" ontouchend="stopHoldRecord(event)">
+      <button id="ptt-btn" onclick="toggleRecord(event)" ontouchend="toggleRecord(event)">
         <span id="ptt-mic-icon">🎙️</span>
-        <span id="ptt-label">Hold to Record</span>
+        <span id="ptt-label">Press Space to Record</span>
       </button>
       <div id="voice-output"></div>
       <div id="voice-status"></div>
@@ -1986,7 +1985,19 @@
         }
 
         if (item.modelUrl && item.modelUrl.trim() !== '') {
-          const resolvedUrl = (item.modelUrlRemote && item.modelUrlRemote.trim() !== '') ? item.modelUrlRemote : item.modelUrl;
+          // Resolve the model URL:
+          //   - modelUrlRemote is a server-relative path like "/library/file.glb"
+          //     → make it absolute using this page's origin (works for LAN, Quest, Cloudflare tunnel)
+          //   - modelUrl is the WebView2 virtual-host URL "http://library.local/file.glb"
+          //     → only works when the page is loaded inside the WinUI app itself
+          let resolvedUrl;
+          if (item.modelUrlRemote && item.modelUrlRemote.trim() !== '') {
+            const remote = item.modelUrlRemote.trim();
+            // If already absolute (starts with http/https) keep it; else prepend origin
+            resolvedUrl = remote.startsWith('http') ? remote : `${location.origin}${remote.startsWith('/') ? '' : '/'}${remote}`;
+          } else {
+            resolvedUrl = item.modelUrl;
+          }
 
           gltfLoader.load(resolvedUrl, (gltf) => {
             const rawModel = gltf.scene;
@@ -2758,8 +2769,31 @@
         const p = document.getElementById('voice-panel'); if (p && p.dataset.dragged !== 'true') p.classList.toggle('collapsed');
       };
 
+      // Toggle record on click or spacebar
+      window.toggleRecord = async function (e) { if (e && e.preventDefault) e.preventDefault(); if (_isRecording) { stopRecording(); } else { await startRecording(); } };
+
+      // Legacy hold-API kept as no-op aliases (VR or external code may still call them)
       window.startHoldRecord = async function (e) { if (e && e.preventDefault) e.preventDefault(); if (_isRecording) return; await startRecording(); };
       window.stopHoldRecord = function (e) { if (e && e.preventDefault) e.preventDefault(); if (!_isRecording) return; stopRecording(); };
+
+      // ── Spacebar shortcut ──────────────────────────────────────────────────
+      let _spaceActive = false; // guard against key-repeat
+      document.addEventListener('keydown', function (e) {
+        if (e.code !== 'Space') return;
+        // Don't steal space from text inputs
+        const tag = document.activeElement && document.activeElement.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+        e.preventDefault();
+        if (_spaceActive) return; // ignore key-repeat
+        _spaceActive = true;
+        if (!_isRecording) startRecording();
+      });
+      document.addEventListener('keyup', function (e) {
+        if (e.code !== 'Space') return;
+        _spaceActive = false;
+        if (_isRecording) stopRecording();
+      });
+      // ────────────────────────────────────────────────────────────────────────
 
       async function startRecording() {
         try {
@@ -2771,7 +2805,7 @@
           _mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) _audioChunks.push(e.data); };
           _mediaRecorder.onstop = () => { stream.getTracks().forEach(t => t.stop()); uploadAudio(); };
           _mediaRecorder.start();
-          pttBtn.classList.add('recording'); pttLabel.textContent = 'Release to send…'; setStatus('Recording — release to send', '');
+          pttBtn.classList.add('recording'); pttLabel.textContent = 'Recording… (Space or click to stop)'; setStatus('Recording — press Space or click to stop', '');
         } catch (err) { setStatus('Microphone access denied: ' + err.message, 'error'); _isRecording = false; }
       }
 
@@ -2801,7 +2835,7 @@
       }
 
       function setStatus(msg, cls) { if (voiceStatus) { voiceStatus.textContent = msg; voiceStatus.className = cls ? `${cls}` : ''; } }
-      function resetBtn() { pttBtn.classList.remove('loading', 'recording'); pttLabel.textContent = 'Hold to Record'; _isRecording = false; }
+      function resetBtn() { pttBtn.classList.remove('loading', 'recording'); pttLabel.textContent = 'Press Space to Record'; _isRecording = false; }
 
       setTimeout(async () => {
         try {

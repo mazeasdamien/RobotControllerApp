@@ -2336,6 +2336,16 @@ namespace RobotControllerApp
                     return;
                 }
 
+                if (type == "ping")
+                {
+                    // Echo the timestamp back immediately so the browser can compute RTT
+                    string tsRaw = payload.ValueKind == JsonValueKind.Number
+                        ? payload.GetRawText()
+                        : "0";
+                    _ = _broadcastServer.BroadcastAsync("pong", tsRaw);
+                    return;
+                }
+
                 if (type == "refreshScene")
                 {
                     _ = Task.Run(async () => await PushObjectsToSceneAsync());
