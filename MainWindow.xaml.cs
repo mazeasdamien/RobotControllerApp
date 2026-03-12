@@ -2498,6 +2498,7 @@ namespace RobotControllerApp
                             // don't need to fetch it over HTTP (avoids Cloudflare 502 on large files)
                             try
                             {
+                                string glbPath = Path.Combine(LibraryPath, glbFileName);
                                 byte[] glbBytes = await File.ReadAllBytesAsync(glbPath);
                                 string b64 = Convert.ToBase64String(glbBytes);
                                 Log($"[GLB-WS] Pushing '{label}' ({glbBytes.Length / 1024} KB) via WebSocket");
