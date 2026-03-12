@@ -420,14 +420,10 @@
                                             <ColumnDefinition Width="48"/>
                                             <ColumnDefinition Width="*"/>
                                             <ColumnDefinition Width="130"/>
-                                            <ColumnDefinition Width="110"/>
-                                            <ColumnDefinition Width="130"/>
                                             <ColumnDefinition Width="44"/>
                                         </Grid.ColumnDefinitions>
-                                        <TextBlock Grid.Column="1" Text="NAME"     FontSize="9" Opacity="0.4" CharacterSpacing="60" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="2" Text="ADDED"    FontSize="9" Opacity="0.4" CharacterSpacing="60" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="3" Text="3D MODEL" FontSize="9" Opacity="0.4" CharacterSpacing="60" VerticalAlignment="Center"/>
-                                        <TextBlock Grid.Column="4" Text="GENERATE" FontSize="9" Opacity="0.4" CharacterSpacing="60" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="1" Text="NAME"  FontSize="9" Opacity="0.4" CharacterSpacing="60" VerticalAlignment="Center"/>
+                                        <TextBlock Grid.Column="2" Text="ADDED" FontSize="9" Opacity="0.4" CharacterSpacing="60" VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>
 
@@ -452,8 +448,6 @@
                                                     <Grid.ColumnDefinitions>
                                                         <ColumnDefinition Width="48"/>
                                                         <ColumnDefinition Width="*"/>
-                                                        <ColumnDefinition Width="130"/>
-                                                        <ColumnDefinition Width="110"/>
                                                         <ColumnDefinition Width="130"/>
                                                         <ColumnDefinition Width="44"/>
                                                     </Grid.ColumnDefinitions>
@@ -489,32 +483,8 @@
                                                                Opacity="0.55" VerticalAlignment="Center"
                                                                TextTrimming="CharacterEllipsis"/>
 
-                                                    <!-- 3D model status: ✓ green / ⚠ missing orange / — none (Loaded handler) -->
-                                                    <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                                                        <TextBlock Loaded="Preview3DBtn_Loaded"
-                                                                   Text="&#x2713; Model" FontSize="11" FontWeight="SemiBold"
-                                                                   Foreground="#00E5A0" VerticalAlignment="Center"
-                                                                   Visibility="Collapsed"/>
-                                                        <!-- Missing-on-disk badge (HasModel=false but JSON has filename) -->
-                                                        <TextBlock Loaded="ModelMissing_Loaded"
-                                                                   Text="&#x26A0; Missing" FontSize="10" FontWeight="SemiBold"
-                                                                   Foreground="#FFAA44" VerticalAlignment="Center"
-                                                                   Visibility="Collapsed"
-                                                                   ToolTipService.ToolTip="Model filename in JSON but file not found on disk"/>
-                                                    </StackPanel>
-
-                                                    <!-- Generate 3D button -->
-                                                    <Button Grid.Column="4"
-                                                            Click="Generate3DModel_Click"
-                                                            Loaded="Generate3DModel_Loaded"
-                                                            Content="&#x1F3B2; To 3D Model"
-                                                            FontSize="11" Padding="10,5"
-                                                            CornerRadius="6"
-                                                            HorizontalAlignment="Stretch"
-                                                            VerticalAlignment="Center"/>
-
                                                     <!-- Delete -->
-                                                    <Button Grid.Column="5"
+                                                    <Button Grid.Column="3"
                                                             Click="DeleteLibraryObject_Click"
                                                             Background="Transparent"
                                                             BorderBrush="#22FF4444" BorderThickness="1"

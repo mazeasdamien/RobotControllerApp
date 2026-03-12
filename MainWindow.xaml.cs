@@ -1114,9 +1114,6 @@ namespace RobotControllerApp
             {
                 progressCallback?.Invoke("🍌 Enhancing image…");
 
-                // Model ID confirmed from official Google Cloud docs (March 2025):
-                // https://docs.cloud.google.com/vertex-ai/generative-ai/docs/models/gemini/2-5-flash-image
-                // Works on the standard Gemini REST API with a regular API key.
                 string modelName = string.IsNullOrEmpty(_settings.BananaModel)
                     ? "gemini-2.5-flash-image"
                     : _settings.BananaModel;
@@ -1138,11 +1135,12 @@ namespace RobotControllerApp
                 double frameScale = _settings.BananaFramingScale > 0 ? _settings.BananaFramingScale * 100 : 60;
 
                 string promptText =
-                    $"Extract the physical {objectLabel} shown in this image {customPromptPart}. " +
-                    $"Subtly enhance the object's colors so they look natural and realistic, completely faithful to the original. " +
-                    $"Remove all other objects (hands, tools, furniture, floors, table surface). " +
-                    $"Place the object on a clean, plain WHITE background with ABSOLUTELY NO SHADOWS underneath it. " +
-                    $"Provide a 1:1 square output where the {objectLabel} occupies about {frameScale}% of the canvas.";
+                    $"GENERATE AN IMAGE of ONLY the {objectLabel} — one single isolated object. " +
+                    $"IMPORTANT: the output image must contain EXACTLY 1 object: the {objectLabel}. No other objects. " +
+                    $"{customPromptPart} " +
+                    $"Remove ALL other objects and background. Keep ONLY the {objectLabel}. " +
+                    $"Output: the {objectLabel} centered on a plain WHITE background, NO shadows, filling about {frameScale}% of the square canvas.";
+
 
                 var payload = new
                 {
@@ -1697,7 +1695,7 @@ namespace RobotControllerApp
 
                 _settings.BananaModel = BananaModelComboBox.SelectedIndex switch
                 {
-                    _ => "gemini-2.5-flash-image"   // confirmed official model ID
+                    _ => "gemini-2.5-flash-image"
                 };
 
                 _settings.BananaPromptTemplate = BananaPromptTextBox.Text;
@@ -2338,6 +2336,12 @@ namespace RobotControllerApp
                     return;
                 }
 
+                if (type == "refreshScene")
+                {
+                    _ = Task.Run(async () => await PushObjectsToSceneAsync());
+                    return;
+                }
+
                 if (type == "scanScene")
                 {
                     Log("[Scene3D] Remote scan request received.");
@@ -2400,11 +2404,54 @@ namespace RobotControllerApp
                                     _ = _broadcastServer.BroadcastAsync("setGen3DProgress", JsonSerializer.Serialize(new { label, status = msg }));
                                 });
 
-                            DispatcherQueue.TryEnqueue(() =>
+                            DispatcherQueue.TryEnqueue(async () =>
                             {
                                 var cfg = _libraryConfig.FirstOrDefault(c => string.Equals(c.Name, label, StringComparison.OrdinalIgnoreCase));
-                                if (cfg != null) { cfg.ModelFileName = glbFileName; if (string.IsNullOrEmpty(cfg.ImageFileName)) cfg.ImageFileName = bananaFileName; }
+                                bool isNewEntry = cfg == null;
+                                if (isNewEntry)
+                                {
+                                    // First time this object gets a 3D model — create the library entry
+                                    cfg = new LibraryItemConfig
+                                    {
+                                        Name = label,
+                                        DateAdded = DateTime.Now.ToString("yyyy-MM-dd HH:mm"),
+                                        ColorHex = "#FFFFFF"
+                                    };
+                                    _libraryConfig.Insert(0, cfg);
+                                }
+                                cfg.ModelFileName = glbFileName;
+                                if (string.IsNullOrEmpty(cfg.ImageFileName)) cfg.ImageFileName = bananaFileName;
                                 _ = SaveLibraryAsync();
+
+                                // ── Sync the UI ObservableCollection ──────────────────────
+                                var existingVm = _libraryItems.FirstOrDefault(v => string.Equals(v.Name, label, StringComparison.OrdinalIgnoreCase));
+                                if (existingVm != null)
+                                {
+                                    existingVm.HasModel = true;
+                                }
+                                else
+                                {
+                                    // Build a new VM with thumbnail
+                                    var vm = new LibraryItemViewModel
+                                    {
+                                        Name = label,
+                                        DateAdded = cfg.DateAdded,
+                                        HasModel  = true,
+                                        HasImage  = !string.IsNullOrEmpty(bananaFileName)
+                                    };
+                                    try
+                                    {
+                                        string imgPath = Path.Combine(LibraryPath, bananaFileName);
+                                        if (File.Exists(imgPath))
+                                        {
+                                            byte[] imgBytes = await File.ReadAllBytesAsync(imgPath);
+                                            vm.ImageSource = await LoadImageFromBytesAsync(imgBytes);
+                                        }
+                                    }
+                                    catch { }
+                                    _libraryItems.Insert(0, vm);
+                                }
+
                                 _totalTripo3dCost += tripoCost; UpdateTotalCostDisplay();
                                 Log($"[Scene3D-3D] '{label}' GLB saved. Tripo cost: {tripoCost:0.0000} credits");
                             });

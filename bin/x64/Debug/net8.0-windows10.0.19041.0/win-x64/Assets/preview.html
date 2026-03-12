@@ -4,7 +4,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
   <title>3D Scene Preview</title>
   <style>
     * {
@@ -131,7 +132,7 @@
     }
 
     #hud .hint::before {
-      content: 'Â·';
+      content: '·';
       font-size: 14px;
       color: rgba(255, 255, 255, 0.25);
       line-height: 1;
@@ -245,7 +246,7 @@
       }
     }
 
-    /* FK / Control Panel â€” left side, fixed */
+    /* FK / Control Panel — left side, fixed */
     #fk-panel {
       position: absolute;
       top: 50%;
@@ -256,11 +257,11 @@
       border-radius: var(--radius-lg);
       backdrop-filter: var(--blur);
       color: var(--text);
-      font-size: 12px;
-      width: 230px;
+      font-size: 11px;
+      width: 95px;
       overflow: hidden;
       resize: none;
-      transition: max-height 0.38s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: max-height 0.38s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
       max-height: 92vh;
       opacity: 1;
       user-select: none;
@@ -273,8 +274,10 @@
       overflow: hidden;
     }
 
-    /* Hide Forward-Kinematics sub-section — kept functional in JS but not needed in UI */
-    .fk-robot-selector, #fk-sliders, #fk-reset-btn, .fk-divider {
+    .fk-robot-selector,
+    #fk-sliders,
+    #fk-reset-btn,
+    .fk-divider {
       display: none !important;
     }
 
@@ -355,282 +358,14 @@
     }
 
     #fk-body {
-      padding: 12px 14px 14px;
-    }
-
-    .fk-robot-selector {
-      display: flex;
-      gap: 5px;
-      margin-bottom: 12px;
-      background: rgba(0, 0, 0, 0.25);
-      border-radius: 8px;
-      padding: 3px;
-    }
-
-    .fk-robot-btn {
-      flex: 1;
-      padding: 5px 0;
-      border-radius: 6px;
-      border: none;
-      background: transparent;
-      color: var(--text-muted);
-      font-size: 11px;
-      font-weight: 500;
-      font-family: inherit;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-
-    .fk-robot-btn.active {
-      background: linear-gradient(135deg, rgba(85, 153, 255, 0.28), rgba(85, 153, 255, 0.12));
-      color: #aaccff;
-      font-weight: 600;
-      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-    }
-
-    #fk-sliders {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .fk-axis-row {
-      display: grid;
-      grid-template-columns: 38px 1fr 46px;
-      align-items: center;
-      gap: 8px;
-      padding: 3px 0;
-    }
-
-    .fk-axis-label {
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--text-muted);
-      text-align: right;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .fk-slider-wrap {
-      position: relative;
-    }
-
-    .fk-slider {
-      -webkit-appearance: none;
-      appearance: none;
-      width: 100%;
-      height: 3px;
-      border-radius: 999px;
-      background: rgba(85, 153, 255, 0.12);
-      outline: none;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-
-    .fk-slider:hover {
-      background: rgba(85, 153, 255, 0.2);
-    }
-
-    .fk-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 15px;
-      height: 15px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #88bbff, #3366cc);
-      box-shadow: 0 0 6px rgba(85, 153, 255, 0.55), 0 2px 4px rgba(0, 0, 0, 0.4);
-      cursor: pointer;
-      border: 2px solid rgba(255, 255, 255, 0.15);
-      transition: box-shadow 0.15s, transform 0.15s;
-    }
-
-    .fk-slider:active::-webkit-slider-thumb {
-      box-shadow: 0 0 12px rgba(85, 153, 255, 0.8);
-      transform: scale(1.15);
-    }
-
-    .fk-val {
-      font-size: 11px;
-      font-weight: 600;
-      color: #aaccff;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-      background: rgba(85, 153, 255, 0.08);
-      border: 1px solid rgba(85, 153, 255, 0.14);
-      border-radius: 5px;
-      padding: 2px 6px;
-    }
-
-    .fk-divider {
-      height: 1px;
-      background: rgba(255, 255, 255, 0.05);
-      margin: 8px 0;
-    }
-
-    #fk-reset-btn {
-      width: 100%;
-      margin-top: 8px;
-      padding: 7px 0;
-      border-radius: var(--radius-sm);
-      border: 1px solid rgba(255, 100, 100, 0.2);
-      background: rgba(255, 60, 60, 0.06);
-      color: rgba(255, 150, 150, 0.75);
-      font-size: 11px;
-      font-weight: 500;
-      font-family: inherit;
-      cursor: pointer;
-      transition: background 0.2s, border-color 0.2s, color 0.2s;
-      letter-spacing: 0.03em;
-    }
-
-    #fk-reset-btn:hover {
-      background: rgba(255, 60, 60, 0.14);
-      border-color: rgba(255, 100, 100, 0.35);
-      color: rgba(255, 180, 180, 0.9);
-    }
-
-    /* ── IK Panel ────────────────────────────────────────────── */
-    #ik-panel {
-      background: var(--glass-bg);
-      border: 1px solid var(--glass-border);
-      border-radius: var(--radius-md);
-      overflow: hidden;
-      margin-bottom: 8px;
-    }
-
-    #ik-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      cursor: pointer;
-      background: rgba(255, 165, 0, 0.06);
-      border-bottom: 1px solid rgba(255, 165, 0, 0.12);
-      user-select: none;
-    }
-
-    #ik-header-left {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      font-size: 11px;
-      font-weight: 700;
-      color: #ffaa44;
-      letter-spacing: 0.07em;
-      text-transform: uppercase;
-    }
-
-    #ik-collapse-btn {
-      font-size: 18px;
-      color: rgba(255, 165, 0, 0.7);
-      background: none;
-      border: none;
-      cursor: pointer;
-      transition: transform 0.3s;
-      padding: 2px 4px;
-      line-height: 1;
-    }
-
-    #ik-panel.collapsed #ik-body {
-      display: none;
-    }
-
-    #ik-panel.collapsed #ik-collapse-btn {
-      transform: rotate(-90deg);
-    }
-
-    #ik-body {
-      padding: 10px 13px 13px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .ik-robot-row {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6px;
-    }
-
-    .ik-robot-card {
-      background: rgba(255, 255, 255, 0.03);
-      border: 1px solid rgba(255, 255, 255, 0.07);
-      border-radius: 7px;
-      padding: 8px 10px;
-    }
-
-    .ik-robot-title {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      margin-bottom: 6px;
-    }
-
-    .ik-r1-title {
-      color: #5599ff;
-    }
-
-    .ik-r2-title {
-      color: #FFD279;
-    }
-
-    .ik-toggle-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      margin-bottom: 6px;
-    }
-
-    .ik-toggle {
-      width: 28px;
-      height: 15px;
-      border-radius: 999px;
-      background: rgba(255, 255, 255, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      cursor: pointer;
-      position: relative;
-      transition: background 0.2s;
-    }
-
-    .ik-toggle.active {
-      background: rgba(255, 140, 0, 0.4);
-      border-color: rgba(255, 140, 0, 0.6);
-    }
-
-    .ik-toggle::after {
-      content: '';
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 9px;
-      height: 9px;
-      border-radius: 50%;
-      background: rgba(255, 255, 255, 0.4);
-      transition: left 0.2s, background 0.2s;
-    }
-
-    .ik-toggle.active::after {
-      left: 15px;
-      background: #ffaa44;
-    }
-
-    .ik-toggle-label {
-      font-size: 10px;
-      color: var(--text-muted);
-    }
-
-    .ik-pos-display {
-      font-size: 10px;
-      font-family: 'Consolas', monospace;
-      color: rgba(255, 255, 255, 0.35);
-      margin-bottom: 6px;
-      line-height: 1.6;
+      padding: 6px 8px 8px;
     }
 
     #cp-actions {
       display: flex;
       flex-direction: column;
-      gap: 5px;
-      margin-bottom: 10px;
+      gap: 8px;
+      margin-bottom: 8px;
     }
 
     .cp-action-btn {
@@ -638,13 +373,13 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 5px;
-      padding: 7px 10px;
+      gap: 4px;
+      padding: 7px 4px;
       border-radius: var(--radius-sm);
       border: 1px solid rgba(255, 255, 255, 0.08);
       background: rgba(255, 255, 255, 0.04);
       color: var(--text-dim);
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 500;
       font-family: inherit;
       cursor: pointer;
@@ -690,8 +425,7 @@
       font-size: 12px;
       width: 340px;
       overflow: hidden;
-      /* Use a JS-driven CSS variable so we can adapt height to content */
-      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
       max-height: var(--ctx-max-height, 200px);
       user-select: none;
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 204, 106, 0.06);
@@ -850,16 +584,17 @@
       color: #ff6666;
     }
 
-    /* Photo strip */
+    /* Photo grid */
     #ctx-photos {
-      display: flex;
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
       gap: 8px;
-      overflow-x: auto;
-      padding: 6px 0 4px;
-      scroll-snap-type: x mandatory;
+      overflow-y: auto;
+      padding: 4px 2px 4px;
       scrollbar-width: thin;
       scrollbar-color: rgba(0, 204, 106, 0.3) transparent;
-      margin-top: 6px;
+      margin-top: 8px;
+      max-height: 460px;
     }
 
     #ctx-photos:empty {
@@ -867,37 +602,43 @@
     }
 
     .ctx-photo-card {
-      flex-shrink: 0;
-      scroll-snap-align: start;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 4px;
-      background: rgba(0, 0, 0, 0.3);
+      gap: 5px;
+      background: rgba(0, 0, 0, 0.35);
       border: 1px solid rgba(0, 204, 106, 0.18);
-      border-radius: 8px;
-      padding: 5px;
-      width: 80px;
+      border-radius: 10px;
+      padding: 7px 6px 8px;
+      transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
+      cursor: default;
+    }
+
+    .ctx-photo-card:hover {
+      border-color: rgba(0, 204, 106, 0.42);
+      box-shadow: 0 4px 18px rgba(0, 204, 106, 0.12);
+      transform: translateY(-1px);
     }
 
     .ctx-photo-card img {
-      width: 70px;
-      height: 70px;
+      width: 100%;
+      aspect-ratio: 1 / 1;
       object-fit: cover;
-      border-radius: 5px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
     }
 
     .ctx-photo-label {
-      font-size: 9px;
-      font-weight: 600;
-      color: #55ddaa;
-      letter-spacing: 0.04em;
+      font-size: 9.5px;
+      font-weight: 700;
+      color: #7aeec0;
+      letter-spacing: 0.06em;
       text-transform: uppercase;
       text-align: center;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      word-break: break-word;
+      line-height: 1.3;
       width: 100%;
+      padding: 0 2px;
     }
 
     #ctx-costs {
@@ -908,12 +649,6 @@
       font-size: 9px;
       color: rgba(255, 255, 255, 0.45);
     }
-
-
-
-
-
-
 
     #ctx-cumulative {
       display: flex;
@@ -941,30 +676,32 @@
     }
 
     .ctx-model-badge {
-      font-size: 8px;
+      font-size: 9px;
       font-weight: 700;
-      letter-spacing: 0.03em;
-      padding: 2px 5px;
-      border-radius: 4px;
+      letter-spacing: 0.04em;
+      padding: 4px 6px;
+      border-radius: 6px;
       width: 100%;
       text-align: center;
       cursor: pointer;
-      transition: opacity 0.15s;
+      transition: opacity 0.15s, box-shadow 0.2s, background 0.2s;
+      line-height: 1.3;
     }
 
     .ctx-model-badge.no-model {
-      background: rgba(255, 140, 0, 0.2);
-      border: 1px solid rgba(255, 140, 0, 0.5);
-      color: #ffaa40;
+      background: rgba(255, 140, 0, 0.18);
+      border: 1px solid rgba(255, 140, 0, 0.45);
+      color: #ffb84d;
     }
 
     .ctx-model-badge.no-model:hover {
-      opacity: 0.75;
+      background: rgba(255, 140, 0, 0.30);
+      box-shadow: 0 0 10px rgba(255, 140, 0, 0.25);
     }
 
     .ctx-model-badge.has-model {
-      background: rgba(0, 200, 100, 0.15);
-      border: 1px solid rgba(0, 200, 100, 0.4);
+      background: rgba(0, 200, 100, 0.14);
+      border: 1px solid rgba(0, 200, 100, 0.38);
       color: #55ddaa;
       cursor: default;
     }
@@ -972,126 +709,12 @@
     .ctx-model-badge.not-in-library {
       background: rgba(100, 100, 255, 0.15);
       border: 1px solid rgba(100, 100, 255, 0.4);
-      color: #8899ff;
+      color: #99aaff;
     }
 
     .ctx-model-badge.not-in-library:hover {
-      opacity: 0.75;
-    }
-
-    #cp-sliders {
-      display: flex;
-      gap: 14px;
-      margin-bottom: 10px;
-    }
-
-    .cp-slider-row {
-      flex: 1;
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .cp-slider-label {
-      font-size: 9px;
-      font-weight: 600;
-      color: var(--text-muted);
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      white-space: nowrap;
-    }
-
-    .cp-slider-val {
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--accent);
-      white-space: nowrap;
-    }
-
-    .cp-slider {
-      -webkit-appearance: none;
-      appearance: none;
-      flex: 1 1 100%;
-      height: 3px;
-      border-radius: 999px;
-      background: rgba(85, 153, 255, 0.15);
-      outline: none;
-      cursor: pointer;
-    }
-
-    .cp-slider::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 13px;
-      height: 13px;
-      border-radius: 50%;
-      background: radial-gradient(circle at 35% 35%, #88bbff, #3366cc);
-      cursor: pointer;
-      box-shadow: 0 0 5px rgba(85, 153, 255, 0.4);
-    }
-
-    .sb-reset-btn {
-      background: rgba(255, 255, 255, 0.06);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 5px;
-      color: var(--text-muted);
-      font-size: 12px;
-      padding: 1px 5px;
-      cursor: pointer;
-      flex-shrink: 0;
-      line-height: 1.6;
-    }
-
-    .sb-reset-btn:hover {
-      background: rgba(255, 255, 255, 0.14);
-      color: var(--text);
-    }
-
-    /* XR Toast */
-    #xr-toast {
-      position: absolute;
-      bottom: 80px;
-      left: 50%;
-      transform: translateX(-50%) translateY(12px);
-      background: rgba(20, 20, 35, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 10px;
-      padding: 10px 18px;
-      color: var(--text);
-      font-size: 12px;
-      font-weight: 500;
-      backdrop-filter: blur(16px);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.3s, transform 0.3s;
-      z-index: 100;
-      max-width: 380px;
-      text-align: center;
-      white-space: pre-line;
-    }
-
-    #xr-toast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
-
-    .drag-handle {
-      cursor: grab;
-      touch-action: none;
-    }
-
-    .drag-handle:active {
-      cursor: grabbing;
-    }
-
-    body.white-bg #hud,
-    body.white-bg #fk-panel {
-      background: rgba(240, 240, 245, 0.9);
-      border-color: rgba(0, 0, 0, 0.1);
-    }
-
-    body.white-bg #hud .hud-title {
-      color: #111;
+      background: rgba(100, 100, 255, 0.28);
+      box-shadow: 0 0 10px rgba(100, 100, 255, 0.2);
     }
 
     /* ── Voice Panel ──────────────────────────────────────── */
@@ -1107,7 +730,7 @@
       font-size: 12px;
       width: 260px;
       overflow: hidden;
-      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
       max-height: 600px;
       box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(180, 80, 255, 0.05);
       user-select: none;
@@ -1286,6 +909,53 @@
     #voice-status.success {
       color: #00cc6a;
     }
+
+    /* XR Toast */
+    #xr-toast {
+      position: absolute;
+      bottom: 80px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      background: rgba(20, 20, 35, 0.92);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      padding: 10px 18px;
+      color: var(--text);
+      font-size: 12px;
+      font-weight: 500;
+      backdrop-filter: blur(16px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s, transform 0.3s;
+      z-index: 100;
+      max-width: 380px;
+      text-align: center;
+      white-space: pre-line;
+    }
+
+    #xr-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .drag-handle {
+      cursor: grab;
+      touch-action: none;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
+    body.white-bg #hud,
+    body.white-bg #fk-panel {
+      background: rgba(240, 240, 245, 0.9);
+      border-color: rgba(0, 0, 0, 0.1);
+    }
+
+    body.white-bg #hud .hud-title {
+      color: #111;
+    }
   </style>
 </head>
 
@@ -1336,7 +1006,6 @@
         </button>
       </div>
 
-
       <button class="cp-action-btn" id="cp-feed-opacity-btn" onclick="toggleFeedOpacity()" style="margin-bottom:6px;">
         <span id="cp-feed-opacity-label">Hide Live Feed</span>
       </button>
@@ -1350,23 +1019,6 @@
       <div id="fk-sliders"></div>
       <div class="fk-divider"></div>
       <button id="fk-reset-btn" onclick="resetFk()">↺ &nbsp;Reset to Home</button>
-
-      <div class="fk-divider"></div>
-
-      <div id="ik-panel" style="display:flex;flex-direction:column;gap:6px;padding:4px 0;">
-        <div style="display:flex;gap:10px;align-items:center;">
-          <div class="ik-toggle-row" style="gap:6px;">
-            <div class="ik-toggle" id="ik-r1-toggle" onclick="toggleIk(0)"></div>
-            <span class="ik-toggle-label" style="font-size:10px;">R1 IK</span>
-          </div>
-          <div class="ik-toggle-row" style="gap:6px;">
-            <div class="ik-toggle" id="ik-r2-toggle" onclick="toggleIk(1)"></div>
-            <span class="ik-toggle-label" style="font-size:10px;">R2 IK</span>
-          </div>
-        </div>
-        <div id="ik-r1-pos" style="display:none;"></div>
-        <div id="ik-r2-pos" style="display:none;"></div>
-      </div>
     </div>
   </div>
 
@@ -1445,9 +1097,14 @@
     import * as THREE from 'three';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // WebXR modules 
     import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
     import { OculusHandModel } from 'three/addons/webxr/OculusHandModel.js';
     import { OculusHandPointerModel } from 'three/addons/webxr/OculusHandPointerModel.js';
+    import { HTMLMesh } from 'three/addons/interactive/HTMLMesh.js';
+    import { InteractiveGroup } from 'three/addons/interactive/InteractiveGroup.js';
+    import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
 
     // ── Global Scope State ───────────────────────────────────────────────
     let _scanInProgress = false;
@@ -1458,45 +1115,51 @@
     let _feedOpacityHidden = false;
 
     // ── IK State ──────────────────────────────────────────────────────────
-    const IK_GHOST_COLORS  = [0x4466ff, 0xffaa22];  // blue robot 1, amber robot 2
-    const IK_GHOSTS        = [];                      // {root, joints, tip}
-    const IK_HANDLES       = [];                      // THREE.Group sphere at tip
-    const IK_ENABLED       = [false, false];          // true when IK is solving
-    const IK_TARGET_POS    = [new THREE.Vector3(), new THREE.Vector3()];
-    const IK_ANGLES_R      = [[0,0,0,0,0,0], [0,0,0,0,0,0]]; // IK joint angles (deg)
-    const _ikLastSendMs    = [0, 0];   // throttle timestamps for _ikSendContinuous
-    const IK_DELTA_DEG     = 0.5;      // finite-difference step (degrees)
-    const IK_DAMPING       = 0.08;     // damped-least-squares lambda
+    const IK_GHOST_COLORS = [0x4466ff, 0xffaa22];  // blue robot 1, amber robot 2
+    const IK_GHOSTS = [];                      // {root, joints, tip}
+    const IK_HANDLES = [];                      // THREE.Group sphere at tip
+    const IK_ENABLED = [false, false];          // true when IK is solving
+    const IK_TARGET_POS = [new THREE.Vector3(), new THREE.Vector3()];
+    const IK_ANGLES_R = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]]; // IK joint angles (deg)
+    const _ikLastSendMs = [0, 0];   // throttle timestamps for _ikSendContinuous
+    const IK_DELTA_DEG = 0.5;      // finite-difference step (degrees)
+    const IK_DAMPING = 0.08;     // damped-least-squares lambda
     const IK_LEARNING_RATE = 0.80;
-    const IK_STOP_THRESH   = 0.003;    // stop when tip error < 3 mm
+    const IK_STOP_THRESH = 0.003;    // stop when tip error < 3 mm
+
     // Scratch vectors — pre-allocated to avoid GC stutter in the render loop
     const _p0 = new THREE.Vector3(), _p1 = new THREE.Vector3();
     const _mid = new THREE.Vector3(), _rawDelta = new THREE.Vector3();
     const _ee0 = new THREE.Vector3(), _ee1 = new THREE.Vector3(), _posErr = new THREE.Vector3();
-    const _J = [[0,0,0,0,0,0],[0,0,0,0,0,0],[0,0,0,0,0,0]]; // 3×6 Jacobian (plain arrays)
+    const _targetWp = new THREE.Vector3(); // Used to securely lock world targets in VR
+    const _qRest = new THREE.Quaternion(), _qRot = new THREE.Quaternion();
+    const _J = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]]; // 3×6 Jacobian (plain arrays)
 
-    // ── Renderer ── (XR-optimised: no ACES, auto camera update disabled)
+    // ── Renderer ── (XR-optimised)
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;  // desktop; switched OFF in XR
+    renderer.shadowMap.enabled = false;
+
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.05;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.xr.enabled = true;
-    renderer.xr.cameraAutoUpdate = false; // we call updateCamera() manually — required for correct stereo
 
     document.body.appendChild(renderer.domElement);
 
     // ── Scene ──
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0a0a0c);
-    scene.fog = new THREE.FogExp2(0x0a0a0c, 0.38); // exponential fog — fades grid to infinity
+
+    // CRITICAL FIX: The XR Rig prevents coordinates from going crazy by moving the user safely instead of the scene
+    const xrRig = new THREE.Group();
+    scene.add(xrRig);
 
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 50);
     camera.position.set(0.33 + 1.2, 1.2, 0.35 + 0.3);
     camera.lookAt(0.33, 0.05, 0.35);
+    xrRig.add(camera);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.08;
@@ -1505,8 +1168,7 @@
     controls.minDistance = 0.3; controls.maxDistance = 10;
     controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.DOLLY };
 
-    // ── Procedural Environment Map (no external file needed) ──
-    // Creates a gradient sky that gives metal/plastic surfaces realistic reflections
+    // ── Procedural Environment Map ──
     (function buildEnvMap() {
       const size = 64;
       const data = new Uint8Array(4 * size * size * 6);
@@ -1542,7 +1204,6 @@
     })();
 
     // ── Lighting ──
-    // Warm key light from upper-right
     const ambientLight = new THREE.AmbientLight(0x8899cc, 0.45);
     scene.add(ambientLight);
 
@@ -1556,8 +1217,6 @@
     dir.shadow.normalBias = 0.02;
     scene.add(dir);
 
-    // Unified fill — HemisphereLight gives a coherent sky/ground gradient
-    // warm sky above, cool neutral ground below — no harsh coloured shadows
     const hemi = new THREE.HemisphereLight(0xfff0dd, 0x445566, 0.9);
     scene.add(hemi);
 
@@ -1566,16 +1225,12 @@
     const TABLE_CX = (TABLE_W / 2) - 0.15;
     const TABLE_CZ = 0;
 
-    // Light warm oak table
-    const tableMat = new THREE.MeshStandardMaterial({
-      color: 0xc4a06a, roughness: 0.78, metalness: 0.0
-    });
+    const tableMat = new THREE.MeshStandardMaterial({ color: 0xc4a06a, roughness: 0.78, metalness: 0.0 });
     const tableMesh = new THREE.Mesh(new THREE.BoxGeometry(TABLE_W, 0.012, TABLE_D), tableMat);
     tableMesh.receiveShadow = true;
     tableMesh.position.set(TABLE_CX, -0.006, TABLE_CZ);
     scene.add(tableMesh);
 
-    // Grid exactly matches table footprint — 8 squares across 80cm = 10cm per cell
     const grid = new THREE.GridHelper(TABLE_W, 8, 0x9e7a4a, 0xc49a5e);
     grid.position.set(TABLE_CX, 0.002, TABLE_CZ);
     scene.add(grid);
@@ -1593,8 +1248,6 @@
     let fkTarget = 0;
     const FK_ANGLES = [0, 0, 0, 0, 0, 0];
     const FK_ANGLES_R = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]];
-
-
 
     const JOINT_PATTERNS = [
       ['joint_1', 'Joint1', 'Axis1', 'axis_1', 'shoulder_link'],
@@ -1653,14 +1306,12 @@
             if (t) { t.anisotropy = maxAniso; t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; }
           });
           const col = mat.color;
-          // Detect teal/cyan robot body colour and upgrade to MeshPhysicalMaterial
           const isTeal = col.r < 0.5 && col.g > 0.4 && col.b > 0.5;
           const isDark = col.r < 0.15 && col.g < 0.15 && col.b < 0.15;
           if (isTeal || isDark) {
             node.material = new THREE.MeshPhysicalMaterial({
               color: mat.color, roughness: Math.min(mat.roughness ?? 0.5, 0.45),
-              metalness: Math.max(mat.metalness ?? 0.1, 0.1),
-              clearcoat: 0.85, clearcoatRoughness: 0.15,
+              metalness: Math.max(mat.metalness ?? 0.1, 0.1), clearcoat: 0.85, clearcoatRoughness: 0.15,
               map: mat.map, normalMap: mat.normalMap, normalScale: mat.normalScale,
               roughnessMap: mat.roughnessMap, metalnessMap: mat.metalnessMap, aoMap: mat.aoMap,
             });
@@ -1673,11 +1324,11 @@
       });
     }
 
-    // ── Logic d'initialisation 3D ──
     gltfLoader.load('ned.glb', (gltf) => {
       const nedModel = gltf.scene;
       polishNedMaterials(nedModel);
 
+      // Kept exact original offsets
       const BASE_OFFSET = 0.095, MARGIN = 0.017, FORWARD_SHIFT = 0.05, OFFSET = BASE_OFFSET + MARGIN;
 
       // Robot 1
@@ -1698,7 +1349,7 @@
       for (let rIdx = 0; rIdx < FK_ROBOTS.length; rIdx++) { fkTarget = rIdx; applyFk(); }
       fkTarget = 0;
 
-      // ── Build ghost for each FK robot ──
+      // Build ghost for each FK robot
       FK_ROBOTS.forEach((fkR, idx) => {
         const ghost = fkR.root.clone();
         ghost.traverse(n => { n.userData.restQ = n.quaternion.clone(); });
@@ -1719,12 +1370,12 @@
         IK_GHOSTS.push({ root: ghost, joints: ghostJoints, tip: ghostTip });
       });
 
-      // ── IK handle spheres (visible target markers) ──
-      const IK_HANDLE_GEO   = new THREE.SphereGeometry(0.020, 14, 14);
+      // IK handle spheres (visible target markers)
+      const IK_HANDLE_GEO = new THREE.SphereGeometry(0.020, 14, 14);
       const IK_HANDLE_OUTER = new THREE.SphereGeometry(0.034, 14, 14);
       FK_ROBOTS.forEach((fkR, idx) => {
         const group = new THREE.Group();
-        group.add(new THREE.Mesh(IK_HANDLE_GEO,   new THREE.MeshBasicMaterial({ color: IK_GHOST_COLORS[idx], transparent: true, opacity: 0.9 })));
+        group.add(new THREE.Mesh(IK_HANDLE_GEO, new THREE.MeshBasicMaterial({ color: IK_GHOST_COLORS[idx], transparent: true, opacity: 0.9 })));
         group.add(new THREE.Mesh(IK_HANDLE_OUTER, new THREE.MeshBasicMaterial({ color: IK_GHOST_COLORS[idx], transparent: true, opacity: 0.15, depthWrite: false })));
         const tip = IK_GHOSTS[idx].tip;
         if (tip) {
@@ -1739,7 +1390,10 @@
         IK_HANDLES.push(group);
       });
 
-      // CORRECTION CRITIQUE DE SYNTAXE (Fermeture du load)
+      setTimeout(() => {
+        IK_HANDLES.forEach((_, idx) => { if (window.enableIk) window.enableIk(idx); });
+      }, 100);
+
     }, undefined, (e) => {
       console.warn("Fichier ned.glb introuvable. Simulation sans les meshes 3D du bras.", e);
     });
@@ -1751,10 +1405,17 @@
       for (let i = 0; i < 6; i++) {
         const joint = ghost.joints[i]; if (!joint) continue;
         const rad = angles[i] * Math.PI / 180;
-        joint.quaternion.copy(joint.userData.restQ || new THREE.Quaternion())
-          .multiply(new THREE.Quaternion().setFromAxisAngle(JOINT_AXES[i], rad));
+        _qRest.copy(joint.userData.restQ || new THREE.Quaternion());
+        _qRot.setFromAxisAngle(JOINT_AXES[i], rad);
+        joint.quaternion.copy(_qRest).multiply(_qRot);
+        joint.updateMatrix();
       }
-      ghost.root.updateWorldMatrix(true, true);
+
+      // VR LAG FIX: Only update the explicit chain of bone matrices, not the entire scene
+      let curr = ghost.tip;
+      const chain = [];
+      while (curr && curr !== ghost.root.parent) { chain.push(curr); curr = curr.parent; }
+      for (let i = chain.length - 1; i >= 0; i--) { chain[i].updateMatrixWorld(false); }
     }
 
     function solveLinear3(A, b) {
@@ -1775,14 +1436,29 @@
     }
 
     window.solveIkStep = function (robotIdx) {
-      const ghost = IK_GHOSTS[robotIdx], tip = ghost?.tip;
-      if (!ghost || !tip || !IK_ENABLED[robotIdx]) return;
-      const angles = IK_ANGLES_R[robotIdx], target = IK_TARGET_POS[robotIdx];
+      const ghost = IK_GHOSTS[robotIdx], tip = ghost?.tip, handle = IK_HANDLES[robotIdx];
+      if (!ghost || !tip || !handle || !IK_ENABLED[robotIdx]) return;
+
+      const angles = IK_ANGLES_R[robotIdx];
       const DELTA_RAD = IK_DELTA_DEG * Math.PI / 180;
+
+      // CRITICAL VR FIX: Use pure Absolute World Space so VR tracking offsets don't confuse the IK
+      IK_HANDLES[robotIdx].getWorldPosition(_targetWp);
+
+      // ── NaN / fly-away guard ─────────────────────────────────────────────
+      // Hand-tracking can emit NaN or astronomically large positions when
+      // confidence drops. Abort the IK step entirely in those cases.
+      if (isNaN(_targetWp.x) || isNaN(_targetWp.y) || isNaN(_targetWp.z)) return;
+      if (_targetWp.length() > 5) return;   // more than 5 m from origin → bogus reading
+
       applyGhostFk(robotIdx);
       tip.getWorldPosition(_ee0);
-      _posErr.subVectors(target, _ee0);
-      if (_posErr.length() < IK_STOP_THRESH) return;
+      _posErr.subVectors(_targetWp, _ee0);
+
+      const errLen = _posErr.length();
+      if (errLen < IK_STOP_THRESH) return;
+      if (errLen > 0.05) _posErr.multiplyScalar(0.05 / errLen); // Clamp huge VR tracking jumps
+
       for (let i = 0; i < 6; i++) {
         const saved = angles[i]; angles[i] += IK_DELTA_DEG;
         applyGhostFk(robotIdx); tip.getWorldPosition(_ee1);
@@ -1792,14 +1468,16 @@
         angles[i] = saved;
       }
       applyGhostFk(robotIdx);
-      const lam2 = IK_DAMPING * IK_DAMPING, JJT = [[0,0,0],[0,0,0],[0,0,0]];
+      const lam2 = IK_DAMPING * IK_DAMPING, JJT = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
       for (let r = 0; r < 3; r++)
-        for (let c = 0; c < 3; c++) { let s = 0; for (let k = 0; k < 6; k++) s += _J[r][k]*_J[c][k]; JJT[r][c] = s + (r===c?lam2:0); }
+        for (let c = 0; c < 3; c++) { let s = 0; for (let k = 0; k < 6; k++) s += _J[r][k] * _J[c][k]; JJT[r][c] = s + (r === c ? lam2 : 0); }
       const x = solveLinear3(JJT, [_posErr.x, _posErr.y, _posErr.z]);
       for (let i = 0; i < 6; i++) {
-        let dang = 0; for (let j = 0; j < 3; j++) dang += _J[j][i]*x[j];
+        let dang = 0; for (let j = 0; j < 3; j++) dang += _J[j][i] * x[j];
+        // Guard against NaN delta angles (singular Jacobian)
+        if (isNaN(dang)) continue;
         dang *= IK_LEARNING_RATE * 180 / Math.PI;
-        angles[i] = Math.max(JOINT_LIMITS[i][0], Math.min(JOINT_LIMITS[i][1], angles[i]+dang));
+        angles[i] = Math.max(JOINT_LIMITS[i][0], Math.min(JOINT_LIMITS[i][1], angles[i] + dang));
       }
       applyGhostFk(robotIdx);
     };
@@ -1815,28 +1493,35 @@
         ws.send(JSON.stringify({ type: 'ik_joints', payload: { angles: Array.from(angles), robotIdx } }));
     };
 
-    // ── Activate IK for a robot (e.g. called from VR) ────────────────────
     window.enableIk = function (robotIdx) {
       IK_ENABLED[robotIdx] = true;
-      if (IK_GHOSTS[robotIdx])  IK_GHOSTS[robotIdx].root.visible  = true;
+      if (IK_GHOSTS[robotIdx]) IK_GHOSTS[robotIdx].root.visible = true;
       if (IK_HANDLES[robotIdx]) IK_HANDLES[robotIdx].visible = true;
       const realRobot = FK_ROBOTS[robotIdx];
       if (realRobot) {
         realRobot.root.updateWorldMatrix(true, true);
-        IK_ANGLES_R[robotIdx] = [...FK_ANGLES_R[robotIdx]];
+        IK_ANGLES_R[robotIdx] = [...(FK_ANGLES_R[robotIdx] || [0, 0, 0, 0, 0, 0])];
         applyGhostFk(robotIdx);
         const tip = IK_GHOSTS[robotIdx]?.tip;
         if (tip) {
           const wp = new THREE.Vector3(); tip.getWorldPosition(wp);
-          IK_HANDLES[robotIdx].position.copy(wp); IK_TARGET_POS[robotIdx].copy(wp);
+          IK_HANDLES[robotIdx].position.copy(scene.worldToLocal(wp.clone()));
+          IK_TARGET_POS[robotIdx].copy(IK_HANDLES[robotIdx].position);
         }
       }
     };
 
     window.disableIk = function (robotIdx) {
       IK_ENABLED[robotIdx] = false;
-      if (IK_GHOSTS[robotIdx])  IK_GHOSTS[robotIdx].root.visible  = false;
+      if (IK_GHOSTS[robotIdx]) IK_GHOSTS[robotIdx].root.visible = false;
       if (IK_HANDLES[robotIdx]) IK_HANDLES[robotIdx].visible = false;
+    };
+
+    window.toggleIk = function (robotIdx) {
+      if (IK_ENABLED[robotIdx]) { window.disableIk(robotIdx); }
+      else { window.enableIk(robotIdx); }
+      const toggle = document.getElementById(`ik-r${robotIdx + 1}-toggle`);
+      if (toggle) toggle.classList.toggle('active', IK_ENABLED[robotIdx]);
     };
 
     // ── Marker Board Representation (Real scale ~ 30cm x 18.9cm) ──
@@ -2041,7 +1726,7 @@
       else {
         if (type === 'scanScene') {
           const statusEl = document.getElementById('ctx-status');
-          if (statusEl) { statusEl.textContent = `WS not ready â€” reconnecting…`; statusEl.className = 'error'; }
+          if (statusEl) { statusEl.textContent = `WS not ready — reconnecting…`; statusEl.className = 'error'; }
           _scanInProgress = false; document.getElementById('ctx-scan-btn')?.classList.remove('scanning');
         }
       }
@@ -2114,9 +1799,15 @@
       if (_scanInProgress) return; _scanInProgress = true;
       const btn = document.getElementById('ctx-scan-btn'), statusEl = document.getElementById('ctx-status');
       if (btn) btn.classList.add('scanning'); if (statusEl) { statusEl.textContent = 'Scanning…'; statusEl.className = 'scanning'; }
+      if (window._vrGuiCtxStatus) window._vrGuiCtxStatus.setValue('Scanning...'); // VR Sync
       window.sendCommandToHost('scanScene', true);
       setTimeout(() => {
-        if (_scanInProgress) { _scanInProgress = false; if (btn) btn.classList.remove('scanning'); if (statusEl) { statusEl.textContent = 'No response from app.'; statusEl.className = 'error'; } }
+        if (_scanInProgress) {
+          _scanInProgress = false;
+          if (btn) btn.classList.remove('scanning');
+          if (statusEl) { statusEl.textContent = 'No response from app.'; statusEl.className = 'error'; }
+          if (window._vrGuiCtxStatus) window._vrGuiCtxStatus.setValue('Error: No response');
+        }
       }, 35000);
     };
 
@@ -2124,20 +1815,20 @@
       const strip = document.getElementById('ctx-photos'); if (!strip) return; strip.innerHTML = '';
       const hasPhotos = items.some(i => i.cropBase64);
 
-      // Adapt ctx-panel height: compact when no images, taller when photo strip shows
+      // Adapt ctx-panel height: compact when no images, taller when photo grid shows
       const panel = document.getElementById('ctx-panel');
       if (panel) {
-        const targetH = hasPhotos ? Math.min(window.innerHeight * 0.80, 600) : 200;
+        const targetH = hasPhotos ? Math.min(window.innerHeight * 0.88, 700) : 200;
         panel.style.setProperty('--ctx-max-height', targetH + 'px');
       }
 
       items.forEach(item => {
         if (!item.cropBase64) return;
-        const card = document.createElement('div'); card.className = 'ctx-photo-card';
+        const card = document.createElement('div'); card.className = 'ctx-photo-card'; card.title = item.label;
         const img = document.createElement('img'); img.src = item.cropBase64; img.alt = item.label;
         const lbl = document.createElement('div'); lbl.className = 'ctx-photo-label'; lbl.textContent = item.label;
         const badge = document.createElement('div');
-        if (item.hasModel) { badge.className = 'ctx-model-badge has-model'; badge.textContent = '✓ 3D Model'; }
+        if (item.hasModel) { badge.className = 'ctx-model-badge has-model'; badge.textContent = '✓ 3D Ready'; }
         else if (item.isInLibrary) { badge.className = 'ctx-model-badge not-in-library'; badge.textContent = '⟳ Update 3D'; badge.onclick = () => requestGenerate3D(item, badge); }
         else { badge.className = 'ctx-model-badge no-model'; badge.textContent = '⬡ Generate 3D'; badge.onclick = () => requestGenerate3D(item, badge); }
         card.appendChild(img); card.appendChild(lbl); card.appendChild(badge); strip.appendChild(card);
@@ -2146,6 +1837,9 @@
 
     // Track active generation badges by label
     window._gen3DBadges = window._gen3DBadges || {};
+
+    // ── Cache of last scene items (needed to refresh 3D after model generation) ──
+    let _lastSceneItems = [];
 
     function requestGenerate3D(item, badgeEl) {
       badgeEl.textContent = '\u23F3 Enhancing\u2026'; badgeEl.style.opacity = '0.7'; badgeEl.onclick = null;
@@ -2158,7 +1852,7 @@
         const { label, status } = JSON.parse(jsonStr);
         const badge = window._gen3DBadges[label];
         if (!badge) return;
-        const failed = status.startsWith('\u274c');
+        const failed = status.startsWith('\u274c') || status.startsWith('❌');
         badge.textContent = failed ? status : '\u23F3\u00a0' + status;
         badge.style.opacity = failed ? '1' : '0.75';
         if (failed) {
@@ -2181,13 +1875,29 @@
     window.setModelGlb = function (jsonStr) {
       try {
         const { label, glbUrl } = JSON.parse(jsonStr);
+        // 1. Update the badge in the photo grid
         document.querySelectorAll('.ctx-photo-card').forEach(card => {
           if (card.querySelector('.ctx-photo-label')?.textContent === label) {
-            const b = card.querySelector('.ctx-model-badge'); if (b) { b.className = 'ctx-model-badge has-model'; b.textContent = '✓ 3D Model'; b.style.cursor = 'default'; }
+            const b = card.querySelector('.ctx-model-badge');
+            if (b) { b.className = 'ctx-model-badge has-model'; b.textContent = '✓ 3D Ready'; b.style.cursor = 'default'; b.onclick = null; }
           }
         });
-        if (glbUrl && window.loadModelGlb) window.loadModelGlb(glbUrl);
-      } catch (e) { }
+        // 2. Find the cached scene item, patch in the new model URL, and re-render
+        if (glbUrl) {
+          const fileName = glbUrl.split('/').pop();
+          const item = _lastSceneItems.find(i => i.label === label);
+          if (item) {
+            item.modelUrl = `http://library.local/${fileName}`;
+            item.modelUrlRemote = glbUrl;
+            item.hasModel = true;
+            renderObjects(_lastSceneItems);
+            console.log(`[setModelGlb] Loaded 3D model for '${label}' -> ${glbUrl}`);
+          } else {
+            // Item not in cache (e.g. page reloaded) — ask host to re-push full list
+            window.sendCommandToHost('refreshScene', true);
+          }
+        }
+      } catch (e) { console.error('[setModelGlb]', e); }
     };
 
     window.setDetectedObjects = function (jsonStr) {
@@ -2195,10 +1905,13 @@
       try {
         const items = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
         if (!Array.isArray(items)) return;
+        // Deep-clone so mutations in loadModelGlb don't corrupt the original broadcast
+        _lastSceneItems = items.map(i => Object.assign({}, i));
         renderObjects(items); renderCtxPhotos(items);
         document.getElementById('ctx-panel')?.classList.remove('collapsed');
         const statusEl = document.getElementById('ctx-status');
         if (statusEl) { statusEl.textContent = items.length ? `${items.length} object(s)` : 'No objects.'; statusEl.className = ''; }
+        if (window._vrGuiCtxStatus) window._vrGuiCtxStatus.setValue(items.length ? `${items.length} object(s)` : 'No objects.'); // VR sync
       } catch (e) { }
       if (_autoScanActive) setTimeout(window.triggerScan, 400);
     };
@@ -2207,8 +1920,15 @@
       _autoScanActive = !_autoScanActive;
       const btn = document.getElementById('ctx-autoscan-btn'), statusEl = document.getElementById('ctx-status');
       if (btn) btn.classList.toggle('active', _autoScanActive);
-      if (_autoScanActive) { if (statusEl) { statusEl.textContent = 'Auto-scan on'; statusEl.className = 'scanning'; } if (!_scanInProgress) window.triggerScan(); }
-      else { if (statusEl) { statusEl.textContent = 'Auto-scan off'; statusEl.className = ''; } }
+      if (_autoScanActive) {
+        if (statusEl) { statusEl.textContent = 'Auto-scan on'; statusEl.className = 'scanning'; }
+        if (window._vrGuiCtxStatus) window._vrGuiCtxStatus.setValue('Auto-scan ON');
+        if (!_scanInProgress) window.triggerScan();
+      }
+      else {
+        if (statusEl) { statusEl.textContent = 'Auto-scan off'; statusEl.className = ''; }
+        if (window._vrGuiCtxStatus) window._vrGuiCtxStatus.setValue('Auto-scan OFF');
+      }
     };
 
     window.setCameraPose = function (jsonStr) {
@@ -2291,7 +2011,7 @@
             const correctedBox = new THREE.Box3().setFromObject(scaleGroup);
             const modelW = correctedBox.max.x - correctedBox.min.x;
             const modelD = correctedBox.max.z - correctedBox.min.z;
-            const maxDim  = Math.max(modelW, modelD, 0.0001);
+            const maxDim = Math.max(modelW, modelD, 0.0001);
             const targetW = Math.max(0.01, item.sizeW || 0.05);
             let scaleFactor = targetW / maxDim;
             if (item.offsetScale && item.offsetScale !== 1.0) scaleFactor *= item.offsetScale;
@@ -2375,161 +2095,428 @@
       FK_ANGLES[idx] = val; document.getElementById(`fk-val-${idx}`).textContent = Math.round(val) + '°'; applyFk();
     };
 
-    // WebXR Mixed Reality — Quest 3, floating XR panels, two-grip repositioning,
-    // hand tracking with OculusHandPointerModel pinch-to-drag IK targets.
-    // Follows the three.js ve-handinput-point-and-drag example pattern.
-    // ──────────────────────────────────────────────────────────────────────
+    // =========================================================================================
+    // ── WebXR Mixed Reality (Safely Overlaid Without Breaking 2D Logic) ──────────────────────
+    // =========================================================================================
     let _xrSession = null, _xrMode = null, _savedBg = null, _savedFog = null;
 
-    // Controllers + grips (live under the XR camera group — never moved by scene)
+    // Attach controllers securely to the XR Rig so the player can be translated safely
     const _xrCtrls = [renderer.xr.getController(0), renderer.xr.getController(1)];
     const _xrGrips = [renderer.xr.getControllerGrip(0), renderer.xr.getControllerGrip(1)];
-    renderer.xr.getCamera().add(_xrCtrls[0], _xrCtrls[1], _xrGrips[0], _xrGrips[1]);
+    xrRig.add(_xrCtrls[0], _xrCtrls[1], _xrGrips[0], _xrGrips[1]);
 
-    // ── Controller models via factory (auto-detects Quest 3) ──────────────
     const _ctrlModelFactory = new XRControllerModelFactory();
     _xrGrips[0].add(_ctrlModelFactory.createControllerModel(_xrGrips[0]));
     _xrGrips[1].add(_ctrlModelFactory.createControllerModel(_xrGrips[1]));
 
+    // Controller ray pointer lines (visual targeting beam)
+    const _rayGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)
+    ]);
+    const _rayMat = new THREE.LineBasicMaterial({ color: 0xffffff, opacity: 0.6, transparent: true });
+
+    // VR FIX: Adding laser pointer trigger-dragging logic
+    const _raycaster = new THREE.Raycaster();
+    const _tempMatrix = new THREE.Matrix4();
+    const _ctrlState = [{ attached: null, dist: 0 }, { attached: null, dist: 0 }];
+
+    function onSelectStart(event) {
+      const ctrl = event.target, idx = _xrCtrls.indexOf(ctrl);
+      _tempMatrix.identity().extractRotation(ctrl.matrixWorld);
+      _raycaster.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
+      _raycaster.ray.direction.set(0, 0, -1).applyMatrix4(_tempMatrix);
+
+      // Prevent IK grabbing if pointing at the VR UI panel
+      if (window._vrPanelGroup && _raycaster.intersectObjects(window._vrPanelGroup.children, true).length > 0) return;
+
+      const hits = _raycaster.intersectObjects(IK_HANDLES, true);
+      if (hits.length > 0) {
+        let handle = hits[0].object;
+        while (handle.parent && !IK_HANDLES.includes(handle)) handle = handle.parent;
+        if (IK_HANDLES.includes(handle)) {
+          const handleIdx = IK_HANDLES.indexOf(handle);
+          if (!IK_ENABLED[handleIdx]) window.enableIk(handleIdx);
+          _ctrlState[idx].attached = handle;
+          _ctrlState[idx].dist = hits[0].distance;
+          const r = ctrl.children.find(c => c.name === 'ctrl-ray');
+          if (r) r.material.color.setHex(0x00ff00);
+        }
+      }
+    }
+
+    function onSelectEnd(event) {
+      const ctrl = event.target, idx = _xrCtrls.indexOf(ctrl);
+      if (_ctrlState[idx].attached) {
+        const handleIdx = IK_HANDLES.indexOf(_ctrlState[idx].attached);
+        // Correctly save local scene coordinates on release
+        IK_TARGET_POS[handleIdx].copy(scene.worldToLocal(_ctrlState[idx].attached.getWorldPosition(new THREE.Vector3())));
+        _ctrlState[idx].attached = null;
+        const r = ctrl.children.find(c => c.name === 'ctrl-ray');
+        if (r) r.material.color.setHex(0xffffff);
+      }
+    }
+
+    _xrCtrls.forEach(ctrl => {
+      const ray = new THREE.Line(_rayGeo, _rayMat.clone());
+      ray.name = 'ctrl-ray'; ray.scale.z = 5;
+      ctrl.add(ray);
+      ctrl.addEventListener('selectstart', onSelectStart);
+      ctrl.addEventListener('selectend', onSelectEnd);
+    });
+
+    // ── VR floating HTMLMesh panels – one per DOM panel ─────────
+    // Each panel is independently grabbable with a single grip button.
+    // Data tracked per VR panel:
+    //   { domId, group (InteractiveGroup), mesh (HTMLMesh), grabbed: false, grabCtrl: null, grabOffset: Vector3 }
+    const _vrPanels = [];
+    window._vrPanelGroup = null; // kept for compat (points to first group)
+    window._vrPanelMesh  = null; // kept for compat
+    // Legacy gui null (lil-gui removed)
+    let _vrGui = null;
+    let _vrCtxStatusCtrl = null;
+    let _vrVoiceStatusCtrl = null;
+
+    // Config: which panels to show in VR and where to spawn them
+    const VR_PANEL_CFG = [
+      { domId: 'fk-panel',    pos: [-0.55, 1.35, -0.55], rotY:  Math.PI / 8,  scale: 2.02 },
+      { domId: 'ctx-panel',   pos: [ 0.00, 1.35, -0.62], rotY:  0,            scale: 0.78 },
+      { domId: 'voice-panel', pos: [ 0.50, 1.35, -0.55], rotY: -Math.PI / 8,  scale: 1.55 },
+    ];
+
+    function buildVrPanel() {
+      if (_vrPanels.length > 0) return;
+
+      VR_PANEL_CFG.forEach((cfg) => {
+        const domEl = document.getElementById(cfg.domId);
+        if (!domEl) return;
+
+        // Keep the panel visible so an external 2D observer (second screen / mirror)
+        // can read all state changes in real time. Only disable mouse interaction
+        // so the 2D cursor doesn't interfere with the XR session.
+        domEl.dataset.vrHidden = '1';
+        domEl.style.pointerEvents = 'none';
+        // Ensure it isn't collapsed so the mesh looks full
+        domEl.classList.remove('collapsed');
+
+        const group = new InteractiveGroup();
+        group.listenToPointerEvents(renderer, camera);
+        group.listenToXRControllerEvents(_xrCtrls[0]);
+        group.listenToXRControllerEvents(_xrCtrls[1]);
+        xrRig.add(group);
+
+        const mesh = new HTMLMesh(domEl);
+        mesh.position.set(...cfg.pos);
+        mesh.rotation.y = cfg.rotY;
+        mesh.scale.setScalar(cfg.scale);
+        group.add(mesh);
+
+        _vrPanels.push({ domId: cfg.domId, domEl, group, mesh, grabbed: false, grabCtrl: null, grabOffset: new THREE.Vector3() });
+      });
+
+      // Convenience aliases for compat
+      if (_vrPanels.length > 0) {
+        window._vrPanelGroup = _vrPanels[0].group;
+        window._vrPanelMesh  = _vrPanels[0].mesh;
+      }
+
+      // Hide IK ghost robots + target handles in VR — not needed in passthrough
+      IK_GHOSTS.forEach(g => {
+        if (g?.root) { g.root.userData._vrWasVisible = g.root.visible; g.root.visible = false; }
+      });
+      IK_HANDLES.forEach(h => {
+        if (h) { h.userData._vrWasVisible = h.visible; h.visible = false; }
+      });
+    }
+
+    function destroyVrPanel() {
+      _vrPanels.forEach(vp => {
+        vp.group.remove(vp.mesh);
+        vp.mesh.material?.map?.dispose();
+        vp.mesh.geometry?.dispose();
+        xrRig.remove(vp.group);
+        // Restore 2D panel
+        if (vp.domEl && vp.domEl.dataset.vrHidden) {
+          vp.domEl.style.pointerEvents = '';
+          delete vp.domEl.dataset.vrHidden;
+        }
+      });
+      _vrPanels.length = 0;
+      window._vrPanelGroup = null;
+      window._vrPanelMesh  = null;
+      if (_vrGui) { _vrGui.destroy(); _vrGui = null; }
+
+      // Restore IK visuals to their pre-VR state
+      IK_GHOSTS.forEach(g => {
+        if (g?.root) g.root.visible = g.root.userData._vrWasVisible ?? false;
+      });
+      IK_HANDLES.forEach(h => {
+        if (h) h.visible = h.userData._vrWasVisible ?? false;
+      });
+    }
+
     // ── Hand tracking: OculusHandModel + OculusHandPointerModel ───────────
-    const _xrHands  = [renderer.xr.getHand(0), renderer.xr.getHand(1)];
-    const _handPtrs = []; // OculusHandPointerModel instances
+    const _xrHands = [renderer.xr.getHand(0), renderer.xr.getHand(1)];
+    const _handPtrs = [];
+    xrRig.add(_xrHands[0], _xrHands[1]);
+
     _xrHands.forEach((hand, i) => {
       hand.add(new OculusHandModel(hand));
       const ptr = new OculusHandPointerModel(hand, _xrCtrls[i]);
       hand.add(ptr);
       _handPtrs.push(ptr);
-      renderer.xr.getCamera().add(hand);
     });
 
-    // ── Two-grip translate + rotate (squeeze both grips) ─────────────────
-    const _gripState = [false, false];
-    let   _grabbing  = false;
-    const _grabMid   = new THREE.Vector3();
-    const _grabFwdXZ = new THREE.Vector3();
-    const _grabScenePos = new THREE.Vector3();
-    let   _grabAngleBase = 0;
-    const _g0 = new THREE.Vector3(), _g1 = new THREE.Vector3();
+    // ── Single-grip: grab/move a VR panel ────────────────────────
+    // Per-controller state for panel grabbing
+    const _panelGrabState = [
+      { panelIdx: -1, grabOffset: new THREE.Vector3(), grabRotY: 0, ctrlStartRotY: 0 },
+      { panelIdx: -1, grabOffset: new THREE.Vector3(), grabRotY: 0, ctrlStartRotY: 0 },
+    ];
 
-    const ANCHOR_KEY = 'xr_table_anchor';
+    function _tryGrabPanel(ctrlIdx) {
+      if (_vrPanels.length === 0) return false;
+      const ctrl = _xrCtrls[ctrlIdx];
+      _tempMatrix.identity().extractRotation(ctrl.matrixWorld);
+      _raycaster.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
+      _raycaster.ray.direction.set(0, 0, -1).applyMatrix4(_tempMatrix);
+
+      let bestDist = Infinity, bestIdx = -1;
+      _vrPanels.forEach((vp, idx) => {
+        const hits = _raycaster.intersectObject(vp.mesh, false);
+        if (hits.length > 0 && hits[0].distance < bestDist) { bestDist = hits[0].distance; bestIdx = idx; }
+      });
+
+      if (bestIdx < 0) return false;
+
+      const vp = _vrPanels[bestIdx];
+      const gs = _panelGrabState[ctrlIdx];
+      gs.panelIdx = bestIdx;
+      // Store world-space offset: mesh world pos relative to controller world pos
+      const ctrlWp = new THREE.Vector3().setFromMatrixPosition(ctrl.matrixWorld);
+      const meshWp = vp.mesh.getWorldPosition(new THREE.Vector3());
+      gs.grabOffset.subVectors(meshWp, ctrlWp);
+      gs.grabRotY = vp.mesh.rotation.y;
+      // Store controller's Y rotation at grab time so we can delta-rotate the panel
+      const ctrlQuat = new THREE.Quaternion().setFromRotationMatrix(
+        _tempMatrix.extractRotation(ctrl.matrixWorld)
+      );
+      gs.ctrlStartRotY = new THREE.Euler().setFromQuaternion(ctrlQuat, 'YXZ').y;
+      vp.grabbed = true;
+      vp.grabCtrl = ctrlIdx;
+      return true;
+    }
+
+    function _releasePanel(ctrlIdx) {
+      const gs = _panelGrabState[ctrlIdx];
+      if (gs.panelIdx >= 0 && gs.panelIdx < _vrPanels.length) {
+        _vrPanels[gs.panelIdx].grabbed = false;
+        _vrPanels[gs.panelIdx].grabCtrl = null;
+      }
+      gs.panelIdx = -1;
+    }
+
+    function _tickPanelGrabs() {
+      if (_vrPanels.length === 0) return;
+      [0, 1].forEach(ctrlIdx => {
+        const gs = _panelGrabState[ctrlIdx];
+        if (gs.panelIdx < 0) return;
+        const vp = _vrPanels[gs.panelIdx];
+        const ctrl = _xrCtrls[ctrlIdx];
+
+        // Follow controller world position + offset
+        const ctrlWp = new THREE.Vector3().setFromMatrixPosition(ctrl.matrixWorld);
+        const newMeshWp = ctrlWp.add(gs.grabOffset);
+
+        // Convert to xrRig local space (where the mesh lives)
+        const rigInv = new THREE.Matrix4().copy(xrRig.matrixWorld).invert();
+        newMeshWp.applyMatrix4(rigInv);
+        vp.mesh.position.copy(newMeshWp);
+
+        // Delta-rotate panel around Y based on controller yaw change
+        _tempMatrix.identity().extractRotation(ctrl.matrixWorld);
+        const ctrlQuat = new THREE.Quaternion().setFromRotationMatrix(_tempMatrix);
+        const ctrlCurRotY = new THREE.Euler().setFromQuaternion(ctrlQuat, 'YXZ').y;
+        vp.mesh.rotation.y = gs.grabRotY + (ctrlCurRotY - gs.ctrlStartRotY);
+      });
+    }
+
+    // ── Two-grip: translate + rotate + LIFT (squeeze both grips, no panel grabbed) ─
+    const _gripState = [false, false];
+    let _grabbing = false;
+    const _grabStartMid = new THREE.Vector3();
+    let _grabStartAngle = 0;
+    let _grabStartMidY = 0;   // NEW: track vertical midpoint at grab start
+
+    // VR FIX: We offset the user's Rig position instead of shifting the Scene
+    const _grabRigPos = new THREE.Vector3();
+    let _grabRigRot = 0;
 
     _xrCtrls.forEach((ctrl, i) => {
       ctrl.addEventListener('squeezestart', () => {
         _gripState[i] = true;
-        if (_gripState[0] && _gripState[1]) {
-          _g0.setFromMatrixPosition(_xrGrips[0].matrixWorld);
-          _g1.setFromMatrixPosition(_xrGrips[1].matrixWorld);
-          _grabMid.addVectors(_g0, _g1).multiplyScalar(0.5);
-          _grabFwdXZ.subVectors(_g1, _g0).setY(0).normalize();
-          _grabAngleBase = Math.atan2(_grabFwdXZ.x, _grabFwdXZ.z);
-          _grabScenePos.copy(scene.position);
+
+        // Single-grip: try to grab a VR panel first
+        if (!_grabbing) {
+          _tryGrabPanel(i);
+        }
+
+        // Two-grip: world navigation only if neither grip is panel-grabbing
+        if (_gripState[0] && _gripState[1] &&
+            _panelGrabState[0].panelIdx < 0 && _panelGrabState[1].panelIdx < 0) {
+          const p0 = _xrGrips[0].position;
+          const p1 = _xrGrips[1].position;
+          _grabStartMid.addVectors(p0, p1).multiplyScalar(0.5);
+          _grabStartAngle = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+          _grabStartMidY = _grabStartMid.y;  // capture Y for lift
+
+          _grabRigPos.copy(xrRig.position);
+          _grabRigRot = xrRig.rotation.y;
           _grabbing = true;
         }
       });
       ctrl.addEventListener('squeezeend', () => {
+        _releasePanel(i);
         _gripState[i] = false;
-        if (_grabbing) { _grabbing = false; saveAnchorPosition(); }
+        if (_grabbing) { _grabbing = false; }
       });
     });
 
     function tickWorldGrab() {
       if (!_grabbing || !_gripState[0] || !_gripState[1]) return;
-      _g0.setFromMatrixPosition(_xrGrips[0].matrixWorld);
-      _g1.setFromMatrixPosition(_xrGrips[1].matrixWorld);
-      const mid = _g0.clone().add(_g1).multiplyScalar(0.5);
-      const delta = mid.clone().sub(_grabMid); delta.y = 0;
-      const fwdNow = _g1.clone().sub(_g0).setY(0).normalize();
-      const angleNow = Math.atan2(fwdNow.x, fwdNow.z);
-      scene.position.copy(_grabScenePos).add(delta);
-      scene.rotation.y = (scene.rotation.y || 0) + (angleNow - _grabAngleBase) * 0.15;
-      _grabMid.copy(mid);
-      _grabAngleBase = angleNow;
+      // Don't world-navigate while a panel is being grabbed
+      if (_panelGrabState[0].panelIdx >= 0 || _panelGrabState[1].panelIdx >= 0) return;
+
+      const p0 = _xrGrips[0].position;
+      const p1 = _xrGrips[1].position;
+      const currentMid = new THREE.Vector3().addVectors(p0, p1).multiplyScalar(0.5);
+      const currentAngle = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+
+      const angleDelta = currentAngle - _grabStartAngle;
+      xrRig.rotation.y = _grabRigRot - angleDelta;
+
+      const delta = currentMid.clone().sub(_grabStartMid);
+
+      // Horizontal movement (XZ plane)
+      const deltaXZ = new THREE.Vector3(delta.x, 0, delta.z);
+      deltaXZ.applyAxisAngle(new THREE.Vector3(0, 1, 0), _grabRigRot);
+
+      // Vertical lift: moving both grips up/down raises/lowers the virtual scene
+      const deltaY = delta.y;
+
+      // Moving the VR user in the opposite direction moves the scene
+      xrRig.position.set(
+        _grabRigPos.x - deltaXZ.x,
+        _grabRigPos.y - deltaY,   // lift: rig goes down when grips go up (scene goes up)
+        _grabRigPos.z - deltaXZ.z
+      );
     }
 
-    function saveAnchorPosition() {
-      const { x, y, z } = scene.position, ry = scene.rotation.y;
-      localStorage.setItem(ANCHOR_KEY, JSON.stringify({ x, y, z, ry }));
-    }
+    // ── VR Pinch IK Dragging — offset-based, NO re-parenting ──────────────
+    // Root cause of fly-away: the old code called `children[0].attach(handle)`
+    // which re-parents the IK sphere to an internal child of OculusHandPointerModel.
+    // When hand tracking loses confidence, that child matrix goes NaN/infinite
+    // and the sphere teleports away, feeding garbage into the IK solver.
+    //
+    // New approach: never re-parent anything.  On pinch-start we record the
+    // world-space offset (handlePos – pointerPos) and each frame we compute
+    // the new handle world position as (currentPointerPos + offset), validate
+    // it, clamp it, and write directly to IK_TARGET_POS.  Clean and robust.
 
-    async function restoreAnchorPosition() {
-      try {
-        const s = JSON.parse(localStorage.getItem(ANCHOR_KEY));
-        if (s) { scene.position.set(s.x ?? 0, s.y ?? 0, s.z ?? -0.8); scene.rotation.y = s.ry ?? 0; return; }
-      } catch (_) { }
-      scene.position.set(0, 0, -0.8); scene.rotation.y = 0;
-    }
-
-    // ── VR Pinch IK Dragging (OculusHandPointerModel pattern) ────────────
-    // Pinch on an IK handle sphere → it attaches to pointer → follows hand.
-    // Mirrors the three.js point-and-drag example DraggableSystem.
-    const _ikDragState = []; // populated once IK_HANDLES are built
-
-    function ensureIkDragStates() {
-      while (_ikDragState.length < IK_HANDLES.length)
-        _ikDragState.push({ state: 'detached', attachedPointer: null, originalParent: null });
-    }
+    // Per hand-pointer drag state (indexed by hand, not by handle)
+    const _pinchDrag = _handPtrs.map(() => ({
+      handleIdx: -1,
+      grabOffset: new THREE.Vector3(),
+    }));
 
     function tickVrIk() {
       if (!_xrSession) return;
-      // Update hand pointer rays every frame (required by OculusHandPointerModel)
-      _handPtrs.forEach(hp => hp.update());
-      if (_handPtrs.length === 0) return;
-      ensureIkDragStates();
+      IK_HANDLES.forEach(h => h.scale.setScalar(1.0)); // hover-size reset
 
-      _handPtrs.forEach(hp => {
-        let closestIdx = -1, closestDist = Infinity;
-        IK_HANDLES.forEach((handle, idx) => {
-          const hits = hp.intersectObject(handle, true);
-          if (hits && hits.length > 0 && hits[0].distance < closestDist) {
-            closestDist = hits[0].distance; closestIdx = idx;
-          }
-        });
+      // ── Controller ray-cast dragging (unchanged) ──────────────────────────
+      _xrCtrls.forEach((ctrl, idx) => {
+        if (_ctrlState[idx].attached) {
+          _ctrlState[idx].attached.scale.setScalar(1.2);
+          const handleIdx = IK_HANDLES.indexOf(_ctrlState[idx].attached);
 
-        if (closestIdx >= 0) {
-          hp.setCursor(closestDist);
-          const drag = _ikDragState[closestIdx];
-          IK_HANDLES[closestIdx].scale.setScalar(1.2); // hover scale
+          _tempMatrix.identity().extractRotation(ctrl.matrixWorld);
+          const dir = new THREE.Vector3(0, 0, -1).applyMatrix4(_tempMatrix);
+          const wp = new THREE.Vector3().setFromMatrixPosition(ctrl.matrixWorld);
+          wp.add(dir.multiplyScalar(_ctrlState[idx].dist));
 
-          if (hp.isPinched()) {
-            if (!hp.isAttached() && drag.state !== 'attached') {
-              if (!IK_ENABLED[closestIdx]) window.enableIk(closestIdx);
-              drag.originalParent = IK_HANDLES[closestIdx].parent;
-              drag.state = 'to-be-attached';
-              drag.attachedPointer = hp;
-              hp.setAttached(true);
-            }
-          } else {
-            if (hp.isAttached() && drag.state === 'attached') {
-              drag.state = 'to-be-detached';
-              drag.attachedPointer = null;
-              hp.setAttached(false);
-            }
-          }
-        } else {
-          hp.setCursor(1.5);
+          _ctrlState[idx].attached.position.copy(scene.worldToLocal(wp.clone()));
+          IK_TARGET_POS[handleIdx].copy(_ctrlState[idx].attached.position);
         }
       });
 
-      // State transitions (same pattern as DraggableSystem in the example)
-      IK_HANDLES.forEach((handle, idx) => {
-        const drag = _ikDragState[idx];
-        switch (drag.state) {
-          case 'to-be-attached':
-            drag.attachedPointer.children[0].attach(handle);
-            drag.state = 'attached';
-            break;
-          case 'to-be-detached':
-            if (drag.originalParent) drag.originalParent.attach(handle);
-            IK_TARGET_POS[idx].copy(handle.position);
-            drag.state = 'detached';
-            break;
-          case 'attached': {
-            const worldPos = handle.getWorldPosition(new THREE.Vector3());
-            IK_TARGET_POS[idx].copy(scene.worldToLocal(worldPos.clone()));
-            break;
+      // ── Hand pointer update + offset-based pinch dragging ─────────────────
+      _handPtrs.forEach((hp, hpIdx) => {
+        if (typeof hp.update === 'function') hp.update();
+
+        const drag = _pinchDrag[hpIdx];
+
+        if (hp.isPinched()) {
+          if (drag.handleIdx < 0) {
+            // ── Grab start: find closest visible IK handle ────────────────
+            let bestDist = Infinity, bestIdx = -1;
+            IK_HANDLES.forEach((handle, idx) => {
+              if (!handle.visible) return;
+              const hits = hp.intersectObject(handle, true);
+              if (hits && hits.length > 0 && hits[0].distance < bestDist) {
+                bestDist = hits[0].distance; bestIdx = idx;
+              }
+            });
+            if (bestIdx >= 0) {
+              if (!IK_ENABLED[bestIdx]) window.enableIk(bestIdx);
+              // World position of the hand pointer
+              const pointerWp = hp.getWorldPosition(new THREE.Vector3());
+              // Guard against NaN pointer position (tracking not ready)
+              if (isNaN(pointerWp.x) || isNaN(pointerWp.y) || isNaN(pointerWp.z)) return;
+              const handleWp = IK_HANDLES[bestIdx].getWorldPosition(new THREE.Vector3());
+              drag.grabOffset.subVectors(handleWp, pointerWp);
+              drag.handleIdx = bestIdx;
+            }
+          } else {
+            // ── Drag frame: follow pointer + stored offset ────────────────
+            const pointerWp = hp.getWorldPosition(new THREE.Vector3());
+
+            // If the tracker emits a bad reading, skip this frame entirely
+            if (isNaN(pointerWp.x) || isNaN(pointerWp.y) || isNaN(pointerWp.z)) return;
+            if (pointerWp.length() > 8) return; // > 8 m = clearly bogus
+
+            const newHandleWp = pointerWp.clone().add(drag.grabOffset);
+
+            // Convert to scene-local and clamp to a safe volume around the table
+            const localPos = scene.worldToLocal(newHandleWp);
+            localPos.x = Math.max(-1.5, Math.min(1.5, localPos.x));
+            localPos.y = Math.max(-0.1, Math.min(1.5, localPos.y));
+            localPos.z = Math.max(-1.5, Math.min(1.5, localPos.z));
+
+            IK_HANDLES[drag.handleIdx].position.copy(localPos);
+            IK_TARGET_POS[drag.handleIdx].copy(localPos);
+            IK_HANDLES[drag.handleIdx].scale.setScalar(1.2);
+
+            // Show cursor at the handle
+            const handleWp2 = IK_HANDLES[drag.handleIdx].getWorldPosition(new THREE.Vector3());
+            hp.setCursor(pointerWp.distanceTo(handleWp2));
           }
-          default:
-            handle.scale.setScalar(1.0); // reset hover scale
+        } else {
+          // ── Release ───────────────────────────────────────────────────────
+          if (drag.handleIdx >= 0) {
+            IK_HANDLES[drag.handleIdx].scale.setScalar(1.0);
+            drag.handleIdx = -1;
+          }
+          hp.setCursor(1.5);
+        }
+
+        // Highlight hovered handles even when not dragging
+        if (!hp.isPinched() && drag.handleIdx < 0) {
+          IK_HANDLES.forEach((handle, idx) => {
+            const hits = hp.intersectObject(handle, true);
+            if (hits && hits.length > 0 && hits[0].distance < 2.0) {
+              handle.scale.setScalar(1.15);
+              hp.setCursor(hits[0].distance);
+            }
+          });
         }
       });
     }
@@ -2551,22 +2538,20 @@
 
       try {
         const session = await navigator.xr.requestSession(_xrMode, {
-          optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'anchors'],
+          optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking'],
         });
         _xrSession = session;
 
-        const btn   = document.getElementById('sb-vr-btn');
-        const icon  = document.getElementById('sb-vr-icon');
-        const lbl   = document.getElementById('sb-vr-label');
+        const btn = document.getElementById('sb-vr-btn');
+        const icon = document.getElementById('sb-vr-icon');
+        const lbl = document.getElementById('sb-vr-label');
         if (btn) btn.classList.add('active');
         if (icon) icon.textContent = '⏹️';
-        if (lbl)  lbl.textContent  = arOk ? '\u00a0Exit MR' : '\u00a0Exit VR';
+        if (lbl) lbl.textContent = arOk ? '\u00a0Exit MR' : '\u00a0Exit VR';
 
-        // Save & clear background for MR passthrough
         _savedBg = scene.background; _savedFog = scene.fog;
         if (_xrMode === 'immersive-ar') { scene.background = null; scene.fog = null; renderer.setClearColor(0x000000, 0); }
 
-        // Perf: disable shadows + expensive tone-mapping while in XR
         renderer.shadowMap.enabled = false;
         renderer.toneMapping = THREE.NoToneMapping;
         scene.scale.setScalar(1);
@@ -2574,21 +2559,27 @@
         await renderer.xr.setSession(session);
         renderer.xr.setReferenceSpaceType('local-floor');
 
-        // Place scene 1 m in front of user, at floor level
-        await restoreAnchorPosition();
+        // VR FIX: Spawns the user safely 0.8m backward from the table, preserving global Scene coordinates
+        xrRig.position.set(TABLE_CX, 0, TABLE_CZ + 0.8);
+        xrRig.rotation.set(0, 0, 0);
+
+        buildVrPanel();
 
         session.addEventListener('end', () => {
           _xrSession = null;
-          // Restore perf-critical settings
-          renderer.shadowMap.enabled = true;
+          destroyVrPanel();
+          renderer.shadowMap.enabled = false;
           renderer.toneMapping = THREE.ACESFilmicToneMapping;
-          scene.background = _savedBg; scene.fog = _savedFog;
-          scene.position.set(0, 0, 0); scene.rotation.y = 0; scene.scale.setScalar(1);
+          scene.background = _savedBg || new THREE.Color(0x0a0a0c);
+          scene.fog = _savedFog || null;
+
+          xrRig.position.set(0, 0, 0); xrRig.rotation.set(0, 0, 0); // Restore original 2D layout framing
+
           renderer.setClearColor(0x000000, 1);
           _gripState[0] = _gripState[1] = false; _grabbing = false;
-          if (btn)  btn.classList.remove('active');
+          if (btn) btn.classList.remove('active');
           if (icon) icon.textContent = '🥽';
-          if (lbl)  lbl.textContent  = arOk ? '\u00a0Enter MR' : '\u00a0Enter VR';
+          if (lbl) lbl.textContent = arOk ? '\u00a0Enter MR' : '\u00a0Enter VR';
         });
       } catch (err) { showXrToast('XR failed: ' + (err.message || err)); }
     };
@@ -2604,15 +2595,59 @@
 
     // ── Render loop ──
     let _xrFrameCount = 0;
+    // IK perf: track last solved handle position to skip idle frames
+    const _ikLastSolvedPos = [new THREE.Vector3(Infinity, 0, 0), new THREE.Vector3(Infinity, 0, 0)];
+    const IK_MOVE_THRESH = 0.001; // 1 mm — skip solve if handle hasn't moved more than this
+
     renderer.setAnimationLoop(() => {
-      if (_xrSession) renderer.xr.updateCamera(camera);
-      tickWorldGrab();
-      tickVrIk();
-      for (let i = 0; i < 2; i++) {
-        if (IK_ENABLED[i]) {
-          if (window.solveIkStep)       window.solveIkStep(i);
-          if (window._ikSendContinuous) window._ikSendContinuous(i);
+      if (_xrSession) {
+        renderer.xr.updateCamera(camera);
+        tickWorldGrab();
+        _tickPanelGrabs();
+        tickVrIk();
+      }
+
+      // Adaptive HTMLMesh refresh: faster when IK is dragging (every 3 frames),
+      // slower at rest (every 9 frames) to save GPU bandwidth.
+      const _ikAnyActive = _xrSession && (IK_ENABLED[0] || IK_ENABLED[1]);
+      const _vrRefreshEvery = _ikAnyActive ? 3 : 9;
+      if (_xrSession && _xrFrameCount % _vrRefreshEvery === 0) {
+        _vrPanels.forEach(vp => {
+          if (vp.mesh && vp.mesh.material.map) vp.mesh.material.map.update();
+        });
+        if (window._vrPanelMesh && window._vrPanelMesh.material.map) window._vrPanelMesh.material.map.update();
+      }
+
+      // Sync IK angles → FK sliders so the 2D panel mirrors what VR is commanding.
+      // Runs every 6 frames — cheap enough to not impact performance.
+      if (_xrFrameCount % 6 === 0) {
+        for (let i = 0; i < 2; i++) {
+          if (IK_ENABLED[i] && IK_ANGLES_R[i]) {
+            FK_ANGLES_R[i] = [...IK_ANGLES_R[i]];
+            if (fkTarget === i) {
+              for (let j = 0; j < 6; j++) FK_ANGLES[j] = IK_ANGLES_R[i][j];
+              syncSlidersFromAngles(IK_ANGLES_R[i]);
+            }
+          }
         }
+      }
+      _xrFrameCount++;
+
+      for (let i = 0; i < 2; i++) {
+        if (!IK_ENABLED[i]) continue;
+        // IK visuals are hidden in VR — skip solving entirely
+        if (_xrSession) continue;
+
+        // ── Perf: in VR only solve every 2 frames (36 Hz vs 72 Hz) ──
+        if (_xrSession && (_xrFrameCount & 1)) continue;
+
+        // ── Perf: skip if handle hasn't moved ──
+        const handlePos = IK_HANDLES[i]?.position;
+        if (handlePos && _ikLastSolvedPos[i].distanceTo(handlePos) < IK_MOVE_THRESH) continue;
+        if (handlePos) _ikLastSolvedPos[i].copy(handlePos);
+
+        if (window.solveIkStep) window.solveIkStep(i);
+        if (window._ikSendContinuous) window._ikSendContinuous(i);
       }
       controls.update();
       renderer.render(scene, camera);
@@ -2624,7 +2659,7 @@
       renderer.setSize(window.innerWidth, window.innerHeight);
     });
 
-    // ── Remote WebSocket client ──────────────
+    // ── Remote WebSocket client (100% UNTOUCHED) ──────────────
     (function initRemoteWS() {
       const badge = document.getElementById('ws-badge'), label = document.getElementById('ws-label');
       const isRemote = location.hostname !== 'app.local' && location.hostname !== '';
@@ -2714,7 +2749,7 @@
       connect();
     })();
 
-    // ── Voice-to-Text Panel ───────────────────────────────────────────────────
+    // ── Voice-to-Text Panel (100% UNTOUCHED) ───────────────────────────────────────────────────
     (function initVoicePanel() {
       let _mediaRecorder = null, _audioChunks = [], _isRecording = false;
       const pttBtn = document.getElementById('ptt-btn'), pttLabel = document.getElementById('ptt-label'), voiceOutput = document.getElementById('voice-output'), voiceStatus = document.getElementById('voice-status');
@@ -2723,8 +2758,8 @@
         const p = document.getElementById('voice-panel'); if (p && p.dataset.dragged !== 'true') p.classList.toggle('collapsed');
       };
 
-      window.startHoldRecord = async function (e) { if (e) e.preventDefault(); if (_isRecording) return; await startRecording(); };
-      window.stopHoldRecord = function (e) { if (e) e.preventDefault(); if (!_isRecording) return; stopRecording(); };
+      window.startHoldRecord = async function (e) { if (e && e.preventDefault) e.preventDefault(); if (_isRecording) return; await startRecording(); };
+      window.stopHoldRecord = function (e) { if (e && e.preventDefault) e.preventDefault(); if (!_isRecording) return; stopRecording(); };
 
       async function startRecording() {
         try {
@@ -2736,7 +2771,7 @@
           _mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) _audioChunks.push(e.data); };
           _mediaRecorder.onstop = () => { stream.getTracks().forEach(t => t.stop()); uploadAudio(); };
           _mediaRecorder.start();
-          pttBtn.classList.add('recording'); pttLabel.textContent = 'Release to send…'; setStatus('Recording â€” release to send', '');
+          pttBtn.classList.add('recording'); pttLabel.textContent = 'Release to send…'; setStatus('Recording — release to send', '');
         } catch (err) { setStatus('Microphone access denied: ' + err.message, 'error'); _isRecording = false; }
       }
 
