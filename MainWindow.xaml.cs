@@ -57,8 +57,8 @@ namespace RobotControllerApp
         public double OffsetRx { get; set; } = 0;
         public double OffsetRy { get; set; } = 0;
         public double OffsetRz { get; set; } = 0;
-        /// <summary>Multiplied on top of the auto-scale. 1.0 = no change.</summary>
         public double OffsetScale { get; set; } = 1.0;
+        public string OrientImageUrl { get; set; } = "";
     }
 
     public class LibraryItemViewModel
@@ -1241,7 +1241,7 @@ namespace RobotControllerApp
             string fileToken = uploadDoc.RootElement.GetProperty("data").GetProperty("image_token").GetString() ?? throw new Exception("image_token missing.");
 
             progressCallback?.Invoke("Creating task...");
-            var taskPayload = new { type = "image_to_model", file = new { type = "png", file_token = fileToken }, model_version = "Turbo-v1.0-20250506", texture = true, pbr = false, face_limit = 8000, compress = "geometry", enable_image_autofix = true };
+            var taskPayload = new { type = "image_to_model", file = new { type = "png", file_token = fileToken }, model_version = "P1-20260311", texture = true, pbr = false, face_limit = 8000, compress = "geometry", enable_image_autofix = true, orientation = "align_image" };
 
             using var taskReq = new HttpRequestMessage(HttpMethod.Post, "https://api.tripo3d.ai/v2/openapi/task")
             {
@@ -1335,11 +1335,25 @@ namespace RobotControllerApp
                     }
 
                     // Phase 2 — Tripo3D: generate the 3D model from the enhanced image
-                    var (glbFileName, tripoCost) = await GenerateTripoModelCoreAsync(imgBytes, safeName, msg => DispatcherQueue.TryEnqueue(() => btn.Content = msg));
+                    var tripoTask = GenerateTripoModelCoreAsync(imgBytes, safeName, msg => DispatcherQueue.TryEnqueue(() => btn.Content = msg));
+                    
+                    // Phase 3 — Orient Anything V2: Calculate accurate auto-orientation
+                    var orientTask = GetOrientAnythingOffsetsAsync(imgBytes, safeName, msg => DispatcherQueue.TryEnqueue(() => btn.Content = msg));
+
+                    await Task.WhenAll(tripoTask, orientTask);
+                    var (glbFileName, tripoCost) = tripoTask.Result;
+                    var offsets = orientTask.Result;
 
                     DispatcherQueue.TryEnqueue(async () =>
                     {
                         configData.ModelFileName = glbFileName;
+                        if (offsets.HasValue)
+                        {
+                            // Only save the orient debug image URL — do NOT apply angle offsets.
+                            // Banana already corrects perspective, so the Tripo model is already upright.
+                            if (!string.IsNullOrEmpty(offsets.Value.orientFileName))
+                                configData.OrientImageUrl = offsets.Value.orientFileName;
+                        }
                         await SaveLibraryAsync();
                         generationSuccess = true;
                         _totalTripo3dCost += tripoCost;
@@ -1371,6 +1385,99 @@ namespace RobotControllerApp
                     });
                 }
             });
+        }
+
+        private async Task<(double rx, double ry, double rz, string orientFileName)?> GetOrientAnythingOffsetsAsync(byte[] imageBytes, string safeName, Action<string>? progressCallback = null)
+        {
+            try
+            {
+                progressCallback?.Invoke("Analyzing Orientation...");
+                string dataUrl = "data:image/png;base64," + Convert.ToBase64String(imageBytes);
+
+                var imgObj = new { url = dataUrl, meta = new { _type = "gradio.FileData" } };
+                var payload = new { data = new object[] { imgObj, null, true } };
+
+                using var triggerReq = new HttpRequestMessage(HttpMethod.Post, "https://viglong-orient-anything-v2.hf.space/gradio_api/call/run_inference")
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json")
+                };
+
+                using var triggerRes = await SharedHttpClient.SendAsync(triggerReq);
+                if (!triggerRes.IsSuccessStatusCode) return null;
+
+                var triggerDoc = JsonDocument.Parse(await triggerRes.Content.ReadAsStringAsync());
+                if (!triggerDoc.RootElement.TryGetProperty("event_id", out var eventIdEl)) return null;
+                string eventId = eventIdEl.GetString() ?? "";
+
+                using var sseReq = new HttpRequestMessage(HttpMethod.Get, $"https://viglong-orient-anything-v2.hf.space/gradio_api/call/run_inference/{eventId}");
+                sseReq.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("text/event-stream"));
+                using var sseRes = await SharedHttpClient.SendAsync(sseReq, HttpCompletionOption.ResponseHeadersRead);
+
+                using var stream = await sseRes.Content.ReadAsStreamAsync();
+                using var reader = new StreamReader(stream);
+                string? line;
+                string? dataLine = null;
+
+                while ((line = await reader.ReadLineAsync()) != null)
+                {
+                    if (line.StartsWith("event: complete"))
+                    {
+                        dataLine = await reader.ReadLineAsync();
+                        break;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(dataLine) || !dataLine.StartsWith("data: ")) return null;
+
+                string jsonResult = dataLine.Substring(6).Trim();
+                var doc = JsonDocument.Parse(jsonResult);
+                if (doc.RootElement.ValueKind != JsonValueKind.Array || doc.RootElement.GetArrayLength() < 5) return null;
+
+                // Index 2 is Azimuth (Yaw), 3 is Polar (Pitch), 4 is Rotation (Roll)
+                double ry = 0, rx = 0, rz = 0;
+                
+                if (double.TryParse(doc.RootElement[2].GetString()?.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double azimuth))
+                {
+                    ry = azimuth;
+                }
+                if (double.TryParse(doc.RootElement[3].GetString()?.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double polar))
+                {
+                    rx = polar;
+                }
+                if (double.TryParse(doc.RootElement[4].GetString()?.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double rotation))
+                {
+                    rz = rotation;
+                }
+
+                string orientUrl = "";
+                if (doc.RootElement[0].TryGetProperty("url", out var urlEl))
+                {
+                    orientUrl = urlEl.GetString() ?? "";
+                }
+
+                string localOrientFileName = "";
+                if (!string.IsNullOrEmpty(orientUrl))
+                {
+                    try
+                    {
+                        var orientBytes = await SharedHttpClient.GetByteArrayAsync(orientUrl);
+                        localOrientFileName = $"{safeName}_Orient.png";
+                        await File.WriteAllBytesAsync(Path.Combine(LibraryPath, localOrientFileName), orientBytes);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine("Failed to download Orient image: " + ex.Message);
+                    }
+                }
+
+                // Convert degrees to radians. Invert them to cancel out the perceived camera rotation
+                return (-rx * Math.PI / 180.0, -ry * Math.PI / 180.0, -rz * Math.PI / 180.0, localOrientFileName);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("OrientAnything API Error: " + ex.Message);
+                return null;
+            }
         }
 
         private void Generate3DModel_Loaded(object sender, RoutedEventArgs e)
@@ -1895,6 +2002,37 @@ namespace RobotControllerApp
 
                     var thumbBytes = obj.ThumbJpgBytes ?? obj.CropJpgBytes;
                     string cropBase64 = thumbBytes != null && thumbBytes.Length > 0 ? "data:image/jpeg;base64," + Convert.ToBase64String(thumbBytes) : "";
+                    
+                    // Provide the clean Banana image instead of the scan if it exists, for display in UI Context
+                    if (libItem != null && !string.IsNullOrEmpty(libItem.ImageFileName))
+                    {
+                        try
+                        {
+                            string bananaPath = Path.Combine(LibraryPath, libItem.ImageFileName);
+                            if (File.Exists(bananaPath))
+                            {
+                                byte[] eBytes = File.ReadAllBytes(bananaPath);
+                                cropBase64 = "data:image/png;base64," + Convert.ToBase64String(eBytes);
+                            }
+                        }
+                        catch { }
+                    }
+
+                    string orientBase64 = "";
+                    if (libItem != null && !string.IsNullOrEmpty(libItem.OrientImageUrl))
+                    {
+                        try
+                        {
+                            // If OrientImageUrl is a local file name (like _Orient.png)
+                            string orientPath = Path.Combine(LibraryPath, libItem.OrientImageUrl);
+                            if (File.Exists(orientPath))
+                            {
+                                byte[] oBytes = File.ReadAllBytes(orientPath);
+                                orientBase64 = "data:image/png;base64," + Convert.ToBase64String(oBytes);
+                            }
+                        }
+                        catch { }
+                    }
 
                     return new
                     {
@@ -1913,7 +2051,8 @@ namespace RobotControllerApp
                         offsetRx    = libItem?.OffsetRx    ?? 0.0,
                         offsetRy    = libItem?.OffsetRy    ?? 0.0,
                         offsetRz    = libItem?.OffsetRz    ?? 0.0,
-                        offsetScale = libItem?.OffsetScale ?? 1.0
+                        offsetScale = libItem?.OffsetScale ?? 1.0,
+                        orientImageUrl = orientBase64
                     };
                 }).ToList();
 
@@ -2392,6 +2531,71 @@ namespace RobotControllerApp
                     return;
                 }
 
+                if (type == "reAnalyzeOrientAll")
+                {
+                    // payload is an array of labels from the current scene
+                    var requestedLabels = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (payload.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var el in payload.EnumerateArray())
+                        {
+                            var lbl = el.GetString();
+                            if (!string.IsNullOrEmpty(lbl)) requestedLabels.Add(lbl);
+                        }
+                    }
+
+                    Log($"[Orient] Re-analyze scene request: {requestedLabels.Count} objects.");
+                    _ = Task.Run(async () =>
+                    {
+                        // Get a snapshot on the UI thread — only for requested labels
+                        List<(string name, string imageFileName, string safeName)> targets = new();
+                        DispatcherQueue.TryEnqueue(() =>
+                        {
+                            foreach (var cfg in _libraryConfig)
+                            {
+                                if (!string.IsNullOrEmpty(cfg.ImageFileName) &&
+                                    (requestedLabels.Count == 0 || requestedLabels.Contains(cfg.Name)))
+                                    targets.Add((cfg.Name, cfg.ImageFileName, GetSafeFileName(cfg.Name)));
+                            }
+                        });
+
+                        await Task.Delay(200); // wait for dispatcher
+                        int total = targets.Count;
+                        int done = 0;
+                        foreach (var (name, imageFileName, safeName) in targets)
+                        {
+                            try
+                            {
+                                string imgPath = Path.Combine(LibraryPath, imageFileName);
+                                if (!File.Exists(imgPath)) continue;
+                                await _broadcastServer.BroadcastAsync("setOrientStatus", JsonSerializer.Serialize(new { text = $"Analyzing {name}… ({done + 1}/{total})" }));
+                                byte[] imgBytes = await File.ReadAllBytesAsync(imgPath);
+                                var offsets = await GetOrientAnythingOffsetsAsync(imgBytes, safeName);
+                                if (offsets.HasValue && !string.IsNullOrEmpty(offsets.Value.orientFileName))
+                                {
+                                    DispatcherQueue.TryEnqueue(async () =>
+                                    {
+                                        var cfg = _libraryConfig.FirstOrDefault(c => string.Equals(c.Name, name, StringComparison.OrdinalIgnoreCase));
+                                        if (cfg != null)
+                                        {
+                                            // Only save orient image, don't apply angles (Banana already fixed perspective)
+                                            cfg.OrientImageUrl = offsets.Value.orientFileName;
+                                            await SaveLibraryAsync();
+                                        }
+                                    });
+                                }
+                                done++;
+                                await Task.Delay(300); // small pause between requests
+                            }
+                            catch (Exception ex) { Log($"[Orient] Error analyzing '{name}': {ex.Message}"); }
+                        }
+                        await _broadcastServer.BroadcastAsync("setOrientStatus", JsonSerializer.Serialize(new { text = $"Done ({done}/{total})" }));
+                        // Push fresh scene data so orient panel updates with new images
+                        await PushObjectsToSceneAsync();
+                    });
+                    return;
+                }
+
                 if (type == "generate3DModel")
                 {
                     string label = payload.TryGetProperty("label", out var lbProp) ? lbProp.GetString() ?? "object" : "object";
@@ -2431,12 +2635,23 @@ namespace RobotControllerApp
                             await _broadcastServer.BroadcastAsync("setBananaImage", JsonSerializer.Serialize(new { label, imageUrl = $"/library/{Uri.EscapeDataString(bananaFileName)}" }));
 
                             // Phase 2 — Tripo3D: generate the 3D mesh
-                            var (glbFileName, tripoCost) = await GenerateTripoModelCoreAsync(imgBytes, safeName,
+                            var tripoTask = GenerateTripoModelCoreAsync(imgBytes, safeName,
                                 msg =>
                                 {
                                     Log($"[Scene3D-3D] {label}: {msg}");
                                     _ = _broadcastServer.BroadcastAsync("setGen3DProgress", JsonSerializer.Serialize(new { label, status = msg }));
                                 });
+
+                            // Phase 3 — Orient Anything V2
+                            var orientTask = GetOrientAnythingOffsetsAsync(imgBytes, safeName,
+                                msg =>
+                                {
+                                    Log($"[Scene3D-Orient] {label}: {msg}");
+                                });
+
+                            await Task.WhenAll(tripoTask, orientTask);
+                            var (glbFileName, tripoCost) = tripoTask.Result;
+                            var offsets = orientTask.Result;
 
                             DispatcherQueue.TryEnqueue(async () =>
                             {
@@ -2453,8 +2668,17 @@ namespace RobotControllerApp
                                     };
                                     _libraryConfig.Insert(0, cfg);
                                 }
-                                cfg.ModelFileName = glbFileName;
+                                cfg!.ModelFileName = glbFileName;
                                 if (string.IsNullOrEmpty(cfg.ImageFileName)) cfg.ImageFileName = bananaFileName;
+                                
+                                if (offsets.HasValue)
+                                {
+                                    // Only save the orient debug image URL — do NOT apply angle offsets.
+                                    // Banana already corrects perspective, so the Tripo model is already upright.
+                                    if (!string.IsNullOrEmpty(offsets.Value.orientFileName))
+                                        cfg.OrientImageUrl = offsets.Value.orientFileName;
+                                }
+
                                 _ = SaveLibraryAsync();
 
                                 // ── Sync the UI ObservableCollection ──────────────────────

@@ -17,6 +17,7 @@ using System.Net.WebSockets;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -73,9 +74,11 @@ namespace RobotControllerApp.Services
             private readonly ConcurrentDictionary<string, byte[]> _latestSlot = new();
             private volatile int _latestPending = 0; // 1 = a droppable flush is already scheduled
 
-            // Message types safe to drop when the client is too slow to keep up
+            // Message types safe to drop when the client is too slow to keep up.
+            // "pong" is droppable: a stale pong from the previous ping cycle must not
+            // arrive after the client has already sent a newer ping.
             private static readonly HashSet<string> _droppableTypes =
-                new() { "updateCameraFeed", "setCameraPose", "setRobotJoints", "setCameraRobot" };
+                new() { "updateCameraFeed", "setCameraPose", "setRobotJoints", "setCameraRobot", "pong" };
 
             private readonly CancellationTokenSource _cts = new();
             private readonly SemaphoreSlim _socketLock = new(1, 1);
@@ -236,6 +239,13 @@ namespace RobotControllerApp.Services
                     }
                 });
 
+                // TCP_NODELAY — disables Nagle's algorithm so small WS frames (ping/pong,
+                // pose updates) are flushed immediately instead of being batched for up to 40 ms.
+                builder.Services.Configure<Microsoft.AspNetCore.Server.Kestrel.Transport.Sockets.SocketTransportOptions>(opts =>
+                {
+                    opts.NoDelay = true;
+                });
+
                 builder.Services.AddCors(options =>
                 {
                     options.AddDefaultPolicy(policy =>
@@ -255,7 +265,7 @@ namespace RobotControllerApp.Services
                 _app = app;
 
                 app.UseCors();
-                app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(25) });
+                app.UseWebSockets(new WebSocketOptions { KeepAliveInterval = TimeSpan.FromSeconds(60) });
 
                 // ── Static file serving ───────────────────────────────────────────
                 var mimeProvider = new FileExtensionContentTypeProvider();
@@ -370,6 +380,27 @@ namespace RobotControllerApp.Services
                                 if (messageBuffer.TryGetBuffer(out ArraySegment<byte> segment))
                                 {
                                     var msg = Encoding.UTF8.GetString(segment.Array!, segment.Offset, segment.Count);
+
+                                    // ── Fast-path: ping → pong without going through the MainWindow event chain.
+                                    // Cuts ~1-3 ms of dispatch + channel roundtrip for the RTT-critical message.
+                                    if (msg.Contains("\"ping\"", StringComparison.Ordinal))
+                                    {
+                                        try
+                                        {
+                                            using var pingDoc = JsonDocument.Parse(msg);
+                                            var root = pingDoc.RootElement;
+                                            if (root.TryGetProperty("type", out var t) && t.GetString() == "ping"
+                                                && root.TryGetProperty("payload", out var pl))
+                                            {
+                                                string tsRaw = pl.ValueKind == JsonValueKind.Number ? pl.GetRawText() : "0";
+                                                string pongJson = $"{{\"type\":\"pong\",\"payload\":{tsRaw}}}";
+                                                client.Enqueue("pong", Encoding.UTF8.GetBytes(pongJson));
+                                                continue; // skip MainWindow dispatch
+                                            }
+                                        }
+                                        catch { /* fall through to normal dispatch */ }
+                                    }
+
                                     OnBrowserMessage?.Invoke(msg);
                                 }
                             }

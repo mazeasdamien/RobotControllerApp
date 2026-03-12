@@ -17,6 +17,13 @@
     <SolidColorBrush x:Key="Brush.Status.Error"         Color="#FFCC3300" />
 
     <!-- NAVIGATION VIEW OVERRIDES (Fix Blue Highlight) -->
+    <!-- SystemAccentColor overrides kept as Color resources — WMC warnings are designer-only, no build impact -->
+    <Color x:Key="SystemAccentColor">#FFFF7900</Color>
+    <Color x:Key="SystemAccentColorLight1">#FFE66000</Color>
+    <Color x:Key="SystemAccentColorLight2">#FFE66000</Color>
+    <Color x:Key="SystemAccentColorDark1">#FFE66000</Color>
+    <Color x:Key="SystemAccentColorDark2">#FFE66000</Color>
+
     <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground"               Color="#FFFF7900" />
     <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForegroundPointerOver"    Color="#FFE66000" />
     <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForegroundPressed"        Color="#FFE66000" />

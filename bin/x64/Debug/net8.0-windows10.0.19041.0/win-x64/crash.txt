@@ -1,13 +1,12 @@
-Cannot find a Resource with the Name/Key Text.Headline2 [Line: 470 Position: 64]
-Microsoft.UI.Xaml.Markup.XamlParseException: The text associated with this error code could not be found.
+Le fichier spécifié est introuvable.
 
-Cannot find a Resource with the Name/Key Text.Headline2 [Line: 470 Position: 64]
+Microsoft.UI.Xaml.Markup.XamlParseException: XAML parsing failed.
    at WinRT.ExceptionHelpers.<ThrowExceptionForHR>g__Throw|38_0(Int32 hr)
    at WinRT.ExceptionHelpers.ThrowExceptionForHR(Int32 hr)
    at ABI.Microsoft.UI.Xaml.IApplicationStaticsMethods.LoadComponent(IObjectReference _obj, Object component, Uri resourceLocator, ComponentResourceLocation componentResourceLocation)
    at Microsoft.UI.Xaml.Application.LoadComponent(Object component, Uri resourceLocator, ComponentResourceLocation componentResourceLocation)
-   at RobotControllerApp.MainWindow.InitializeComponent() in C:\Users\Damien Mazeas\Desktop\portfolio\Orange\RobotControllerApp\obj\x64\Debug\net8.0-windows10.0.19041.0\win-x64\MainWindow.g.i.cs:line 293
-   at RobotControllerApp.MainWindow..ctor() in C:\Users\Damien Mazeas\Desktop\portfolio\Orange\RobotControllerApp\MainWindow.xaml.cs:line 124
-   at RobotControllerApp.App.OnLaunched(LaunchActivatedEventArgs args) in C:\Users\Damien Mazeas\Desktop\portfolio\Orange\RobotControllerApp\App.xaml.cs:line 29
+   at RobotControllerApp.MainWindow.InitializeComponent()
+   at RobotControllerApp.MainWindow..ctor()
+   at RobotControllerApp.App.OnLaunched(LaunchActivatedEventArgs args)
    at Microsoft.UI.Xaml.Application.Microsoft.UI.Xaml.IApplicationOverrides.OnLaunched(LaunchActivatedEventArgs args)
    at ABI.Microsoft.UI.Xaml.IApplicationOverrides.Do_Abi_OnLaunched_0(IntPtr thisPtr, IntPtr args)
