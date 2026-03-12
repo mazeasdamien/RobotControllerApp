@@ -626,10 +626,12 @@
 
     .ctx-photo-card img {
       width: 100%;
-      aspect-ratio: 1 / 1;
-      object-fit: cover;
+      aspect-ratio: auto;
+      max-height: 220px;
+      object-fit: contain;
       border-radius: 7px;
       border: 1px solid rgba(255, 255, 255, 0.06);
+      background: rgba(0, 0, 0, 0.45);
     }
 
     .ctx-photo-label {
@@ -807,6 +809,7 @@
 
     #voice-body {
       padding: 14px;
+      padding-bottom: 18px;
     }
 
     #ptt-btn {
@@ -1843,7 +1846,15 @@
     window._gen3DBadges = window._gen3DBadges || {};
 
     // ── Cache of last scene items (needed to refresh 3D after model generation) ──
+    // Exposed on window so the WS glbData handler (different IIFE scope) can re-render.
     let _lastSceneItems = [];
+    Object.defineProperty(window, '_lastSceneItems', {
+      get: () => _lastSceneItems,
+      set: (v) => { _lastSceneItems = v; },
+      configurable: true
+    });
+    // Expose renderObjects so glbData handler can trigger a re-render
+    window.renderObjects = function(items) { renderObjects(items); };
 
     function requestGenerate3D(item, badgeEl) {
       badgeEl.textContent = '\u23F3 Enhancing\u2026'; badgeEl.style.opacity = '0.7'; badgeEl.onclick = null;
@@ -1960,6 +1971,63 @@
       const legendEl = document.getElementById('legend-items'); if (legendEl) legendEl.innerHTML = '';
     }
 
+    // ── GLB Blob URL cache (populated by WebSocket glbData messages) ──────────
+    // Keys: item.label (string) → Object URL (blob:…) created from WS-delivered base64 GLB
+    // This lets renderObjects load models without any HTTP request.
+    window._wsGlbCache = {};
+
+    // ── Shared GLTF load helper (used by both WS-cache and HTTP paths) ──────────
+    function loadGltfFromUrl(url, item, px, pz, objGroup, labelSprite, addSphere, attempt = 1, maxAttempts = 3) {
+      console.log(`[GLB] Loading '${item.label}' from: ${url} (attempt ${attempt}/${maxAttempts})`);
+      gltfLoader.load(url, (gltf) => {
+        console.log(`[GLB] ✅ Loaded '${item.label}' successfully`);
+        const rawModel = gltf.scene;
+        rawModel.traverse((node) => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
+
+        const box0 = new THREE.Box3().setFromObject(rawModel);
+        const center0 = new THREE.Vector3(); box0.getCenter(center0);
+        rawModel.position.set(-center0.x, -box0.min.y, -center0.z);
+
+        const correctionGroup = new THREE.Group();
+        correctionGroup.add(rawModel);
+        if (item.offsetRx) correctionGroup.rotation.x = item.offsetRx;
+        if (item.offsetRy) correctionGroup.rotation.y = item.offsetRy;
+        if (item.offsetRz) correctionGroup.rotation.z = item.offsetRz;
+
+        const scaleGroup = new THREE.Group();
+        scaleGroup.add(correctionGroup);
+        const correctedBox = new THREE.Box3().setFromObject(scaleGroup);
+        const modelW = correctedBox.max.x - correctedBox.min.x;
+        const modelD = correctedBox.max.z - correctedBox.min.z;
+        const maxDim = Math.max(modelW, modelD, 0.0001);
+        const targetW = Math.max(0.01, item.sizeW || 0.05);
+        let scaleFactor = targetW / maxDim;
+        if (item.offsetScale && item.offsetScale !== 1.0) scaleFactor *= item.offsetScale;
+        scaleGroup.scale.set(scaleFactor, scaleFactor, scaleFactor);
+
+        const worldGroup = new THREE.Group();
+        worldGroup.add(scaleGroup);
+        worldGroup.position.set(px, 0, pz);
+        if (item.angleRad !== undefined) worldGroup.rotation.y = -item.angleRad;
+        worldGroup.add(new THREE.AxesHelper(0.08 / scaleFactor));
+        objGroup.add(worldGroup);
+
+        const finalBox = new THREE.Box3().setFromObject(worldGroup);
+        labelSprite.position.set(px, finalBox.max.y + 0.03, pz);
+        objGroup.add(labelSprite);
+
+      }, undefined, (err) => {
+        console.warn(`[GLB] ⚠ Attempt ${attempt}/${maxAttempts} failed for '${item.label}':`, err?.message || err);
+        if (attempt < maxAttempts) {
+          const delay = 2000 * attempt;
+          setTimeout(() => loadGltfFromUrl(url, item, px, pz, objGroup, labelSprite, addSphere, attempt + 1, maxAttempts), delay);
+        } else {
+          console.error(`[GLB] ❌ All ${maxAttempts} attempts failed for '${item.label}'. Fallback to sphere.`);
+          addSphere();
+        }
+      });
+    }
+
     function renderObjects(items) {
       clearObjects();
       const noObjEl = document.getElementById('no-objects'), countEl = document.getElementById('obj-count'), legendEl = document.getElementById('legend-items');
@@ -1989,66 +2057,35 @@
           labelSprite.position.set(px, radius * 2 + 0.03, pz); objGroup.add(labelSprite);
         }
 
-        if (item.modelUrl && item.modelUrl.trim() !== '') {
-          // Resolve the model URL:
-          //   - modelUrlRemote is a server-relative path like "/library/file.glb"
-          //     → make it absolute using this page's origin (works for LAN, Quest, Cloudflare tunnel)
-          //   - modelUrl is the WebView2 virtual-host URL "http://library.local/file.glb"
-          //     → only works when the page is loaded inside the WinUI app itself
+        if (item.hasModel || (item.modelUrl && item.modelUrl.trim() !== '')) {
+          // ── Priority 1: WebSocket Blob URL (no HTTP needed, works through any tunnel) ──
+          if (window._wsGlbCache[item.label]) {
+            const cachedUrl = window._wsGlbCache[item.label];
+            console.log(`[GLB] Using WS-cached Blob URL for '${item.label}'`);
+            loadGltfFromUrl(cachedUrl, item, px, pz, objGroup, labelSprite, addSphere);
+            return; // skip HTTP path
+          }
+
+          // ── Priority 2: Request via WebSocket (avoids HTTP entirely) ──
+          // Fire the WS request in background; use HTTP URL as fallback in parallel.
+          if (window._remoteWs && window._remoteWs.readyState === WebSocket.OPEN) {
+            console.log(`[GLB] Requesting '${item.label}' via WebSocket…`);
+            window._remoteWs.send(JSON.stringify({ type: 'requestGlb', payload: item.label }));
+            // The glbData handler will call renderObjects again once data arrives.
+            // Meanwhile show a sphere as placeholder.
+            addSphere(); return;
+          }
+
+          // ── Priority 3: HTTP fallback (LAN / local WebView2) ──
           let resolvedUrl;
           if (item.modelUrlRemote && item.modelUrlRemote.trim() !== '') {
             const remote = item.modelUrlRemote.trim();
-            // If already absolute (starts with http/https) keep it; else prepend origin
             resolvedUrl = remote.startsWith('http') ? remote : `${location.origin}${remote.startsWith('/') ? '' : '/'}${remote}`;
           } else {
             resolvedUrl = item.modelUrl;
           }
 
-          console.log(`[GLB] Loading '${item.label}' from: ${resolvedUrl}`);
-          gltfLoader.load(resolvedUrl, (gltf) => {
-            console.log(`[GLB] ✅ Loaded '${item.label}' successfully`);
-            const rawModel = gltf.scene;
-            rawModel.traverse((node) => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
-
-            // ── 1. PIVOT CORRECTION — centre X/Z, bottom sits exactly on Y=0 ──
-            const box0 = new THREE.Box3().setFromObject(rawModel);
-            const center0 = new THREE.Vector3(); box0.getCenter(center0);
-            rawModel.position.set(-center0.x, -box0.min.y, -center0.z);
-
-            // ── 2. AI CORRECTION OFFSETS — compensate for Tripo's imperfect orientation ──
-            const correctionGroup = new THREE.Group();
-            correctionGroup.add(rawModel);
-            if (item.offsetRx) correctionGroup.rotation.x = item.offsetRx;
-            if (item.offsetRy) correctionGroup.rotation.y = item.offsetRy;
-            if (item.offsetRz) correctionGroup.rotation.z = item.offsetRz;
-
-            // ── 3. SCALE — computed AFTER corrections so the bounding box is accurate ──
-            const scaleGroup = new THREE.Group();
-            scaleGroup.add(correctionGroup);
-
-            const correctedBox = new THREE.Box3().setFromObject(scaleGroup);
-            const modelW = correctedBox.max.x - correctedBox.min.x;
-            const modelD = correctedBox.max.z - correctedBox.min.z;
-            const maxDim = Math.max(modelW, modelD, 0.0001);
-            const targetW = Math.max(0.01, item.sizeW || 0.05);
-            let scaleFactor = targetW / maxDim;
-            if (item.offsetScale && item.offsetScale !== 1.0) scaleFactor *= item.offsetScale;
-            scaleGroup.scale.set(scaleFactor, scaleFactor, scaleFactor);
-
-            // ── 4. WORLD PLACEMENT — position + Yaw from Gemini angle estimation ──
-            const worldGroup = new THREE.Group();
-            worldGroup.add(scaleGroup);
-            worldGroup.position.set(px, 0, pz);
-            if (item.angleRad !== undefined) worldGroup.rotation.y = -item.angleRad;
-            worldGroup.add(new THREE.AxesHelper(0.08 / scaleFactor));
-            objGroup.add(worldGroup);
-
-            // Label above the final bounding box top
-            const finalBox = new THREE.Box3().setFromObject(worldGroup);
-            labelSprite.position.set(px, finalBox.max.y + 0.03, pz);
-            objGroup.add(labelSprite);
-
-          }, undefined, (err) => { console.error(`[GLB] ❌ Failed to load '${item.label}' from ${resolvedUrl}`, err); addSphere(); });
+          loadGltfFromUrl(resolvedUrl, item, px, pz, objGroup, labelSprite, addSphere);
         } else { addSphere(); }
 
         if (legendEl) {
@@ -2681,8 +2718,13 @@
     (function initRemoteWS() {
       const badge = document.getElementById('ws-badge'), label = document.getElementById('ws-label');
       const latEl = document.getElementById('ws-latency');
-      const isRemote = location.hostname !== 'app.local' && location.hostname !== '';
-      if (!isRemote) { if (badge) badge.style.display = 'none'; return; }
+      // Determine the hub host: inside the WebView2 (app.local / blank) use localhost:8181,
+      // otherwise use the page's own origin (LAN IP, Cloudflare tunnel, etc.)
+      const isLocalApp = location.hostname === 'app.local' || location.hostname === '';
+      const hubOrigin = isLocalApp ? 'http://localhost:8181' : location.origin;
+      const hubHost   = isLocalApp ? 'localhost:8181'        : location.host;
+      const wsProtoBase = isLocalApp ? 'ws' : (location.protocol === 'https:' ? 'wss' : 'ws');
+      if (badge) badge.style.display = '';
 
       let retryDelay = 1500, ws = null;
       let _pingTs = 0, _pingInterval = null;
@@ -2721,7 +2763,7 @@
         }
       }
 
-      async function serverReachable() { try { const r = await fetch(`${location.origin}/ping`, { signal: AbortSignal.timeout(3000) }); return r.ok; } catch { return false; } }
+      async function serverReachable() { try { const r = await fetch(`${hubOrigin}/ping`, { signal: AbortSignal.timeout(3000) }); return r.ok; } catch { return false; } }
 
       async function connect() {
         if (label) label.textContent = 'Checking…'; if (badge) badge.classList.remove('live', 'error');
@@ -2732,8 +2774,7 @@
           setTimeout(connect, Math.min(retryDelay * 2, 15000)); retryDelay = Math.min(retryDelay * 1.5, 15000); return;
         }
 
-        const wsProto = location.protocol === 'https:' ? 'wss' : 'ws';
-        ws = new WebSocket(`${wsProto}://${location.host}/scene3d-ws`); window._remoteWs = ws;
+        ws = new WebSocket(`${wsProtoBase}://${hubHost}/scene3d-ws`); window._remoteWs = ws;
 
         ws.onopen = () => {
           retryDelay = 1500;
@@ -2761,14 +2802,14 @@
               }
               case 'setModelGlb': {
                 const { label: glbLabel, glbUrl } = msg.payload;
-                const absUrl = glbUrl.startsWith('http') ? glbUrl : `${location.protocol}//${location.host}${glbUrl}`;
+                const absUrl = glbUrl.startsWith('http') ? glbUrl : `${hubOrigin}${glbUrl.startsWith('/') ? '' : '/'}${glbUrl}`;
                 console.log('[setModelGlb] Loading GLB from:', absUrl);
                 if (window.setModelGlb) window.setModelGlb(JSON.stringify({ label: glbLabel, glbUrl: absUrl }));
                 break;
               }
               case 'setBananaImage': {
                 const { label: lbl, imageUrl } = msg.payload;
-                const absImgUrl = imageUrl.startsWith('http') ? imageUrl : `${location.protocol}//${location.host}${imageUrl}`;
+                const absImgUrl = imageUrl.startsWith('http') ? imageUrl : `${hubOrigin}${imageUrl.startsWith('/') ? '' : '/'}${imageUrl}`;
                 document.querySelectorAll('.ctx-photo-card').forEach(card => {
                   if (card.querySelector('.ctx-photo-label')?.textContent === lbl) {
                     const img = card.querySelector('img');
@@ -2797,6 +2838,25 @@
                 if (voiceOut && !alreadyComplete) { voiceOut.textContent = text; voiceOut.classList.add('has-text'); }
                 if (voiceStatus && !alreadyComplete) { voiceStatus.textContent = 'Transcription received'; voiceStatus.className = 'success'; }
                 document.getElementById('voice-panel')?.classList.remove('collapsed');
+                break;
+              }
+              case 'glbData': {
+                // Server sent the GLB binary as base64 — decode, create Blob URL, cache & re-render
+                const { label: glbLabel, data: b64 } = msg.payload;
+                try {
+                  const binary = atob(b64);
+                  const bytes  = new Uint8Array(binary.length);
+                  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                  const blob = new Blob([bytes], { type: 'model/gltf-binary' });
+                  // Revoke previous Blob URL if any (avoid memory leaks)
+                  if (window._wsGlbCache[glbLabel]) URL.revokeObjectURL(window._wsGlbCache[glbLabel]);
+                  window._wsGlbCache[glbLabel] = URL.createObjectURL(blob);
+                  console.log(`[GLB-WS] ✅ Received '${glbLabel}' (${Math.round(binary.length / 1024)} KB) via WebSocket`);
+                  // Re-render: replaces the sphere placeholder with the real model
+                  if (window._lastSceneItems && window._lastSceneItems.length > 0) {
+                    if (window.renderObjects) renderObjects(window._lastSceneItems);
+                  }
+                } catch (e) { console.error('[GLB-WS] glbData decode error', e); }
                 break;
               }
             }

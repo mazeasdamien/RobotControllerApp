@@ -2346,6 +2346,30 @@ namespace RobotControllerApp
                     return;
                 }
 
+                if (type == "requestGlb")
+                {
+                    // Browser requests GLB binary via WS (avoids Cloudflare HTTP 502 on large files)
+                    string reqLabel = payload.ValueKind == JsonValueKind.String ? payload.GetString() ?? "" : "";
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var libItem = _libraryConfig.FirstOrDefault(x =>
+                                string.Equals(x.Name, reqLabel, StringComparison.OrdinalIgnoreCase));
+                            if (libItem == null || string.IsNullOrEmpty(libItem.ModelFileName)) return;
+                            var glbPath = Path.Combine(LibraryPath, libItem.ModelFileName);
+                            if (!File.Exists(glbPath)) return;
+                            Log($"[GLB-WS] Sending '{reqLabel}' ({new FileInfo(glbPath).Length / 1024} KB) via WebSocket");
+                            byte[] glbBytes = await File.ReadAllBytesAsync(glbPath);
+                            string b64 = Convert.ToBase64String(glbBytes);
+                            await _broadcastServer.BroadcastAsync("glbData",
+                                JsonSerializer.Serialize(new { label = reqLabel, data = b64 }));
+                        }
+                        catch (Exception ex) { Log($"[GLB-WS] requestGlb error: {ex.Message}"); }
+                    });
+                    return;
+                }
+
                 if (type == "refreshScene")
                 {
                     _ = Task.Run(async () => await PushObjectsToSceneAsync());
@@ -2469,6 +2493,18 @@ namespace RobotControllerApp
                             string glbServeUrl = $"/library/{Uri.EscapeDataString(glbFileName)}";
                             await _broadcastServer.BroadcastAsync("setModelGlb", JsonSerializer.Serialize(new { label, glbUrl = glbServeUrl }));
                             await _broadcastServer.BroadcastAsync("refreshLibrary", "{}");
+
+                            // Also push GLB binary through WebSocket so remote clients
+                            // don't need to fetch it over HTTP (avoids Cloudflare 502 on large files)
+                            try
+                            {
+                                byte[] glbBytes = await File.ReadAllBytesAsync(glbPath);
+                                string b64 = Convert.ToBase64String(glbBytes);
+                                Log($"[GLB-WS] Pushing '{label}' ({glbBytes.Length / 1024} KB) via WebSocket");
+                                await _broadcastServer.BroadcastAsync("glbData",
+                                    JsonSerializer.Serialize(new { label, data = b64 }));
+                            }
+                            catch (Exception ex) { Log($"[GLB-WS] Push error: {ex.Message}"); }
                         }
                         catch (Exception ex)
                         {

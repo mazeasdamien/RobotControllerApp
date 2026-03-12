@@ -271,11 +271,54 @@ namespace RobotControllerApp.Services
 
                 if (!string.IsNullOrWhiteSpace(LibraryPath))
                 {
-                    app.UseStaticFiles(new StaticFileOptions
+                    // Use an explicit endpoint instead of UseStaticFiles so we can set
+                    // proper CORS + Content-Length headers that Cloudflare Tunnel needs
+                    // to correctly proxy large binary GLB files (avoids 502 errors).
+                    app.MapGet("/library/{**filename}", async context =>
                     {
-                        FileProvider = new PhysicalFileProvider(LibraryPath),
-                        RequestPath = "/library",
-                        ContentTypeProvider = mimeProvider
+                        var filename = context.Request.RouteValues["filename"]?.ToString() ?? "";
+                        // Decode percent-encoded filename (spaces, special chars)
+                        filename = Uri.UnescapeDataString(filename);
+
+                        // Security: prevent directory traversal
+                        var fullPath = Path.GetFullPath(Path.Combine(LibraryPath, filename));
+                        if (!fullPath.StartsWith(Path.GetFullPath(LibraryPath), StringComparison.OrdinalIgnoreCase))
+                        {
+                            context.Response.StatusCode = 403;
+                            return;
+                        }
+
+                        if (!File.Exists(fullPath))
+                        {
+                            context.Response.StatusCode = 404;
+                            await context.Response.WriteAsync($"Not found: {filename}");
+                            return;
+                        }
+
+                        // Determine MIME type
+                        string ext = Path.GetExtension(fullPath).ToLowerInvariant();
+                        string mime = ext switch
+                        {
+                            ".glb"  => "model/gltf-binary",
+                            ".gltf" => "model/gltf+json",
+                            ".png"  => "image/png",
+                            ".jpg" or ".jpeg" => "image/jpeg",
+                            ".webp" => "image/webp",
+                            _       => "application/octet-stream"
+                        };
+
+                        var fi = new FileInfo(fullPath);
+                        context.Response.ContentType   = mime;
+                        context.Response.ContentLength = fi.Length;
+                        context.Response.Headers["Access-Control-Allow-Origin"]  = "*";
+                        context.Response.Headers["Cache-Control"] = "public, max-age=3600";
+                        context.Response.Headers["X-Content-Type-Options"] = "nosniff";
+
+                        try
+                        {
+                            await context.Response.SendFileAsync(fullPath, context.RequestAborted);
+                        }
+                        catch (OperationCanceledException) { }
                     });
                 }
 
