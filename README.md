@@ -26,7 +26,7 @@
   └───────────────┘   └────────────────────────┘
            │
   ┌────────┴──────────┐
-  │  rosbridge_server │  (ROS 2 on robot)
+  │  rosbridge_server │  (ROS 1 on robot)
   │  Niryo Ned ×2     │
   └───────────────────┘
 ```
