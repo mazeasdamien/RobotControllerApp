@@ -5,8 +5,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon"
-    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🤖</text></svg>">
-  <title>3D Scene Preview</title>
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎛️</text></svg>">
+  <title>Expert Interface</title>
   <style>
     * {
       margin: 0;
@@ -199,9 +199,12 @@
       font-size: 11px;
       font-weight: 500;
       color: var(--text-muted);
-      pointer-events: none;
+      pointer-events: auto;
       transition: border-color 0.4s, box-shadow 0.4s;
       flex-shrink: 0;
+      min-width: 96px; /* prevent layout shift between 2-digit and 3-digit latency */
+      cursor: default;
+      position: relative;
     }
 
     #ws-badge .dot {
@@ -233,6 +236,89 @@
     #ws-latency.lat-good  { color: #00cc6a; }
     #ws-latency.lat-warn  { color: #ffaa00; }
     #ws-latency.lat-bad   { color: #ff5555; }
+
+    /* Fixed-width latency number so the badge never resizes */
+    #ws-latency {
+      font-variant-numeric: tabular-nums;
+      min-width: 36px;
+      text-align: right;
+      display: inline-block;
+    }
+
+    /* ── Live badge route tooltip ──────────────────────────────── */
+    #ws-route-tip {
+      position: absolute;
+      top: calc(100% + 8px);
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(8, 8, 20, 0.96);
+      border: 1px solid rgba(255, 255, 255, 0.10);
+      border-radius: 10px;
+      padding: 9px 14px;
+      white-space: nowrap;
+      font-size: 10.5px;
+      color: rgba(255, 255, 255, 0.75);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.18s, transform 0.18s;
+      transform: translateX(-50%) translateY(4px);
+      z-index: 200;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 8px 28px rgba(0,0,0,0.55);
+    }
+
+    #ws-badge:hover #ws-route-tip {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .ws-route-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 3px 0;
+    }
+
+    .ws-route-node {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+
+    .ws-route-node .node-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .ws-route-arrow {
+      color: rgba(255,255,255,0.28);
+      font-size: 10px;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .ws-route-rtt {
+      font-size: 9px;
+      font-variant-numeric: tabular-nums;
+      background: rgba(255,255,255,0.07);
+      border-radius: 4px;
+      padding: 1px 5px;
+      color: rgba(255,255,255,0.5);
+    }
+
+    .ws-route-city {
+      font-size: 9px;
+      color: rgba(255,255,255,0.38);
+      font-weight: 400;
+      margin-top: 2px;
+      letter-spacing: 0.02em;
+    }
 
     @keyframes pulse-dot {
 
@@ -1157,14 +1243,50 @@
   <!-- ── Top control bar (hidden in VR) ── -->
   <div id="top-bar">
     <div id="top-bar-logo">
-      <div class="logo-icon">🤖</div>
-      <span class="logo-text">Robot Scene</span>
+      <div class="logo-icon">🎛️</div>
+      <span class="logo-text">Expert Interface</span>
     </div>
 
     <div id="ws-badge" style="display:none;">
       <div class="dot"></div>
       <span id="ws-label">Connecting…</span>
       <span id="ws-latency" style="display:none; font-size:10px; opacity:0.7; margin-left:2px;"></span>
+      <!-- Route tooltip shown on hover -->
+      <div id="ws-route-tip">
+        <div class="ws-route-row">
+          <div class="ws-route-node">
+            <div class="node-dot" style="background:#5599ff;"></div>
+            <div>
+              <span style="color:#88aaff;">Local Server</span>
+              <div id="ws-route-server-city" class="ws-route-city">🏠 Your Network</div>
+            </div>
+          </div>
+          <div class="ws-route-arrow">
+            ──<span id="ws-route-rtt1" class="ws-route-rtt">…ms</span>──▶
+          </div>
+          <div class="ws-route-node">
+            <div class="node-dot" style="background:#ff8c42;"></div>
+            <div>
+              <span style="color:#ffaa66;">Cloudflare</span>
+              <div id="ws-route-cf-city" class="ws-route-city">…</div>
+            </div>
+          </div>
+          <div class="ws-route-arrow">
+            ──<span id="ws-route-rtt2" class="ws-route-rtt">…ms</span>──▶
+          </div>
+          <div class="ws-route-node">
+            <div class="node-dot" style="background:#00cc6a;"></div>
+            <div>
+              <span style="color:#55ddaa;">Client</span>
+              <div id="ws-route-client-city" class="ws-route-city">…</div>
+            </div>
+          </div>
+        </div>
+        <div style="margin-top:7px; padding-top:6px; border-top:1px solid rgba(255,255,255,0.07); display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:9px; color:rgba(255,255,255,0.3);">Each arrow ≈ RTT ÷ 2 (one-way estimate)</span>
+          <span style="font-size:9px; color:rgba(255,255,255,0.45);">Total RTT: <span id="ws-route-full-rtt" style="font-variant-numeric:tabular-nums; color:#ffcc44; font-weight:600;">…ms</span></span>
+        </div>
+      </div>
     </div>
 
     <!-- Hide / Show live feed overlay -->
@@ -3419,9 +3541,84 @@
           latEl.textContent = `${avg} ms`;
           latEl.className = avg < 80 ? 'lat-good' : avg < 150 ? 'lat-warn' : 'lat-bad';
         }
+        // Update route tooltip: each arrow shows ~RTT/2 (one-way estimate), footer shows full RTT
+        const half = Math.round(avg / 2);
+        const rtt1El = document.getElementById('ws-route-rtt1');
+        const rtt2El = document.getElementById('ws-route-rtt2');
+        const fullEl = document.getElementById('ws-route-full-rtt');
+        if (rtt1El) rtt1El.textContent = `~${half}ms`;
+        if (rtt2El) rtt2El.textContent = `~${half}ms`;
+        if (fullEl) fullEl.textContent = `${avg}ms`;
+      }
+
+      // ── IATA airport code → city (Cloudflare PoP locations) ─────────────
+      const _CF_IATA = {
+        // Europe
+        CDG:'Paris, FR', LHR:'London, UK', AMS:'Amsterdam, NL', FRA:'Frankfurt, DE',
+        MAD:'Madrid, ES', FCO:'Rome, IT', ZRH:'Zurich, CH', VIE:'Vienna, AT',
+        ARN:'Stockholm, SE', CPH:'Copenhagen, DK', OSL:'Oslo, NO', HEL:'Helsinki, FI',
+        WAW:'Warsaw, PL', PRG:'Prague, CZ', BUD:'Budapest, HU', BRU:'Brussels, BE',
+        LIS:'Lisbon, PT', DUB:'Dublin, IE', ATH:'Athens, GR', MAN:'Manchester, UK',
+        BCN:'Barcelona, ES', MXP:'Milan, IT', OTP:'Bucharest, RO', SOF:'Sofia, BG',
+        HAM:'Hamburg, DE', MUC:'Munich, DE', DUS:'Düsseldorf, DE', BER:'Berlin, DE',
+        GVA:'Geneva, CH', LYS:'Lyon, FR', MRS:'Marseille, FR', NCE:'Nice, FR',
+        EDI:'Edinburgh, UK', LGW:'London, UK', STN:'London, UK',
+        // Americas
+        JFK:'New York, US', LAX:'Los Angeles, US', ORD:'Chicago, US', DFW:'Dallas, US',
+        SFO:'San Francisco, US', MIA:'Miami, US', SEA:'Seattle, US', ATL:'Atlanta, US',
+        BOS:'Boston, US', IAD:'Washington, US', DEN:'Denver, US', PHX:'Phoenix, US',
+        MSP:'Minneapolis, US', LAS:'Las Vegas, US', SJC:'San Jose, US', PDX:'Portland, US',
+        YYZ:'Toronto, CA', YVR:'Vancouver, CA', YUL:'Montreal, CA',
+        GRU:'São Paulo, BR', EZE:'Buenos Aires, AR', BOG:'Bogotá, CO', MEX:'Mexico City, MX',
+        // Asia-Pacific
+        NRT:'Tokyo, JP', HND:'Tokyo, JP', KIX:'Osaka, JP', ICN:'Seoul, KR',
+        PEK:'Beijing, CN', PVG:'Shanghai, CN', HKG:'Hong Kong', SIN:'Singapore',
+        SYD:'Sydney, AU', MEL:'Melbourne, AU', BNE:'Brisbane, AU', AKL:'Auckland, NZ',
+        BKK:'Bangkok, TH', KUL:'Kuala Lumpur, MY', DEL:'Delhi, IN', BOM:'Mumbai, IN',
+        BLR:'Bangalore, IN',
+        // Middle East & Africa
+        DXB:'Dubai, AE', DOH:'Doha, QA', TLV:'Tel Aviv, IL', IST:'Istanbul, TR',
+        CAI:'Cairo, EG', JNB:'Johannesburg, ZA', NBO:'Nairobi, KE', RUH:'Riyadh, SA',
+      };
+
+      // Fetch geo info once on first WS connect — silent fail on any error
+      let _geoFetched = false;
+      async function fetchGeoInfo() {
+        if (_geoFetched) return;
+        _geoFetched = true;
+        // 1. Client city via ipapi.co (free, no key)
+        try {
+          const r = await fetch('https://ipapi.co/json/', { headers: { Accept: 'application/json' } });
+          const d = await r.json();
+          const city = d.city && d.country_code ? `${d.city}, ${d.country_code}` : (d.city || '');
+          const el = document.getElementById('ws-route-client-city');
+          if (el && city) el.textContent = '📍 ' + city;
+        } catch (_) {}
+        // 2. Cloudflare PoP via cdn-cgi/trace (public CF endpoint, no CORS issues)
+        try {
+          const r = await fetch('https://www.cloudflare.com/cdn-cgi/trace');
+          const txt = await r.text();
+          const m = txt.match(/colo=([A-Z]{3})/);
+          if (m) {
+            const iata = m[1];
+            const city = _CF_IATA[iata] || iata;
+            const el = document.getElementById('ws-route-cf-city');
+            if (el) el.textContent = `☁️ ${city} (${iata})`;
+          }
+        } catch (_) {}
+        // 3. Server city — fetched from the server's own /server-geo endpoint (server calls ipapi.co itself)
+        try {
+          const proto = location.protocol === 'https:' ? 'https:' : 'http:';
+          const r = await fetch(`${proto}//${hubHost}/server-geo`, { headers: { Accept: 'application/json' } });
+          const d = await r.json();
+          const city = d.city && d.country_code ? `${d.city}, ${d.country_code}` : (d.city || '');
+          const el = document.getElementById('ws-route-server-city');
+          if (el && city) el.textContent = '🖥️ ' + city;
+        } catch (_) {}
       }
 
       async function connect() {
+
         if (label) label.textContent = 'Connecting…'; if (badge) badge.classList.remove('live', 'error');
 
         // ── Connect directly — skip the HTTP pre-check which added 50-150 ms overhead.
@@ -3436,6 +3633,7 @@
           if (badge) badge.classList.add('live');
           if (label) label.textContent = 'Live';
           startPing();
+          fetchGeoInfo(); // populate route tooltip city names (runs only once)
         };
 
         ws.onmessage = (evt) => {

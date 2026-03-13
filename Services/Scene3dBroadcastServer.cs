@@ -195,6 +195,7 @@ namespace RobotControllerApp.Services
 
         private WebApplication? _app;
         private CancellationTokenSource? _cts;
+        private string? _cachedServerGeo; // cached response from ipapi.co for /server-geo endpoint
 
         public bool IsRunning => _app != null;
 
@@ -428,6 +429,31 @@ namespace RobotControllerApp.Services
                     context.Response.Headers.Append("X-Hub-Version", "1.0");
                     context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
                     await context.Response.WriteAsync($"{{\"ok\":true,\"clients\":{_clients.Count}}}");
+                });
+
+                // ── Server geo-location (called once by the browser to populate the route tooltip) ──
+                // Fetches ipapi.co from the server side so the browser learns the server's real city.
+                app.MapGet("/server-geo", async context =>
+                {
+                    context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
+                    context.Response.ContentType = "application/json";
+                    try
+                    {
+                        // Cache result so we only outbound-call ipapi.co once per server lifetime
+                        if (_cachedServerGeo is null)
+                        {
+                            using var req = new HttpRequestMessage(HttpMethod.Get, "https://ipapi.co/json/");
+                            req.Headers.Add("User-Agent", "RobotControllerApp/1.0");
+                            using var resp = await SharedHttpClient.SendAsync(req, context.RequestAborted);
+                            _cachedServerGeo = await resp.Content.ReadAsStringAsync(context.RequestAborted);
+                        }
+                        await context.Response.WriteAsync(_cachedServerGeo);
+                    }
+                    catch (Exception ex)
+                    {
+                        context.Response.StatusCode = 502;
+                        await context.Response.WriteAsync($"{{\"error\":\"{ex.Message}\"}}");
+                    }
                 });
 
                 // ── Zero-Allocation Transcribe Proxy ──────────────────────────────
