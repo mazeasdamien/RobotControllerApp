@@ -1282,42 +1282,137 @@
   } }
   </script>
 
-  <!-- Stats.js — loaded only once the toggle button is clicked (lazy) -->
-  <!-- NOTE: plain <script> (not module) so togglePerfStats is globally accessible from onclick -->
+  <!-- Custom Perf Panel - no CDN dependency, matches glass UI -->
+  <!-- Plain <script> (not module) so all functions are globally accessible from onclick -->
   <script>
-    window._statsInstance = null;
+    // Request tracker (starts immediately, before panel is opened)
+    window._reqTracker = {
+      total: 0, httpTotal: 0, wsOut: 0, wsIn: 0,
+      _bucketCount: 0, _ratePerSec: 0, _lastTick: Date.now(),
+    };
+
+    // Intercept window.fetch (GLB downloads, transcription API calls, etc.)
+    (function patchFetch() {
+      const _origFetch = window.fetch;
+      window.fetch = function (...args) {
+        window._reqTracker.total++;
+        window._reqTracker.httpTotal++;
+        window._reqTracker._bucketCount++;
+        return _origFetch.apply(this, args);
+      };
+    })();
+
+    // Called once the WS socket is created in initRemoteWS (see patch below)
+    window._patchWsTracking = function (ws) {
+      const _origSend = ws.send.bind(ws);
+      ws.send = function (data) {
+        window._reqTracker.total++;
+        window._reqTracker.wsOut++;
+        window._reqTracker._bucketCount++;
+        return _origSend(data);
+      };
+      const _prevOnMsg = ws.onmessage;
+      ws.onmessage = function (evt) {
+        window._reqTracker.total++;
+        window._reqTracker.wsIn++;
+        window._reqTracker._bucketCount++;
+        if (_prevOnMsg) _prevOnMsg.call(this, evt);
+      };
+    };
+
+    // FPS/MS measurement hooks called from setAnimationLoop
+    window._perfState = { frameTs: 0, frameDur: 0, _fpsCount: 0, _fpsWindow: 0 };
+    window._perfBegin = function () { window._perfState.frameTs = performance.now(); };
+    window._perfEnd   = function () {
+      var now = performance.now();
+      window._perfState.frameDur = now - window._perfState.frameTs;
+      window._perfState._fpsCount++;
+      window._perfState._fpsWindow += window._perfState.frameDur;
+    };
+
+    window._perfPanelEl  = null;
+    window._perfInterval = null;
+    var _fpsHistory = [];
+    for (var _fi = 0; _fi < 20; _fi++) _fpsHistory.push(60);
+
     window.togglePerfStats = function () {
       const btn = document.getElementById('tb-perf-btn');
-      if (window._statsInstance) {
-        // Already showing — remove and destroy
-        document.body.removeChild(window._statsInstance.dom);
-        window._statsInstance = null;
+
+      if (window._perfPanelEl) {
+        document.body.removeChild(window._perfPanelEl);
+        window._perfPanelEl = null;
+        clearInterval(window._perfInterval);
+        window._perfInterval = null;
         if (btn) btn.classList.remove('active');
         return;
       }
 
-      function _initStats() {
-        if (!window.Stats) { console.warn('[Stats] window.Stats not found after load'); return; }
-        const stats = new window.Stats();
-        stats.showPanel(0); // 0=FPS, 1=MS, 2=MB — click panel to cycle
-        stats.dom.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:9999;cursor:pointer;opacity:0.85;';
-        stats.dom.title = 'Click to switch: FPS / MS / MB';
-        document.body.appendChild(stats.dom);
-        window._statsInstance = stats;
-        if (btn) btn.classList.add('active');
+      var panel = document.createElement('div');
+      panel.id = 'custom-perf-panel';
+      panel.style.cssText = 'position:fixed;top:60px;right:8px;z-index:9999;width:196px;background:rgba(8,8,18,0.92);border:1px solid rgba(255,255,255,0.09);border-radius:12px;backdrop-filter:blur(20px);box-shadow:0 8px 32px rgba(0,0,0,0.6);font-family:-apple-system,"Segoe UI",system-ui,sans-serif;font-size:11px;color:rgba(255,255,255,0.82);overflow:hidden;pointer-events:none;user-select:none;';
+      panel.innerHTML =
+        '<div style="display:flex;align-items:center;gap:7px;padding:9px 12px 7px;border-bottom:1px solid rgba(255,255,255,0.06);">'
+        + '<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#5599ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>'
+        + '<span style="font-size:10px;font-weight:700;letter-spacing:0.08em;color:rgba(255,255,255,0.4);text-transform:uppercase;">Performance</span>'
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;border-bottom:1px solid rgba(255,255,255,0.06);">'
+        +   '<div style="padding:8px 0 6px;text-align:center;border-right:1px solid rgba(255,255,255,0.06);"><div style="font-size:18px;font-weight:700;line-height:1;color:#5599ff;" id="pp-fps-val">--</div><div style="font-size:9px;color:rgba(255,255,255,0.32);margin-top:2px;letter-spacing:0.06em;">FPS</div></div>'
+        +   '<div style="padding:8px 0 6px;text-align:center;border-right:1px solid rgba(255,255,255,0.06);"><div style="font-size:18px;font-weight:700;line-height:1;color:#55ddaa;" id="pp-ms-val">--</div><div style="font-size:9px;color:rgba(255,255,255,0.32);margin-top:2px;letter-spacing:0.06em;">MS</div></div>'
+        +   '<div style="padding:8px 0 6px;text-align:center;"><div style="font-size:18px;font-weight:700;line-height:1;color:#cc88ff;" id="pp-mb-val">--</div><div style="font-size:9px;color:rgba(255,255,255,0.32);margin-top:2px;letter-spacing:0.06em;">MB</div></div>'
+        + '</div>'
+        + '<div style="padding:6px 10px 5px;"><canvas id="pp-graph" width="176" height="28" style="width:176px;height:28px;display:block;border-radius:4px;"></canvas></div>'
+        + '<div style="border-top:1px solid rgba(255,255,255,0.06);padding:8px 12px 10px;">'
+        +   '<div style="font-size:9px;font-weight:700;color:rgba(255,255,255,0.32);letter-spacing:0.07em;text-transform:uppercase;margin-bottom:6px;">Tunnel Requests</div>'
+        +   '<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="color:rgba(255,255,255,0.45);">Total</span><span style="font-weight:700;color:#ffd700;" id="pp-total">0</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="color:rgba(255,255,255,0.45);">WS \u2191 out</span><span style="color:rgba(255,255,255,0.65);" id="pp-wsout">0</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="color:rgba(255,255,255,0.45);">WS \u2193 in</span><span style="color:rgba(255,255,255,0.65);" id="pp-wsin">0</span></div>'
+        +   '<div style="display:flex;justify-content:space-between;margin-bottom:6px;"><span style="color:rgba(255,255,255,0.45);">HTTP</span><span style="color:rgba(255,255,255,0.65);" id="pp-http">0</span></div>'
+        +   '<div style="display:flex;align-items:center;gap:6px;">'
+        +     '<div style="flex:1;height:4px;background:rgba(255,255,255,0.07);border-radius:2px;overflow:hidden;"><div id="pp-rps-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#ffd700,#ffaa00);border-radius:2px;transition:width 0.4s;"></div></div>'
+        +     '<span style="font-size:10px;font-weight:600;color:#ffd700;min-width:40px;text-align:right;" id="pp-rps">0 r/s</span>'
+        +   '</div>'
+        + '</div>';
+
+      document.body.appendChild(panel);
+      window._perfPanelEl = panel;
+      if (btn) btn.classList.add('active');
+
+      function drawGraph(fps) {
+        _fpsHistory.push(fps);
+        if (_fpsHistory.length > 20) _fpsHistory.shift();
+        var c = document.getElementById('pp-graph'); if (!c) return;
+        var ctx = c.getContext('2d'); ctx.clearRect(0, 0, 176, 28);
+        var barW = 176 / 20;
+        for (var i = 0; i < _fpsHistory.length; i++) {
+          var f = _fpsHistory[i], pct = Math.min(f / 60, 1), h = Math.max(2, Math.round(pct * 26));
+          var a = (0.3 + pct * 0.7).toFixed(2);
+          ctx.fillStyle = f >= 50 ? 'rgba(85,221,170,' + a + ')' : f >= 30 ? 'rgba(255,200,60,' + a + ')' : 'rgba(255,80,80,' + a + ')';
+          ctx.fillRect(i * barW + 1, 28 - h, barW - 2, h);
+        }
       }
 
-      if (window.Stats) {
-        _initStats();
-        return;
-      }
-
-      // Dynamically inject the stats.js UMD script tag (works with UMD libraries)
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/stats.js@0.17.0/build/stats.min.js';
-      script.onload = _initStats;
-      script.onerror = () => console.warn('[Stats] Failed to load stats.js from CDN');
-      document.head.appendChild(script);
+      window._perfInterval = setInterval(function () {
+        var ps = window._perfState;
+        var fps = ps._fpsWindow > 0 ? Math.round(ps._fpsCount / (ps._fpsWindow / 1000)) : 0;
+        var ms  = ps.frameDur > 0 ? ps.frameDur.toFixed(1) : '--';
+        ps._fpsCount = 0; ps._fpsWindow = 0;
+        var mb = performance.memory ? (performance.memory.usedJSHeapSize / 1048576).toFixed(1) : '--';
+        var fpsCol = fps >= 50 ? '#5599ff' : fps >= 30 ? '#ffcc44' : '#ff5555';
+        var e;
+        e = document.getElementById('pp-fps-val'); if (e) { e.textContent = fps || '--'; e.style.color = fpsCol; }
+        e = document.getElementById('pp-ms-val');  if (e) e.textContent = ms;
+        e = document.getElementById('pp-mb-val');  if (e) e.textContent = mb;
+        drawGraph(fps);
+        var t = window._reqTracker, now = Date.now(), dt = (now - t._lastTick) / 1000;
+        t._ratePerSec = dt > 0 ? Math.round(t._bucketCount / dt) : 0;
+        t._bucketCount = 0; t._lastTick = now;
+        e = document.getElementById('pp-total');   if (e) e.textContent = t.total.toLocaleString();
+        e = document.getElementById('pp-wsout');   if (e) e.textContent = t.wsOut;
+        e = document.getElementById('pp-wsin');    if (e) e.textContent = t.wsIn;
+        e = document.getElementById('pp-http');    if (e) e.textContent = t.httpTotal;
+        e = document.getElementById('pp-rps');     if (e) e.textContent = t._ratePerSec + ' r/s';
+        e = document.getElementById('pp-rps-bar'); if (e) e.style.width = Math.min(t._ratePerSec / 30 * 100, 100) + '%';
+      }, 1000);
     };
   </script>
 
@@ -3206,8 +3301,8 @@
     const IK_MOVE_THRESH = 0.001; // 1 mm — skip solve if handle hasn't moved more than this
 
     renderer.setAnimationLoop(() => {
-      // ── Stats.js begin ────────────────────────────────────────────────────
-      if (window._statsInstance) window._statsInstance.begin();
+      // ── Custom perf panel — begin frame timing
+      if (window._perfBegin) window._perfBegin();
 
       if (_xrSession) {
         renderer.xr.updateCamera(camera);
@@ -3265,8 +3360,8 @@
       controls.update();
       renderer.render(scene, camera);
 
-      // ── Stats.js end ──────────────────────────────────────────────────────
-      if (window._statsInstance) window._statsInstance.end();
+      // ── Custom perf panel — end frame timing
+      if (window._perfEnd) window._perfEnd();
     });
 
     window.addEventListener('resize', () => {
@@ -3332,6 +3427,9 @@
         // ── Connect directly — skip the HTTP pre-check which added 50-150 ms overhead.
         // If the WS handshake fails (onerror/onclose), we retry with back-off as before.
         ws = new WebSocket(`${wsProtoBase}://${hubHost}/scene3d-ws`); window._remoteWs = ws;
+
+        // Hook the request tracker (counts WS send + receive toward tunnel total)
+        if (window._patchWsTracking) window._patchWsTracking(ws);
 
         ws.onopen = () => {
           retryDelay = 1500;

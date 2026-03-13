@@ -82,35 +82,6 @@ Click **Perf** in the top bar to open the custom performance overlay:
 
 ---
 
-## Setup
-
-### Prerequisites
-- Windows 11 + **Windows App SDK** runtime
-- Visual Studio 2022 with WinUI 3 workload
-- .NET 8
-- ROS 2 + `rosbridge_server` running on the robot network
-
-### Build & Run
-```powershell
-# Restore NuGet packages
-dotnet restore
-
-# Build (Debug or Release)
-dotnet build
-
-# Or open RobotControllerApp.slnx in Visual Studio and press F5
-```
-
-### Configuration
-Edit `settings.json` (created on first run, excluded from git) or use the in-app settings panel:
-
-| Key | Default | Description |
-|---|---|---|
-| `Robot1Ip` | `10.10.10.10` | IP of Niryo Ned #1 |
-| `Robot2Ip` | `10.10.10.11` | IP of Niryo Ned #2 |
-| `RelayPort` | `8181` | Local Kestrel port |
-| `CloudflareUrl` | *(tunnel URL)* | Public HTTPS URL for remote access |
-
 ### Cloudflare Tunnel
 The relay is exposed via a permanent Cloudflare tunnel:
 ```
@@ -126,7 +97,7 @@ Configure with `cloudflared tunnel run` or as a Windows service.
 RobotControllerApp/
 ├── Assets/
 │   ├── preview.html          # Three.js WebXR 3D scene (self-contained)
-│   └── ned.glb               # Niryo Ned 3D model (not tracked in git — use Git LFS)
+│   └── ned.glb               # Niryo Ned 3D model
 ├── Services/
 │   ├── RelayServerHost.cs
 │   ├── RobotBridgeService.cs
@@ -134,8 +105,6 @@ RobotControllerApp/
 │   ├── CameraCalibrationService.cs
 │   ├── ConnectionManager.cs
 │   └── AppSettings.cs
-├── Scripts/
-│   └── sync-preview.ps1      # Dev helper: hot-syncs preview.html to the relay
 ├── MainWindow.xaml(.cs)       # Main dashboard UI + service orchestration
 ├── App.xaml(.cs)
 └── RobotControllerApp.csproj
