@@ -36,10 +36,13 @@ namespace RobotControllerApp.Services
         /// <summary>The Banana image generation model.</summary>
         public string BananaModel { get; set; } = "gemini-2.5-flash-image";
 
-        /// <summary>The Tripo3D API Key for cloud-based 3D model generation.</summary>
-        public string TripoApiKey { get; set; } = "";
+        /// <summary>Hugging Face API token — used to authenticate against private/personal HF Spaces (e.g. TRELLIS).</summary>
+        public string HfToken { get; set; } = "";
 
-        /// <summary>If true, use the Tripo3D cloud API instead of the local TripoSR server.</summary>
+        /// <summary>Base URL of the personal TRELLIS HF Space.</summary>
+        public string TrellisSpaceUrl { get; set; } = "https://mazeasdamien-trellis-2.hf.space";
+
+        /// <summary>If true, use cloud 3D generation (TRELLIS) instead of local inference.</summary>
         public bool Use3DApiMode { get; set; } = false;
 
         /// <summary>Scale of the extracted object (0.0 to 1.0) in the generation prompt.</summary>

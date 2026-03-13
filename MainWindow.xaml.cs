@@ -121,7 +121,7 @@ namespace RobotControllerApp
         // ── Costs & IO Locks ──
         private double _totalGeminiCost = 0.0;
         private double _totalBananaCost = 0.0;
-        private double _totalTripo3dCost = 0.0;
+
         private static readonly SemaphoreSlim s_costLock = new(1, 1);
         private static readonly SemaphoreSlim s_libraryLock = new(1, 1);
 
@@ -373,7 +373,7 @@ namespace RobotControllerApp
             {
                 string dir = Path.GetDirectoryName(CostFilePath)!;
                 if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
-                var obj = new { gemini = _totalGeminiCost, banana = _totalBananaCost, tripo = _totalTripo3dCost };
+                var obj = new { gemini = _totalGeminiCost, banana = _totalBananaCost };
                 await File.WriteAllTextAsync(CostFilePath, JsonSerializer.Serialize(obj));
             }
             catch { }
@@ -391,7 +391,7 @@ namespace RobotControllerApp
                 var r = doc.RootElement;
                 if (r.TryGetProperty("gemini", out var g)) _totalGeminiCost = g.GetDouble();
                 if (r.TryGetProperty("banana", out var b)) _totalBananaCost = b.GetDouble();
-                if (r.TryGetProperty("tripo", out var t)) _totalTripo3dCost = t.GetDouble();
+
             }
             catch { }
             finally { s_costLock.Release(); }
@@ -400,8 +400,8 @@ namespace RobotControllerApp
 
         private void UpdateTotalCostDisplay()
         {
-            // Scan uses Orange proxy — not tracked. Only Banana + Tripo3D are paid.
-            double total = _totalBananaCost + _totalTripo3dCost;
+            // Scan uses Orange proxy — only Banana cost tracked. TRELLIS is free.
+            double total = _totalBananaCost;
             if (TotalCostText != null) TotalCostText.Text = $"{total:0.0000} €";
             _ = SaveCostsAsync();
         }
@@ -1095,12 +1095,11 @@ namespace RobotControllerApp
             });
         }
 
-        // ── Banana image enhancement (Gemini) — run before Tripo for best 3D quality ──
+        // ── Banana image enhancement (Gemini) — run before TRELLIS for best 3D quality ──
         /// <summary>
-        /// Calls the Gemini image-generation model to produce a clean, white-background
-        /// square image of the object — exactly what Tripo3D needs for high-quality meshes.
-        /// Returns the enhanced PNG bytes, or <see langword="null"/> if the
-        /// Gemini key is not set or the call fails (caller must abort Tripo3D).
+        /// Calls Gemini image-generation to produce a clean white-background square image
+        /// of the object — exactly what TRELLIS needs for high-quality meshes.
+        /// Returns the enhanced PNG bytes, or null if the key is missing or the call fails.
         /// </summary>
         private async Task<byte[]?> RunBananaEnhancementAsync(byte[] originalBytes, string objectLabel, Action<string>? progressCallback = null)
         {
@@ -1115,16 +1114,12 @@ namespace RobotControllerApp
                 progressCallback?.Invoke("🍌 Enhancing image…");
 
                 string modelName = string.IsNullOrEmpty(_settings.BananaModel)
-                    ? "gemini-2.5-flash-image"
+                    ? "gemini-2.5-flash-preview-04-17"
                     : _settings.BananaModel;
                 string url = $"https://generativelanguage.googleapis.com/v1beta/models/{modelName}:generateContent?key={_settings.GeminiApiKey}";
 
                 string base64Image = Convert.ToBase64String(originalBytes);
 
-                // "Magic Prompt" — Step 3 of the wrapper pattern:
-                // 1. Un-warp the top-down camera perspective → Tripo gets an eye-level photo
-                // 2. Strict "NO SHADOWS" directive → prevents Tripo from baking shadows into the mesh base
-                // 3. White background → clean box.min.y calculation in Three.js
                 string customPromptPart = string.IsNullOrWhiteSpace(_settings.BananaPromptTemplate)
                     ? "preserving 100% of its original shape, text, labels, proportions, and perspective. " +
                       "CRITICAL: Digitally un-warp and rotate the object so it appears perfectly upright " +
@@ -1132,15 +1127,12 @@ namespace RobotControllerApp
                       "ABSOLUTELY NO SHADOWS of any kind — not under the object, not beside it. Shadows corrupt 3D reconstruction."
                     : _settings.BananaPromptTemplate;
 
-                double frameScale = _settings.BananaFramingScale > 0 ? _settings.BananaFramingScale * 100 : 60;
-
                 string promptText =
                     $"GENERATE AN IMAGE of ONLY the {objectLabel} — one single isolated object. " +
                     $"IMPORTANT: the output image must contain EXACTLY 1 object: the {objectLabel}. No other objects. " +
                     $"{customPromptPart} " +
                     $"Remove ALL other objects and background. Keep ONLY the {objectLabel}. " +
-                    $"Output: the {objectLabel} centered on a plain WHITE background, NO shadows, filling about {frameScale}% of the square canvas.";
-
+                    $"Output: the {objectLabel} centered on a plain WHITE solid background, NO shadows, filling about 90% of the square canvas.";
 
                 var payload = new
                 {
@@ -1153,35 +1145,29 @@ namespace RobotControllerApp
                             }
                         }
                     },
-                    // CRITICAL: without responseModalities Gemini only returns text — no image is generated!
-                    generationConfig = new
-                    {
-                        responseModalities = new[] { "IMAGE", "TEXT" }
-                    }
+                    generationConfig = new { responseModalities = new[] { "IMAGE", "TEXT" } }
                 };
 
                 using var request = new HttpRequestMessage(HttpMethod.Post, url)
                 {
                     Content = new StringContent(JsonSerializer.Serialize(payload), System.Text.Encoding.UTF8, "application/json")
                 };
-
                 using var response = await SharedHttpClient.SendAsync(request);
                 if (!response.IsSuccessStatusCode)
                 {
                     var err = await response.Content.ReadAsStringAsync();
                     Log($"[Banana] HTTP {(int)response.StatusCode} for '{objectLabel}': {err}");
-                    progressCallback?.Invoke($"\u274C Banana HTTP {(int)response.StatusCode}");
+                    progressCallback?.Invoke($"❌ Banana HTTP {(int)response.StatusCode}");
                     return null;
                 }
 
                 var responseString = await response.Content.ReadAsStringAsync();
-                Log($"[Banana] Raw response for '{objectLabel}': {responseString[..Math.Min(400, responseString.Length)]}");
+                Log($"[Banana] Response for '{objectLabel}': {responseString[..Math.Min(400, responseString.Length)]}");
 
                 using var doc = JsonDocument.Parse(responseString);
                 if (doc.RootElement.TryGetProperty("candidates", out var candidates) && candidates.GetArrayLength() > 0)
                 {
                     var parts = candidates[0].GetProperty("content").GetProperty("parts");
-                    // Gemini image response: iterate parts to find one with inlineData
                     foreach (var part in parts.EnumerateArray())
                     {
                         if (part.TryGetProperty("inlineData", out var inlineData))
@@ -1189,111 +1175,283 @@ namespace RobotControllerApp
                             string? b64 = inlineData.GetProperty("data").GetString();
                             if (!string.IsNullOrEmpty(b64))
                             {
-                                var enhanced = Convert.FromBase64String(b64);
-
-                                // Track cost
-                                double framingScaleUsd = _settings.BananaFramingScale > 0 ? _settings.BananaFramingScale * 0.01 : 0;
-                                _totalBananaCost += (GetBananaModelPricePerImage() + framingScaleUsd) * 0.94;
-                                DispatcherQueue.TryEnqueue(() => UpdateTotalCostDisplay());
-
-                                progressCallback?.Invoke("\u2705 Banana done");
-                                return enhanced;
+                                progressCallback?.Invoke("✅ Banana done");
+                                return MakeWhiteBackgroundTransparent(Convert.FromBase64String(b64));
                             }
                         }
                     }
-                    // Parts present but no image — log what came back
-                    Log($"[Banana] Response had no inlineData for '{objectLabel}'. Parts: {parts.GetRawText()[..Math.Min(300, parts.GetRawText().Length)]}");
+                    Log($"[Banana] No inlineData for '{objectLabel}'. Parts: {parts.GetRawText()[..Math.Min(300, parts.GetRawText().Length)]}");
                 }
                 else
                 {
-                    Log($"[Banana] No candidates in response for '{objectLabel}': {responseString[..Math.Min(300, responseString.Length)]}");
+                    Log($"[Banana] No candidates for '{objectLabel}': {responseString[..Math.Min(300, responseString.Length)]}");
                 }
 
-                progressCallback?.Invoke("\u274C Banana returned no image");
+                progressCallback?.Invoke("❌ Banana returned no image");
                 return null;
             }
             catch (Exception ex)
             {
-                Log($"[Banana] Enhancement failed for '{objectLabel}': {ex.Message} — aborting");
+                Log($"[Banana] Failed for '{objectLabel}': {ex.Message}");
                 progressCallback?.Invoke("❌ Banana error");
                 return null;
             }
         }
 
-        // ── Single core Tripo3D workflow (reused by WS and UI) ──
-        private async Task<(string fileName, double tripoCost)> GenerateTripoModelCoreAsync(byte[] imageBytes, string safeName, Action<string>? progressCallback = null)
+        /// <summary>Locally converts a white-background PNG to RGBA transparent using OpenCV FloodFill.
+        /// Called after Gemini Banana generation so TRELLIS receives a clean transparent object.
+        /// </summary>
+        private byte[] MakeWhiteBackgroundTransparent(byte[] imageBytes)
         {
-            if (string.IsNullOrWhiteSpace(_settings.TripoApiKey)) throw new InvalidOperationException("Tripo3D API key is missing in settings.");
-
-            progressCallback?.Invoke("Uploading image...");
-            using var formData = new MultipartFormDataContent();
-            var imageContent = new ByteArrayContent(imageBytes);
-            imageContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
-            formData.Add(imageContent, "file", "image.png");
-
-            using var uploadReq = new HttpRequestMessage(HttpMethod.Post, "https://api.tripo3d.ai/v2/openapi/upload") { Content = formData };
-            uploadReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _settings.TripoApiKey);
-
-            using var uploadRes = await SharedHttpClient.SendAsync(uploadReq);
-            if (!uploadRes.IsSuccessStatusCode) throw new Exception($"Upload error: {await uploadRes.Content.ReadAsStringAsync()}");
-
-            using var uploadDoc = JsonDocument.Parse(await uploadRes.Content.ReadAsStringAsync());
-            string fileToken = uploadDoc.RootElement.GetProperty("data").GetProperty("image_token").GetString() ?? throw new Exception("image_token missing.");
-
-            progressCallback?.Invoke("Creating task...");
-            var taskPayload = new { type = "image_to_model", file = new { type = "png", file_token = fileToken }, model_version = "P1-20260311", texture = true, pbr = false, face_limit = 8000, compress = "geometry", enable_image_autofix = true, orientation = "align_image" };
-
-            using var taskReq = new HttpRequestMessage(HttpMethod.Post, "https://api.tripo3d.ai/v2/openapi/task")
+            try
             {
-                Content = new StringContent(JsonSerializer.Serialize(taskPayload), System.Text.Encoding.UTF8, "application/json")
-            };
-            taskReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _settings.TripoApiKey);
+                using var mat = OpenCvSharp.Cv2.ImDecode(imageBytes, OpenCvSharp.ImreadModes.Color);
+                if (mat.Empty()) return imageBytes;
 
-            using var taskRes = await SharedHttpClient.SendAsync(taskReq);
-            if (!taskRes.IsSuccessStatusCode) throw new Exception($"Task creation error: {await taskRes.Content.ReadAsStringAsync()}");
+                // 1-pixel padded mask required by OpenCV FloodFill
+                using var floodMask = new OpenCvSharp.Mat(mat.Rows + 2, mat.Cols + 2, OpenCvSharp.MatType.CV_8UC1, OpenCvSharp.Scalar.All(0));
 
-            using var taskDoc = JsonDocument.Parse(await taskRes.Content.ReadAsStringAsync());
-            string taskId = taskDoc.RootElement.GetProperty("data").GetProperty("task_id").GetString() ?? throw new Exception("task_id missing.");
+                // FloodFill from corner (0,0) — tolerance 15 handles JPEG artifacts
+                int flags = 4 | (255 << 8) | (int)OpenCvSharp.FloodFillFlags.FixedRange;
+                OpenCvSharp.Cv2.FloodFill(
+                    mat, floodMask, new OpenCvSharp.Point(0, 0), OpenCvSharp.Scalar.All(255), out _,
+                    OpenCvSharp.Scalar.All(15), OpenCvSharp.Scalar.All(15), (OpenCvSharp.FloodFillFlags)flags
+                );
 
-            string? glbUrl = null;
-            double actualCost = 0;
-            for (int i = 0; i < 120; i++)
+                // Trim the 1-pixel border padding from the mask
+                using var bgMask = new OpenCvSharp.Mat(floodMask, new OpenCvSharp.Rect(1, 1, mat.Cols, mat.Rows));
+
+                // Invert: background=0 (transparent), object=255 (opaque)
+                using var alpha = new OpenCvSharp.Mat();
+                OpenCvSharp.Cv2.BitwiseNot(bgMask, alpha);
+
+                // Convert BGR → BGRA and replace alpha channel
+                using var rgbaMat = new OpenCvSharp.Mat();
+                OpenCvSharp.Cv2.CvtColor(mat, rgbaMat, OpenCvSharp.ColorConversionCodes.BGR2BGRA);
+                var channels = OpenCvSharp.Cv2.Split(rgbaMat);
+                channels[3].Dispose();
+                channels[3] = alpha;
+                OpenCvSharp.Cv2.Merge(channels, rgbaMat);
+
+                byte[] result = rgbaMat.ImEncode(".png");
+                channels[0].Dispose(); channels[1].Dispose(); channels[2].Dispose();
+                return result;
+            }
+            catch (Exception ex)
             {
-                await Task.Delay(2000);
-                using var pollReq = new HttpRequestMessage(HttpMethod.Get, $"https://api.tripo3d.ai/v2/openapi/task/{taskId}");
-                pollReq.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _settings.TripoApiKey);
+                Log($"[ImageProcessing] Transparency conversion failed: {ex.Message}");
+                return imageBytes;
+            }
+        }
 
-                using var pollRes = await SharedHttpClient.SendAsync(pollReq);
-                if (!pollRes.IsSuccessStatusCode) throw new Exception($"Polling error: {await pollRes.Content.ReadAsStringAsync()}");
+        // ── Single core TRELLIS workflow (reused by WS and UI) ──
+        // Bypasses broken start_session / preprocess_image / lambda endpoints (api_name=False upstream).
+        // OpenCV removes the white background locally before upload, so TRELLIS gets a clean transparent PNG.
+        // The gr.State from image_to_3d is captured from its SSE response and passed directly into extract_glb.
+        private async Task<(string fileName, double tripoCost)> GenerateTrellisModelCoreAsync(byte[] imageBytes, string safeName, Action<string>? progressCallback = null)
+        {
+            string baseUrl = string.IsNullOrWhiteSpace(_settings.TrellisSpaceUrl)
+                ? "https://mazeasdamien-trellis-2.hf.space"
+                : _settings.TrellisSpaceUrl.TrimEnd('/');
 
-                using var pollDoc = JsonDocument.Parse(await pollRes.Content.ReadAsStringAsync());
-                var data = pollDoc.RootElement.GetProperty("data");
-                string status = data.GetProperty("status").GetString() ?? "";
+            string sessionHash = Guid.NewGuid().ToString("N")[..12];
+            var cookieContainer = new System.Net.CookieContainer();
+            using var sessionHandler = new System.Net.Http.HttpClientHandler { CookieContainer = cookieContainer, UseCookies = true };
+            using var trellisClient = new HttpClient(sessionHandler) { Timeout = TimeSpan.FromMinutes(5) };
+            Log($"[TRELLIS] session_hash={sessionHash}");
 
-                progressCallback?.Invoke($"Generating... {(data.TryGetProperty("progress", out var p) ? p.GetInt32() : 0)}%");
-
-                if (status == "success")
-                {
-                    var output = data.GetProperty("output");
-                    glbUrl = output.TryGetProperty("model", out var m) ? m.GetString() : (output.TryGetProperty("pbr_model", out var pbr) ? pbr.GetString() : (output.TryGetProperty("base_model", out var bm) ? bm.GetString() : null));
-                    // Read the actual balance_cost the API deducted for this task
-                    if (data.TryGetProperty("balance_cost", out var bc))
-                        actualCost = bc.ValueKind == JsonValueKind.Number ? bc.GetDouble() : 0;
-                    break;
-                }
-                else if (status is "failed" or "cancelled" or "banned" or "expired") throw new Exception($"Tripo3D task {status}");
+            void Auth(HttpRequestMessage req)
+            {
+                if (!string.IsNullOrWhiteSpace(_settings.HfToken))
+                    req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _settings.HfToken);
             }
 
-            if (string.IsNullOrEmpty(glbUrl)) throw new TimeoutException("Tripo3D generation timed out.");
+            // ── Step 1: Upload transparent PNG ─────────────────────────────────────
+            progressCallback?.Invoke("🧊 TRELLIS: uploading image…");
+            var uploadForm = new MultipartFormDataContent();
+            var imgContent = new ByteArrayContent(imageBytes);
+            imgContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("image/png");
+            uploadForm.Add(imgContent, "files", "image.png");
+            using var uploadReq = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/gradio_api/upload?upload_id={sessionHash}") { Content = uploadForm };
+            Auth(uploadReq);
+            using var uploadRes = await trellisClient.SendAsync(uploadReq);
+            if (!uploadRes.IsSuccessStatusCode)
+                throw new Exception($"[TRELLIS] Upload failed: {await uploadRes.Content.ReadAsStringAsync()}");
 
-            progressCallback?.Invoke("Downloading GLB...");
-            byte[] glbBytes = await SharedHttpClient.GetByteArrayAsync(glbUrl);
+            string uploadResBody = await uploadRes.Content.ReadAsStringAsync();
+            Log($"[TRELLIS] Upload response: {uploadResBody}");
+            using var uploadDoc = JsonDocument.Parse(uploadResBody);
+            string uploadedPath = "";
+            string? uploadedUrl = null;
+            string? uploadedRawJson = null;
+            var rootEl = uploadDoc.RootElement;
+            if (rootEl.ValueKind == JsonValueKind.Array && rootEl.GetArrayLength() > 0)
+            {
+                var firstEl = rootEl[0];
+                if (firstEl.ValueKind == JsonValueKind.String)
+                    uploadedPath = firstEl.GetString() ?? "";
+                else if (firstEl.ValueKind == JsonValueKind.Object)
+                {
+                    uploadedRawJson = firstEl.GetRawText();
+                    uploadedPath = firstEl.TryGetProperty("path", out var pEl) ? pEl.GetString() ?? "" : "";
+                    uploadedUrl = firstEl.TryGetProperty("url", out var uEl) && uEl.ValueKind == JsonValueKind.String ? uEl.GetString() : null;
+                }
+            }
+            if (string.IsNullOrEmpty(uploadedPath)) throw new Exception("[TRELLIS] No upload path returned.");
+            if (string.IsNullOrEmpty(uploadedUrl))
+                uploadedUrl = uploadedPath.StartsWith("http") ? uploadedPath : $"{baseUrl}/gradio_api/file={uploadedPath}";
+
+            object imageFileData = !string.IsNullOrEmpty(uploadedRawJson)
+                ? (object)JsonSerializer.Deserialize<JsonElement>(uploadedRawJson)
+                : new { path = uploadedPath, url = uploadedUrl, size = (int?)null, orig_name = "image.png", mime_type = "image/png", is_stream = false, meta = new { _type = "gradio.FileData" } };
+
+            // ── Step 2: image_to_3d ─────────────────────────────────────────────────
+            progressCallback?.Invoke("🧊 TRELLIS: generating 3D…");
+            var genPayload = new
+            {
+                data = new object[] {
+                    imageFileData,
+                    0,       // seed
+                    "1024",  // resolution
+                    7.5, 0.7, 12, 5,    // ss guidance/rescale/steps/rescale_t
+                    7.5, 0.5, 12, 3,    // shape_slat guidance/rescale/steps/rescale_t
+                    1.0, 0.0, 12, 3     // tex_slat guidance/rescale/steps/rescale_t
+                },
+                session_hash = sessionHash
+            };
+            using var genReq = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/gradio_api/call/image_to_3d")
+            {
+                Content = new StringContent(JsonSerializer.Serialize(genPayload), System.Text.Encoding.UTF8, "application/json")
+            };
+            Auth(genReq);
+            using var genRes = await trellisClient.SendAsync(genReq);
+            if (!genRes.IsSuccessStatusCode)
+                throw new Exception($"[TRELLIS] image_to_3d failed: {await genRes.Content.ReadAsStringAsync()}");
+
+            using var genTriggerDoc = JsonDocument.Parse(await genRes.Content.ReadAsStringAsync());
+            string genEventId = genTriggerDoc.RootElement.GetProperty("event_id").GetString() ?? throw new Exception("[TRELLIS] No image_to_3d event_id.");
+
+            // Poll SSE — capture the returned state object to pass directly to extract_glb
+            object? genState = null;
+            using var genSseReq = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/gradio_api/call/image_to_3d/{genEventId}");
+            genSseReq.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("text/event-stream"));
+            Auth(genSseReq);
+            using var genSseRes = await trellisClient.SendAsync(genSseReq, HttpCompletionOption.ResponseHeadersRead);
+            using var genStream = await genSseRes.Content.ReadAsStreamAsync();
+            using var genReader = new StreamReader(genStream);
+            string? genLine;
+            int tick = 0;
+            bool genComplete = false;
+            while ((genLine = await genReader.ReadLineAsync()) != null)
+            {
+                if (genLine.StartsWith("event: generating") || genLine.StartsWith("event: progress"))
+                {
+                    tick++;
+                    progressCallback?.Invoke($"🧊 TRELLIS: generating… ({tick * 5}s)");
+                }
+                else if (genLine.StartsWith("event: complete"))
+                {
+                    string? completeLine = await genReader.ReadLineAsync();
+                    Log($"[TRELLIS][image_to_3d] complete → {completeLine}");
+                    if (completeLine != null && completeLine.StartsWith("data: "))
+                    {
+                        using var cd = JsonDocument.Parse(completeLine.Substring(6).Trim());
+                        if (cd.RootElement.ValueKind == JsonValueKind.Array && cd.RootElement.GetArrayLength() > 0)
+                        {
+                            var stateEl = cd.RootElement[0];
+                            if (stateEl.ValueKind == JsonValueKind.Object)
+                                genState = JsonSerializer.Deserialize<JsonElement>(stateEl.GetRawText());
+                        }
+                    }
+                    genComplete = true;
+                    break;
+                }
+                else if (genLine.StartsWith("event: error"))
+                {
+                    string? errData = await genReader.ReadLineAsync();
+                    string? errLine2 = await genReader.ReadLineAsync();
+                    Log($"[TRELLIS][image_to_3d-ERROR] {errData} | {errLine2}");
+                    throw new Exception($"[TRELLIS] Generation error: {errData}");
+                }
+                else if (!string.IsNullOrWhiteSpace(genLine))
+                    Log($"[TRELLIS][gen-sse] {genLine}");
+            }
+            if (!genComplete) throw new TimeoutException("[TRELLIS] image_to_3d timed out.");
+
+            // ── Step 3: extract_glb (pass captured state directly — no lambda needed) ──
+            progressCallback?.Invoke("🧊 TRELLIS: extracting GLB…");
+            var extractPayload = new
+            {
+                data = new object?[] {
+                    genState ?? new object(), // state captured from image_to_3d response
+                    300000,  // decimation_target (face count)
+                    2048     // texture_size
+                },
+                session_hash = sessionHash
+            };
+            using var exReq = new HttpRequestMessage(HttpMethod.Post, $"{baseUrl}/gradio_api/call/extract_glb")
+            {
+                Content = new StringContent(JsonSerializer.Serialize(extractPayload), System.Text.Encoding.UTF8, "application/json")
+            };
+            Auth(exReq);
+            using var exRes = await trellisClient.SendAsync(exReq);
+            if (!exRes.IsSuccessStatusCode)
+                throw new Exception($"[TRELLIS] extract_glb trigger failed: {await exRes.Content.ReadAsStringAsync()}");
+
+            using var exTriggerDoc = JsonDocument.Parse(await exRes.Content.ReadAsStringAsync());
+            string exEventId = exTriggerDoc.RootElement.GetProperty("event_id").GetString() ?? throw new Exception("[TRELLIS] No extract_glb event_id.");
+
+            string? glbPath = null;
+            using var exSseReq = new HttpRequestMessage(HttpMethod.Get, $"{baseUrl}/gradio_api/call/extract_glb/{exEventId}");
+            exSseReq.Headers.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("text/event-stream"));
+            Auth(exSseReq);
+            using var exSseRes = await trellisClient.SendAsync(exSseReq, HttpCompletionOption.ResponseHeadersRead);
+            using var exStream = await exSseRes.Content.ReadAsStreamAsync();
+            using var exReader = new StreamReader(exStream);
+            string? exLine;
+            while ((exLine = await exReader.ReadLineAsync()) != null)
+            {
+                if (exLine.StartsWith("event: complete"))
+                {
+                    string? exData = await exReader.ReadLineAsync();
+                    Log($"[TRELLIS][extract_glb] complete → {exData}");
+                    if (exData != null && exData.StartsWith("data: "))
+                    {
+                        using var exDataDoc = JsonDocument.Parse(exData.Substring(6).Trim());
+                        if (exDataDoc.RootElement.GetArrayLength() >= 1)
+                        {
+                            var glbEl = exDataDoc.RootElement[0];
+                            glbPath = glbEl.ValueKind == JsonValueKind.String
+                                ? glbEl.GetString()
+                                : (glbEl.TryGetProperty("path", out var gp) ? gp.GetString() : null);
+                        }
+                    }
+                    break;
+                }
+                else if (exLine.StartsWith("event: error"))
+                {
+                    string? errData = await exReader.ReadLineAsync();
+                    throw new Exception($"[TRELLIS] GLB extraction error: {errData}");
+                }
+                else if (!string.IsNullOrWhiteSpace(exLine))
+                    Log($"[TRELLIS][ex-sse] {exLine}");
+            }
+            if (string.IsNullOrEmpty(glbPath)) throw new TimeoutException("[TRELLIS] extract_glb timed out or returned no path.");
+
+            // ── Step 4: Download GLB ─────────────────────────────────────────────
+            progressCallback?.Invoke("🧊 TRELLIS: downloading GLB…");
+            string glbUrl = glbPath.StartsWith("http") ? glbPath : $"{baseUrl}/gradio_api/file={glbPath}";
+            using var dlReq = new HttpRequestMessage(HttpMethod.Get, glbUrl);
+            Auth(dlReq);
+            using var dlRes = await trellisClient.SendAsync(dlReq);
+            if (!dlRes.IsSuccessStatusCode)
+                throw new Exception($"[TRELLIS] GLB download failed: {dlRes.StatusCode}");
+            byte[] glbBytes = await dlRes.Content.ReadAsByteArrayAsync();
             string glbFileName = $"{safeName}_3DModel.glb";
             await File.WriteAllBytesAsync(Path.Combine(LibraryPath, glbFileName), glbBytes);
 
-            return (glbFileName, actualCost);
+            return (glbFileName, 0.0);
         }
-
         private async void Generate3DModel_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.DataContext is LibraryItemViewModel item)
@@ -1306,11 +1464,6 @@ namespace RobotControllerApp
 
         private async Task Generate3DModel_ApiAsync(Button btn, LibraryItemViewModel item, LibraryItemConfig configData)
         {
-            if (string.IsNullOrWhiteSpace(_settings.TripoApiKey))
-            {
-                await ShowDialogAsync("Clé API manquante", "Veuillez définir la clé Tripo3D API dans les paramètres.");
-                return;
-            }
 
             btn.IsEnabled = false;
             string originalContent = btn.Content?.ToString() ?? "To 3D Model";
@@ -1334,9 +1487,9 @@ namespace RobotControllerApp
                         return;
                     }
 
-                    // Phase 2 — Tripo3D: generate the 3D model from the enhanced image
-                    var tripoTask = GenerateTripoModelCoreAsync(imgBytes, safeName, msg => DispatcherQueue.TryEnqueue(() => btn.Content = msg));
-                    
+                    // Phase 2 — TRELLIS: generate the 3D model from the enhanced image (free HF Space)
+                    var tripoTask = GenerateTrellisModelCoreAsync(imgBytes, safeName, msg => DispatcherQueue.TryEnqueue(() => btn.Content = msg));
+
                     // Phase 3 — Orient Anything V2: Calculate accurate auto-orientation
                     var orientTask = GetOrientAnythingOffsetsAsync(imgBytes, safeName, msg => DispatcherQueue.TryEnqueue(() => btn.Content = msg));
 
@@ -1356,7 +1509,7 @@ namespace RobotControllerApp
                         }
                         await SaveLibraryAsync();
                         generationSuccess = true;
-                        _totalTripo3dCost += tripoCost;
+                        // TRELLIS is free — no cost to track
                         UpdateTotalCostDisplay();
                     });
                 }
@@ -1364,7 +1517,7 @@ namespace RobotControllerApp
                 {
                     DispatcherQueue.TryEnqueue(async () =>
                     {
-                        try { await new ContentDialog { Title = "Erreur Tripo3D API", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync(); } catch { }
+                        try { await new ContentDialog { Title = "Erreur TRELLIS", Content = ex.Message, CloseButtonText = "OK", XamlRoot = this.Content.XamlRoot }.ShowAsync(); } catch { }
                     });
                 }
                 finally
@@ -1435,7 +1588,7 @@ namespace RobotControllerApp
 
                 // Index 2 is Azimuth (Yaw), 3 is Polar (Pitch), 4 is Rotation (Roll)
                 double ry = 0, rx = 0, rz = 0;
-                
+
                 if (double.TryParse(doc.RootElement[2].GetString()?.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double azimuth))
                 {
                     ry = azimuth;
@@ -1624,20 +1777,20 @@ namespace RobotControllerApp
             catch { }
         }
 
-        /// <summary>Shows the red ⚠ overlay on the thumbnail if the image file is missing on disk.</summary>
+        /// <summary>Shows the red âš  overlay on the thumbnail if the image file is missing on disk.</summary>
         private void ThumbnailMissing_Loaded(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement el && el.DataContext is LibraryItemViewModel vm)
                 el.Visibility = vm.HasImage ? Visibility.Collapsed : Visibility.Visible;
         }
 
-        /// <summary>Shows the orange '⚠ Missing' badge when JSON records a model but the GLB is gone from disk.</summary>
+        /// <summary>Shows the orange 'âš  Missing' badge when JSON records a model but the GLB is gone from disk.</summary>
         private void ModelMissing_Loaded(object sender, RoutedEventArgs e)
         {
             if (sender is FrameworkElement el && el.DataContext is LibraryItemViewModel vm)
             {
                 // Show "Missing" only when JSON has a model name BUT the file is gone.
-                // The "✓ Model" badge (Preview3DBtn_Loaded) shows when HasModel=true.
+                // The "âœ“ Model" badge (Preview3DBtn_Loaded) shows when HasModel=true.
                 var cfg = _libraryConfig?.FirstOrDefault(c =>
                     string.Equals(c.Name, vm.Name, StringComparison.OrdinalIgnoreCase));
                 bool jsonHasModel = cfg != null && !string.IsNullOrEmpty(cfg.ModelFileName);
@@ -1646,9 +1799,7 @@ namespace RobotControllerApp
         }
 
 
-        // ════════════════════════════════════════════════════════════════════════
         // LOGS, UTILS & APP SETTINGS
-        // ════════════════════════════════════════════════════════════════════════
 
         private class LogEntry
         {
@@ -1668,7 +1819,7 @@ namespace RobotControllerApp
                 var color = Microsoft.UI.Colors.LightGray;
                 if (message.Contains("Error") || message.Contains("Failed") || message.Contains("Critical") || message.Contains("Exception")) color = Microsoft.UI.Colors.Red;
                 else if (message.Contains("Warning") || message.Contains("Timeout") || message.Contains("Pending")) color = Microsoft.UI.Colors.Orange;
-                else if (message.Contains("Connected") || message.Contains("Success") || message.Contains('✓') || message.Contains("Ready")) color = Microsoft.UI.Colors.LightGreen;
+                else if (message.Contains("Connected") || message.Contains("Success") || message.Contains("\u2705") || message.Contains("Ready")) color = Microsoft.UI.Colors.LightGreen;
                 else if (message.Contains("[Relay]")) color = Microsoft.UI.Colors.Cyan;
                 else if (message.Contains("[ROS]")) color = Microsoft.UI.Colors.Magenta;
                 else if (message.Contains("[Bridge]")) color = Microsoft.UI.Colors.Yellow;
@@ -1743,7 +1894,121 @@ namespace RobotControllerApp
             }
         }
 
+        // Populates the 3D scene with every GLB in the library at random table
+        // positions, so you can test the scene without a camera or robots.
+        private bool _debugModeActive = false;
+        private static readonly Random _debugRng = new();
+
+        private void DebugModeToggle_Click(object sender, RoutedEventArgs e)
+        {
+            _debugModeActive = !_debugModeActive;
+            if (DebugModeLabel != null)
+                DebugModeLabel.Text = _debugModeActive ? "Debug ON" : "Debug";
+
+            if (!_debugModeActive)
+            {
+                // Clear the scene
+                _ = _broadcastServer.BroadcastAsync("setDetectedObjects", "[]");
+                Log("[Debug] Scene cleared.");
+                return;
+            }
+
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (!Directory.Exists(LibraryPath)) { Log("[Debug] Library folder not found."); return; }
+
+                    // Find all GLB files and pair with their PNG crop
+                    var glbFiles = Directory.GetFiles(LibraryPath, "*.glb");
+                    if (glbFiles.Length == 0) { Log("[Debug] No GLB files in library — generate some 3D models first."); return; }
+
+                    // Table extent: x âˆˆ [-0.25, 0.25] m, y âˆˆ [-0.20, 0.20] m (world units)
+                    const double tableHalfW = 0.25, tableHalfD = 0.20;
+
+                    var items = glbFiles.Select(glbPath =>
+                    {
+                        string fileName = Path.GetFileNameWithoutExtension(glbPath); // e.g. "GREEN_MUG_3DModel"
+                        // Derive label: strip "_3DModel" suffix, replace _ with space
+                        string label = fileName.Replace("_3DModel", "").Replace("_", " ").Trim();
+                        if (string.IsNullOrEmpty(label)) label = fileName;
+
+                        // Random position on table
+                        double wx = (_debugRng.NextDouble() * 2 - 1) * tableHalfW;
+                        double wy = (_debugRng.NextDouble() * 2 - 1) * tableHalfD;
+                        double angleRad = _debugRng.NextDouble() * Math.PI * 2;
+
+                        // Build the URLs the browser will use
+                        string glbFile = Path.GetFileName(glbPath);
+                        string modelUrl = $"http://localhost:{_settings.RelayPort}/library/{Uri.EscapeDataString(glbFile)}";
+                        string modelUrlRemote = $"/library/{Uri.EscapeDataString(glbFile)}";
+
+                        // Try to find crop and orient images — search by explicit suffix
+                        string safeLabelBase = label.Replace(" ", "_");
+                        string cropBase64 = "";
+                        string orientBase64 = "";
+
+                        var allPngs = Directory.GetFiles(LibraryPath, $"{safeLabelBase}*.png");
+                        foreach (var png in allPngs)
+                        {
+                            string pngName = Path.GetFileNameWithoutExtension(png);
+                            try
+                            {
+                                if (pngName.EndsWith("_banana", StringComparison.OrdinalIgnoreCase))
+                                    cropBase64 = $"data:image/png;base64,{Convert.ToBase64String(File.ReadAllBytes(png))}";
+                                else if (pngName.EndsWith("_Orient", StringComparison.OrdinalIgnoreCase))
+                                    orientBase64 = $"data:image/png;base64,{Convert.ToBase64String(File.ReadAllBytes(png))}";
+                            }
+                            catch { }
+                        }
+
+                        // Also check library.json config for orient image (covers non-standard filenames)
+                        if (string.IsNullOrEmpty(orientBase64))
+                        {
+                            var cfg = _libraryConfig.FirstOrDefault(c => c.Name.Equals(label, StringComparison.OrdinalIgnoreCase));
+                            if (cfg != null && !string.IsNullOrEmpty(cfg.OrientImageUrl))
+                            {
+                                try
+                                {
+                                    var orientPath = Path.Combine(LibraryPath, cfg.OrientImageUrl);
+                                    if (File.Exists(orientPath))
+                                        orientBase64 = $"data:image/png;base64,{Convert.ToBase64String(File.ReadAllBytes(orientPath))}";
+                                }
+                                catch { }
+                            }
+                        }
+
+                        return new
+                        {
+                            label,
+                            worldX = wx,
+                            worldY = wy,
+                            sizeW = 0.08,
+                            sizeH = 0.08,
+                            angleRad,
+                            modelUrl,
+                            modelUrlRemote,
+                            cropBase64,
+                            hasModel = true,
+                            isInLibrary = true,
+                            offsetRx = 0.0,
+                            offsetRy = 0.0,
+                            offsetRz = 0.0,
+                            offsetScale = 1.0,
+                            orientImageUrl = string.IsNullOrEmpty(orientBase64) ? (string?)null : orientBase64
+
+                        };
+                    }).ToList();
+
+                    await _broadcastServer.BroadcastAsync("setDetectedObjects", JsonSerializer.Serialize(items));
+                    Log($"[Debug] Placed {items.Count} library object(s) randomly on the table.");
+                }
+                catch (Exception ex) { Log($"[Debug] Error: {ex.Message}"); }
+            });
+        }
+
         private void SettingsToggleBtn_Click(object sender, RoutedEventArgs e)
+
         {
             if (SettingsOverlay == null) return;
             bool isOpen = SettingsOverlay.Visibility == Visibility.Visible;
@@ -1766,7 +2031,11 @@ namespace RobotControllerApp
                 OrangeApiKeyInput.Password = _settings.OrangeApiKey;
                 OrangeApiUrlInput.Text = _settings.OrangeApiUrl;
                 GeminiApiKeyInput.Password = _settings.GeminiApiKey;
-                TripoApiKeyInput.Password = _settings.TripoApiKey;
+                HfTokenInput.Password = _settings.HfToken;
+                TrellisSpaceUrlInput.Text = string.IsNullOrWhiteSpace(_settings.TrellisSpaceUrl)
+                    ? "https://mazeasdamien-trellis.hf.space"
+                    : _settings.TrellisSpaceUrl;
+
                 BananaPromptTextBox.Text = string.IsNullOrWhiteSpace(_settings.BananaPromptTemplate) ? DefaultBananaPrompt : _settings.BananaPromptTemplate;
                 BananaScaleSlider.Value = _settings.BananaFramingScale <= 0 ? 0.6 : _settings.BananaFramingScale;
                 BananaModelComboBox.SelectedIndex = _settings.BananaModel switch
@@ -1795,7 +2064,11 @@ namespace RobotControllerApp
                 _settings.OrangeApiKey = OrangeApiKeyInput.Password.Trim();
                 _settings.OrangeApiUrl = OrangeApiUrlInput.Text.Trim();
                 _settings.GeminiApiKey = GeminiApiKeyInput.Password.Trim();
-                _settings.TripoApiKey = TripoApiKeyInput.Password.Trim();
+                _settings.HfToken = HfTokenInput.Password.Trim();
+                _settings.TrellisSpaceUrl = string.IsNullOrWhiteSpace(TrellisSpaceUrlInput.Text)
+                    ? "https://mazeasdamien-trellis.hf.space"
+                    : TrellisSpaceUrlInput.Text.Trim();
+
 
                 _broadcastServer.WhisperApiKey = _settings.OrangeApiKey;
                 _broadcastServer.WhisperApiUrl = _settings.OrangeApiUrl;
@@ -2002,7 +2275,7 @@ namespace RobotControllerApp
 
                     var thumbBytes = obj.ThumbJpgBytes ?? obj.CropJpgBytes;
                     string cropBase64 = thumbBytes != null && thumbBytes.Length > 0 ? "data:image/jpeg;base64," + Convert.ToBase64String(thumbBytes) : "";
-                    
+
                     // Provide the clean Banana image instead of the scan if it exists, for display in UI Context
                     if (libItem != null && !string.IsNullOrEmpty(libItem.ImageFileName))
                     {
@@ -2048,9 +2321,9 @@ namespace RobotControllerApp
                         hasModel = !string.IsNullOrEmpty(modelUrlRemote),
                         isInLibrary = obj.IsAlreadyInLibrary,
                         // Correction offsets so Three.js can re-orient poorly-generated models
-                        offsetRx    = libItem?.OffsetRx    ?? 0.0,
-                        offsetRy    = libItem?.OffsetRy    ?? 0.0,
-                        offsetRz    = libItem?.OffsetRz    ?? 0.0,
+                        offsetRx = libItem?.OffsetRx ?? 0.0,
+                        offsetRy = libItem?.OffsetRy ?? 0.0,
+                        offsetRz = libItem?.OffsetRz ?? 0.0,
                         offsetScale = libItem?.OffsetScale ?? 1.0,
                         orientImageUrl = orientBase64
                     };
@@ -2058,8 +2331,8 @@ namespace RobotControllerApp
 
                 _ = _broadcastServer.BroadcastAsync("setDetectedObjects", JsonSerializer.Serialize(items));
 
-                // Scan (Orange proxy) is free — only Banana + Tripo costs tracked
-                var costs = new { scanEur = 0.0, bananaEur = Math.Round(_totalBananaCost, 4), tripoEur = Math.Round(_totalTripo3dCost, 4), totalEur = Math.Round(_totalBananaCost + _totalTripo3dCost, 4) };
+                // Scan (Orange proxy) is free. TRELLIS 3D is free. Only Banana costs tracked.
+                var costs = new { scanEur = 0.0, bananaEur = Math.Round(_totalBananaCost, 4), totalEur = Math.Round(_totalBananaCost, 4) };
                 _ = _broadcastServer.BroadcastAsync("setScanCosts", JsonSerializer.Serialize(costs));
 
                 if (_lastValidPose != null) await PushCameraPoseAsync(_lastValidPose);
@@ -2634,8 +2907,8 @@ namespace RobotControllerApp
                             Log($"[Scene3D-3D] '{label}' banana image saved: {bananaFileName}");
                             await _broadcastServer.BroadcastAsync("setBananaImage", JsonSerializer.Serialize(new { label, imageUrl = $"/library/{Uri.EscapeDataString(bananaFileName)}" }));
 
-                            // Phase 2 — Tripo3D: generate the 3D mesh
-                            var tripoTask = GenerateTripoModelCoreAsync(imgBytes, safeName,
+                            // Phase 2 — TRELLIS: generate the 3D mesh (free HF Space)
+                            var tripoTask = GenerateTrellisModelCoreAsync(imgBytes, safeName,
                                 msg =>
                                 {
                                     Log($"[Scene3D-3D] {label}: {msg}");
@@ -2670,7 +2943,7 @@ namespace RobotControllerApp
                                 }
                                 cfg!.ModelFileName = glbFileName;
                                 if (string.IsNullOrEmpty(cfg.ImageFileName)) cfg.ImageFileName = bananaFileName;
-                                
+
                                 if (offsets.HasValue)
                                 {
                                     // Only save the orient debug image URL — do NOT apply angle offsets.
@@ -2694,8 +2967,8 @@ namespace RobotControllerApp
                                     {
                                         Name = label,
                                         DateAdded = cfg.DateAdded,
-                                        HasModel  = true,
-                                        HasImage  = !string.IsNullOrEmpty(bananaFileName)
+                                        HasModel = true,
+                                        HasImage = !string.IsNullOrEmpty(bananaFileName)
                                     };
                                     try
                                     {
@@ -2710,8 +2983,9 @@ namespace RobotControllerApp
                                     _libraryItems.Insert(0, vm);
                                 }
 
-                                _totalTripo3dCost += tripoCost; UpdateTotalCostDisplay();
-                                Log($"[Scene3D-3D] '{label}' GLB saved. Tripo cost: {tripoCost:0.0000} credits");
+                                // TRELLIS is free — no cost to track
+                                UpdateTotalCostDisplay();
+                                Log($"[Scene3D-3D] '{label}' GLB saved via TRELLIS (free).");
                             });
 
                             string glbServeUrl = $"/library/{Uri.EscapeDataString(glbFileName)}";
@@ -2815,10 +3089,10 @@ namespace RobotControllerApp
 
         private static void UpdateHardwareInfoBox(HardwareInfo hw, TextBlock temp, TextBlock calib, TextBlock motorTemp, TextBlock errors)
         {
-            temp.Text      = hw.RpiTemp > 0         ? $"{hw.RpiTemp:0.0}°C"   : "—";
-            calib.Text     = hw.CalibrationNeeded   ? "Needs calib"           : "OK";
-            motorTemp.Text = hw.MaxMotorTemp > 0    ? $"{hw.MaxMotorTemp:0}°C" : "—";
-            errors.Text    = hw.ErrorCount > 0      ? hw.ErrorCount.ToString() : "—";
+            temp.Text = hw.RpiTemp > 0 ? $"{hw.RpiTemp:0.0}°C" : "—";
+            calib.Text = hw.CalibrationNeeded ? "Needs calib" : "OK";
+            motorTemp.Text = hw.MaxMotorTemp > 0 ? $"{hw.MaxMotorTemp:0}°C" : "—";
+            errors.Text = hw.ErrorCount > 0 ? hw.ErrorCount.ToString() : "—";
         }
 
         private void StartRelayStatusPoll()
@@ -2946,4 +3220,4 @@ namespace RobotControllerApp
             });
 
     }
-}
+}

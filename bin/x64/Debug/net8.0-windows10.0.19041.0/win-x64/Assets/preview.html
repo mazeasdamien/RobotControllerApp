@@ -189,23 +189,19 @@
 
     /* ── WS Badge ────────────────────────────────────── */
     #ws-badge {
-      position: absolute;
-      bottom: 16px;
-      right: 16px;
       background: var(--glass-bg);
       border: 1px solid var(--glass-border);
       border-radius: 999px;
-      padding: 6px 14px 6px 10px;
+      padding: 5px 12px 5px 9px;
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 7px;
       font-size: 11px;
       font-weight: 500;
       color: var(--text-muted);
-      backdrop-filter: var(--blur);
       pointer-events: none;
       transition: border-color 0.4s, box-shadow 0.4s;
-      z-index: 10;
+      flex-shrink: 0;
     }
 
     #ws-badge .dot {
@@ -250,132 +246,226 @@
       }
     }
 
-    /* FK / Control Panel — left side, fixed */
+    /* ── Legacy FK Panel — hidden; kept so JS refs don't break ── */
     #fk-panel {
-      position: absolute;
-      top: 50%;
-      left: 370px;
-      transform: translateY(-50%);
-      background: var(--glass-bg);
-      border: 1px solid rgba(85, 153, 255, 0.18);
-      border-radius: var(--radius-lg);
-      backdrop-filter: var(--blur);
-      color: var(--text);
-      font-size: 11px;
-      width: 95px;
-      overflow: hidden;
-      resize: none;
-      transition: max-height 0.38s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
-      max-height: 92vh;
-      opacity: 1;
-      user-select: none;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(85, 153, 255, 0.06);
-      z-index: 30;
+      display: none !important;
     }
-
-    #fk-panel.collapsed {
-      max-height: 44px !important;
-      overflow: hidden !important;
-    }
-
-    .fk-robot-selector,
-    #fk-sliders,
-    #fk-reset-btn,
-    .fk-divider {
+    .fk-robot-selector, #fk-sliders, #fk-reset-btn, .fk-divider {
       display: none !important;
     }
 
-
-
-    #fk-header {
+    /* ── Top Control Bar ─────────────────────────────────────── */
+    #top-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 52px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      padding: 0 14px;
-      height: 44px;
+      gap: 8px;
+      padding: 0 16px;
+      background: rgba(8, 8, 18, 0.78);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      backdrop-filter: blur(20px);
+      z-index: 50;
+      user-select: none;
+    }
+
+    #top-bar-logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-right: 8px;
       flex-shrink: 0;
-      cursor: pointer;
-      background: linear-gradient(90deg, rgba(85, 153, 255, 0.08) 0%, transparent 100%);
-      border-bottom: 1px solid rgba(85, 153, 255, 0.10);
-      gap: 8px;
-      transition: background 0.2s;
     }
 
-    #fk-header:hover {
-      background: linear-gradient(90deg, rgba(85, 153, 255, 0.14) 0%, rgba(85, 153, 255, 0.03) 100%);
-    }
-
-    #fk-header-left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    #fk-header-icon {
-      width: 22px;
-      height: 22px;
-      border-radius: 6px;
-      background: linear-gradient(135deg, rgba(85, 153, 255, 0.25), rgba(85, 153, 255, 0.08));
+    #top-bar-logo .logo-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #1a2a4a 0%, #0d1a35 100%);
       border: 1px solid rgba(85, 153, 255, 0.3);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 13px;
-      flex-shrink: 0;
+      font-size: 16px;
     }
 
-    #fk-header-text {
-      font-size: 12px;
-      font-weight: 600;
-      color: #88bbff;
+    #top-bar-logo .logo-text {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
       letter-spacing: 0.02em;
     }
 
-    #fk-live-pill {
-      font-size: 9px;
-      font-weight: 700;
-      padding: 2px 7px;
-      border-radius: 999px;
-      background: rgba(0, 204, 106, 0.12);
-      border: 1px solid rgba(0, 204, 106, 0.3);
-      color: #00cc6a;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      display: none;
+    .tb-sep {
+      width: 1px;
+      height: 28px;
+      background: rgba(255,255,255,0.08);
+      flex-shrink: 0;
+      margin: 0 4px;
     }
 
-    #fk-live-pill.visible {
-      display: block;
-    }
-
-    #fk-collapse-btn {
-      font-size: 18px;
-      color: rgba(85, 153, 255, 0.7);
-      background: none;
-      border: none;
-      cursor: pointer;
-      transition: transform 0.3s;
-      padding: 2px 4px;
-      line-height: 1;
-    }
-
-    #fk-panel.collapsed #fk-collapse-btn {
-      transform: rotate(-90deg);
-    }
-
-    #fk-body {
-      padding: 6px 8px 8px;
-    }
-
-    #cp-actions {
+    .tb-btn {
       display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-bottom: 8px;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-dim);
+      font-size: 11px;
+      font-weight: 500;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s, color 0.15s;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
+    .tb-btn:hover {
+      background: rgba(255, 255, 255, 0.09);
+      color: var(--text);
+      border-color: rgba(255,255,255,0.16);
+    }
+
+    .tb-btn.active {
+      background: rgba(255, 255, 255, 0.11);
+      border-color: rgba(255,255,255,0.22);
+      color: var(--text);
+    }
+
+    .tb-btn.dim {
+      opacity: 0.5;
+    }
+
+    #tb-vr-btn {
+      border-color: rgba(120, 80, 255, 0.35);
+      background: rgba(90, 50, 220, 0.10);
+      color: rgba(200, 180, 255, 0.85);
+      margin-left: auto;
+    }
+
+    #tb-vr-btn:hover {
+      background: rgba(90, 50, 220, 0.22);
+      border-color: rgba(150,110,255,0.55);
+    }
+
+    #tb-vr-btn.active {
+      background: rgba(80, 40, 200, 0.3);
+      border-color: rgba(150, 110, 255, 0.8);
+      color: #c8b4ff;
+    }
+
+    #tb-vr-btn.unsupported {
+      opacity: 0.38;
+      cursor: not-allowed;
+    }
+
+    /* Push main content below the top bar */
+    body { padding-top: 52px; }
+    #hud { top: 68px; }
+    #ctx-panel { top: 68px; }
+    #voice-panel { top: 68px; }
+    #orient-panel { top: 68px; }
+
+    /* Hide top bar entirely in VR */
+    body.vr-mode #top-bar { display: none !important; }
+    body.vr-mode { padding-top: 0; }
+
+    /* ── VR floating action bar (shown only inside the headset overlay) ── */
+    #vr-action-bar {
+      display: none; /* shown by JS only when vr-mode is active */
+      position: fixed;
+      bottom: 32px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 200;
+      background: rgba(12, 12, 22, 0.92);
+      border: 1.5px solid rgba(120, 80, 255, 0.4);
+      border-radius: 20px;
+      backdrop-filter: blur(22px);
+      padding: 10px 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      pointer-events: auto;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(120,80,255,0.10);
+    }
+
+    body:not(.vr-mode) #vr-action-bar { display: none !important; }
+
+    /* In VR the bar becomes an HTMLMesh — no blur/transparency, large tap targets */
+    body.vr-mode #vr-action-bar {
+      position: static;
+      transform: none;
+      width: 460px;
+      padding: 22px 24px;
+      gap: 18px;
+      background: #0e0e1a;
+      border: 3px solid rgba(120, 80, 255, 0.55);
+      border-radius: 28px;
+      backdrop-filter: none;
+      box-shadow: none;
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    body.vr-mode .vr-ab-btn {
+      font-size: 28px;
+      padding: 20px 28px;
+      border-radius: 18px;
+      border-width: 3px;
+      justify-content: center;
+    }
+
+    .vr-ab-btn {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 10px 18px;
+      border-radius: 12px;
+      border: 1.5px solid rgba(255,255,255,0.12);
+      background: rgba(255,255,255,0.06);
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+
+    .vr-ab-btn:hover, .vr-ab-btn:active {
+      background: rgba(255,255,255,0.14);
+    }
+
+    #vr-ab-feed-btn {
+      border-color: rgba(85, 153, 255, 0.35);
+      background: rgba(30, 70, 180, 0.12);
+      color: #88bbff;
+    }
+
+    #vr-ab-feed-btn.active {
+      background: rgba(30, 70, 180, 0.28);
+      border-color: rgba(85,153,255,0.75);
+    }
+
+    #vr-ab-leave-btn {
+      border-color: rgba(255, 80, 100, 0.4);
+      background: rgba(180, 30, 50, 0.12);
+      color: #ff8899;
+    }
+
+    #vr-ab-leave-btn:hover {
+      background: rgba(180, 30, 50, 0.26);
+      border-color: rgba(255,80,100,0.7);
+    }
+
+    /* Legacy .cp-action-btn kept for any inline references */
     .cp-action-btn {
-      width: 100%;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -391,31 +481,6 @@
       cursor: pointer;
       transition: background 0.18s, border-color 0.18s;
       white-space: nowrap;
-    }
-
-    .cp-action-btn:hover {
-      background: rgba(255, 255, 255, 0.09);
-      color: var(--text);
-    }
-
-    #sb-vr-btn {
-      border-color: rgba(120, 80, 255, 0.35);
-      background: rgba(90, 50, 220, 0.10);
-      color: rgba(200, 180, 255, 0.85);
-    }
-
-    #sb-vr-btn:hover {
-      background: rgba(90, 50, 220, 0.22);
-    }
-
-    #sb-vr-btn.active {
-      background: rgba(80, 40, 200, 0.3);
-      border-color: rgba(150, 110, 255, 0.8);
-    }
-
-    #sb-vr-btn.unsupported {
-      opacity: 0.4;
-      cursor: not-allowed;
     }
 
     /* ── Context / Scene Panel ──────────────────────────────────── */
@@ -607,37 +672,9 @@
       display: none;
     }
 
-    /* Orient Anything Panel */
-    #orient-panel {
-      position: absolute;
-      top: 16px;
-      left: 370px;
-      background: var(--glass-bg);
-      border: 1px solid rgba(255, 100, 100, 0.2);
-      border-radius: var(--radius-lg);
-      backdrop-filter: var(--blur);
-      color: var(--text);
-      font-size: 12px;
-      width: 300px;
-      overflow: hidden;
-      transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1);
-      max-height: 400px;
-      user-select: none;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
-      z-index: 30;
-    }
-    #orient-panel.collapsed { max-height: 46px; }
-    #orient-header { display: flex; align-items: center; justify-content: space-between; padding: 0 14px; height: 44px; cursor: pointer; background: linear-gradient(90deg, rgba(255, 136, 187, 0.08) 0%, transparent 100%); border-bottom: 1px solid rgba(255,136,187,0.1); }
-    #orient-header-left { display: flex; align-items: center; gap: 8px; }
-    #orient-header-icon { width: 26px; height: 26px; border-radius: 7px; background: linear-gradient(135deg, rgba(255, 136, 187, 0.25), rgba(255, 136, 187, 0.08)); border: 1px solid rgba(255, 136, 187, 0.35); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-    #orient-header-text { font-size: 12px; font-weight: 600; color: #ff88bb; letter-spacing: 0.02em; }
-    #orient-collapse-btn { font-size: 18px; color: rgba(255, 136, 187, 0.7); background: none; border: none; cursor: pointer; transition: transform 0.3s; padding: 2px 4px; line-height: 1; }
-    #orient-panel.collapsed #orient-collapse-btn { transform: rotate(-90deg); }
-    #orient-body { padding: 12px; }
-    #orient-photos { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; max-height: 300px; scrollbar-width: thin; scrollbar-color: rgba(255,100,100,0.3) transparent;}
-    .orient-photo-card { display: flex; flex-direction: column; background: rgba(0,0,0,0.4); padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);}
-    .orient-photo-card img { width: 100%; height: auto; border-radius: 4px; }
-    .orient-photo-card label { margin-top: 6px; font-weight: bold; text-align: center; color: #ffcccc; font-size: 11px;}
+    /* Orient image tag shown in ctx-photo-card */
+    .ctx-orient-tag { display: flex; align-items: center; gap: 4px; font-size: 9px; color: rgba(255,136,187,0.75); margin-top: 2px; justify-content: center; letter-spacing: 0.04em; }
+    .ctx-orient-tag svg { flex-shrink: 0; }
 
     /* VR scroll buttons — compact in 2D, large enough to hit with a controller ray in VR */
     .vr-scroll-bar {
@@ -1030,7 +1067,6 @@
       transition: none !important;
     }
 
-    body.vr-mode #fk-panel, 
     body.vr-mode #ctx-panel, 
     body.vr-mode #voice-panel {
       background: #16181c !important; /* No transparency in VR for readability */
@@ -1041,12 +1077,10 @@
       font-size: 28px;
     }
 
-    body.vr-mode #fk-panel, 
     body.vr-mode #ctx-panel { border-color: rgba(0, 204, 106, 0.4) !important; }
     body.vr-mode #voice-panel { border-color: rgba(200, 80, 255, 0.4) !important; }
 
     /* Fixed rigid heights in VR to prevent clipping/mesh bugs, unified width */
-    body.vr-mode #fk-panel { width: 540px; height: 740px !important; max-height: 740px !important; padding: 30px; gap: 24px; }
     body.vr-mode #ctx-panel { width: 540px; height: 740px !important; max-height: 740px !important; padding: 0; }
     body.vr-mode #voice-panel { width: 540px; height: 340px !important; max-height: 340px !important; padding: 0; }
 
@@ -1082,11 +1116,7 @@
     body.vr-mode #ptt-btn { font-size: 28px; padding: 24px; border-radius: 20px; width: 100%; display: flex; align-items: center; justify-content: center; gap: 16px; margin-bottom: 20px;}
     body.vr-mode #ptt-mic-icon { font-size: 34px; }
     body.vr-mode #voice-status, body.vr-mode #voice-output { font-size: 24px; text-align: center; }
-    body.vr-mode #orient-header { height: 90px; padding: 0 28px; background: rgba(0, 0, 0, 0.2); }
-    body.vr-mode #orient-header-icon svg { width: 34px; height: 34px; stroke-width: 3px; }
-    body.vr-mode #orient-header-text { font-size: 32px; margin-left: 18px; }
-    body.vr-mode #orient-collapse-btn { display:none; }
-    body.vr-mode #orient-body { padding: 24px; }
+
     
   </style>
 </head>
@@ -1102,59 +1132,77 @@
     Scan the scene to detect objects
   </div>
 
-  <div id="fk-panel">
-    <div id="fk-header" class="drag-handle" onclick="toggleFkPanel()">
-      <div id="fk-header-left">
-        <div id="fk-header-icon">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#88bbff" stroke-width="2"
-            stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path
-              d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" />
-          </svg>
-        </div>
-        <span id="fk-header-text">Control</span>
-        <span id="fk-live-pill">Live</span>
-      </div>
-      <button id="fk-collapse-btn" title="Collapse">▾</button>
-    </div>
+  <!-- Legacy fk-panel kept hidden so JS refs to sb-vr-btn, sb-freeze-btn etc. don't break -->
+  <div id="fk-panel" style="display:none;" aria-hidden="true">
+    <div id="fk-header"><div id="fk-header-left"><div id="fk-header-icon"></div><span id="fk-header-text">Control</span><span id="fk-live-pill">Live</span></div><button id="fk-collapse-btn">▾</button></div>
     <div id="fk-body">
       <div id="cp-actions">
-        <button class="cp-action-btn" id="sb-freeze-btn" onclick="toggleFreeze()">
-          <span id="sb-freeze-label">Live Feed</span>
-        </button>
-        <button class="cp-action-btn" id="sb-calib-freeze-btn" onclick="toggleCalibFreeze()">
-          <span id="sb-calib-freeze-label">Calib Frozen</span>
-        </button>
-        <button class="cp-action-btn" id="sb-vr-btn" onclick="toggleVR()">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 4px;"><path d="M2 12h4l2-2h8l2 2h4"/><path d="M21 8v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <span id="sb-vr-label">Enter MR</span>
-        </button>
-        <button class="cp-action-btn" id="sb-calib-guides-btn" onclick="toggleCalibrationPlane()" style="opacity:0.55;">
-          <span id="sb-calib-guides-label">Show Target</span>
-        </button>
-        <button class="cp-action-btn" onclick="toggleSceneBg()">
-          <span>White BG</span>
-        </button>
+        <button class="cp-action-btn" id="sb-freeze-btn" onclick="toggleFreeze()"><span id="sb-freeze-label">Live Feed</span></button>
+        <button class="cp-action-btn" id="sb-calib-freeze-btn" onclick="toggleCalibFreeze()"><span id="sb-calib-freeze-label">Calib Frozen</span></button>
+        <button class="cp-action-btn" id="sb-vr-btn" onclick="toggleVR()"><span id="sb-vr-icon">🥽</span><span id="sb-vr-label">Enter MR</span></button>
+        <button class="cp-action-btn" id="sb-calib-guides-btn" onclick="toggleCalibrationPlane()"><span id="sb-calib-guides-label">Show Target</span></button>
       </div>
-
-      <button class="cp-action-btn" id="cp-feed-opacity-btn" onclick="toggleFeedOpacity()" style="margin-bottom:6px;">
-        <span id="cp-feed-opacity-label">Hide Live Feed</span>
-      </button>
-
+      <button class="cp-action-btn" id="cp-feed-opacity-btn" onclick="toggleFeedOpacity()"><span id="cp-feed-opacity-label">Hide Live Feed</span></button>
       <div class="fk-divider"></div>
-
       <div class="fk-robot-selector">
         <button class="fk-robot-btn active" id="fk-r1-btn" onclick="selectFkRobot(0)">Robot 1</button>
         <button class="fk-robot-btn" id="fk-r2-btn" onclick="selectFkRobot(1)">Robot 2</button>
       </div>
       <div id="fk-sliders"></div>
       <div class="fk-divider"></div>
-      <button id="fk-reset-btn" onclick="resetFk()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px;"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-        Reset to Home
-      </button>
+      <button id="fk-reset-btn" onclick="resetFk()">Reset to Home</button>
     </div>
+  </div>
+
+  <!-- ── Top control bar (hidden in VR) ── -->
+  <div id="top-bar">
+    <div id="top-bar-logo">
+      <div class="logo-icon">🤖</div>
+      <span class="logo-text">Robot Scene</span>
+    </div>
+
+    <div id="ws-badge" style="display:none;">
+      <div class="dot"></div>
+      <span id="ws-label">Connecting…</span>
+      <span id="ws-latency" style="display:none; font-size:10px; opacity:0.7; margin-left:2px;"></span>
+    </div>
+
+    <!-- Hide / Show live feed overlay -->
+    <button class="tb-btn dim" id="tb-feed-opacity-btn" onclick="toggleFeedOpacity()" title="Toggle video feed overlay opacity">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span id="tb-feed-opacity-label">Show Feed</span>
+    </button>
+
+    <!-- White BG toggle -->
+    <button class="tb-btn" id="tb-bg-btn" onclick="toggleSceneBg()" title="Toggle background">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/></svg>
+      <span>White BG</span>
+    </button>
+
+
+    <!-- Enter MR / VR — pushed right -->
+    <button class="tb-btn" id="tb-vr-btn" onclick="toggleVR()" title="Enter Mixed Reality">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l2-2h8l2 2h4"/><path d="M21 8v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span id="tb-vr-label">Enter MR</span>
+    </button>
+
+    <!-- Perf stats toggle -->
+    <button class="tb-btn dim" id="tb-perf-btn" onclick="togglePerfStats()" title="Toggle performance stats (FPS / MS / MB)" style="margin-left:4px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      <span>Perf</span>
+    </button>
+  </div>
+
+  <!-- ── VR floating action bar: only visible in the headset overlay ── -->
+  <div id="vr-action-bar">
+    <button class="vr-ab-btn" id="vr-ab-feed-btn" onclick="toggleFeedOpacity()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+      <span id="vr-ab-feed-label">Video Feed</span>
+    </button>
+    <button class="vr-ab-btn" id="vr-ab-leave-btn" onclick="toggleVR()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Leave MR
+    </button>
   </div>
 
   <div id="voice-panel">
@@ -1224,50 +1272,53 @@
     </div>
   </div>
 
-  <div id="orient-panel" class="collapsed">
-    <div id="orient-header" class="drag-handle" onclick="toggleOrientPanel()">
-      <div id="orient-header-left">
-        <div id="orient-header-icon">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ff88bb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M14 2L2 14v8h8L22 10V2zM18 6L6 18"/>
-            <path d="M10 14h4v4"/>
-          </svg>
-        </div>
-        <span id="orient-header-text">Orientation</span>
-      </div>
-      <button id="orient-collapse-btn" title="Collapse">▾</button>
-    </div>
-    <div id="orient-body">
-      <div style="padding: 6px 0 10px;">
-        <button id="orient-reanalyze-btn" onclick="window.sendCommandToHost('reAnalyzeOrientAll', true)" style="width:100%; padding:7px 4px; border-radius:6px; border:1px solid rgba(255,136,187,0.3); background:rgba(255,136,187,0.08); color:#ff88bb; font-size:10px; font-weight:600; cursor:pointer; font-family:inherit; display:flex; align-items:center; justify-content:center; gap:6px;">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-          Re-analyze All
-        </button>
-        <div id="orient-status" style="text-align:center; font-size:10px; color:rgba(255,136,187,0.6); margin-top:5px;"></div>
-      </div>
-      <div class="vr-scroll-bar">
-        <button class="vr-scroll-btn" onclick="scrollVrPanel('orient-photos', -200)">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:middle;"><path d="m18 15-6-6-6 6"/></svg> Up
-        </button>
-        <button class="vr-scroll-btn" onclick="scrollVrPanel('orient-photos', 200)">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px; vertical-align:middle;"><path d="m6 9 6 6 6-6"/></svg> Down
-        </button>
-      </div>
-      <div id="orient-photos"></div>
-    </div>
-  </div>
 
-  <div id="ws-badge" style="display:none;">
-    <div class="dot"></div>
-    <span id="ws-label">Connecting…</span>
-    <span id="ws-latency" style="display:none; font-size:10px; opacity:0.7; margin-left:2px;"></span>
-  </div>
+
 
   <script type="importmap">
   { "imports": {
       "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
       "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
   } }
+  </script>
+
+  <!-- Stats.js — loaded only once the toggle button is clicked (lazy) -->
+  <!-- NOTE: plain <script> (not module) so togglePerfStats is globally accessible from onclick -->
+  <script>
+    window._statsInstance = null;
+    window.togglePerfStats = function () {
+      const btn = document.getElementById('tb-perf-btn');
+      if (window._statsInstance) {
+        // Already showing — remove and destroy
+        document.body.removeChild(window._statsInstance.dom);
+        window._statsInstance = null;
+        if (btn) btn.classList.remove('active');
+        return;
+      }
+
+      function _initStats() {
+        if (!window.Stats) { console.warn('[Stats] window.Stats not found after load'); return; }
+        const stats = new window.Stats();
+        stats.showPanel(0); // 0=FPS, 1=MS, 2=MB — click panel to cycle
+        stats.dom.style.cssText = 'position:fixed;bottom:8px;left:8px;z-index:9999;cursor:pointer;opacity:0.85;';
+        stats.dom.title = 'Click to switch: FPS / MS / MB';
+        document.body.appendChild(stats.dom);
+        window._statsInstance = stats;
+        if (btn) btn.classList.add('active');
+      }
+
+      if (window.Stats) {
+        _initStats();
+        return;
+      }
+
+      // Dynamically inject the stats.js UMD script tag (works with UMD libraries)
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/stats.js@0.17.0/build/stats.min.js';
+      script.onload = _initStats;
+      script.onerror = () => console.warn('[Stats] Failed to load stats.js from CDN');
+      document.head.appendChild(script);
+    };
   </script>
 
   <script type="module">
@@ -1313,6 +1364,23 @@
     const _qRest = new THREE.Quaternion(), _qRot = new THREE.Quaternion();
     const _J = [[0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0]]; // 3×6 Jacobian (plain arrays)
 
+    // ── tickVrIk / getPinchWorldPos pre-allocated scratch ──────────────────
+    // Eliminates per-frame GC pressure on the Quest's limited heap.
+    const _vrik_dir   = new THREE.Vector3();
+    const _vrik_wp    = new THREE.Vector3();
+    const _vrik_lpos  = new THREE.Vector3();
+    const _vrik_hwp   = new THREE.Vector3();
+    const _vrik_pwp   = new THREE.Vector3();
+    const _vrik_newWp = new THREE.Vector3();
+    const _vrik_sc    = new THREE.Vector3();
+    const _vrik_q     = new THREE.Quaternion();
+    const _vrik_m4a   = new THREE.Matrix4();
+
+    // ── setRobotJoints scratch — avoids per-joint Quaternion allocation on every FK update
+    const _fkQuat = new THREE.Quaternion();
+    const _vrik_m4b   = new THREE.Matrix4();
+    const _vrik_m4c   = new THREE.Matrix4();
+
     // ── Renderer ── (XR-optimised)
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
@@ -1334,17 +1402,33 @@
     const xrRig = new THREE.Group();
     scene.add(xrRig);
 
+    // ── Camera — orbits around table centre ──────────────────────────────
+    // TABLE_CX = (TABLE_W / 2) - 0.15 = (0.80 / 2) - 0.15 = 0.25
+    // TABLE_CZ = 0  →  table centre on the XZ plane sits at (0.25, 0, 0).
+    // Using literal values here because TABLE_W / TABLE_CX are declared later.
+    const CAM_TARGET = new THREE.Vector3(0.25, 0, 0);
+
     const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.01, 50);
-    camera.position.set(0.33 + 1.2, 1.2, 0.35 + 0.3);
-    camera.lookAt(0.33, 0.05, 0.35);
+    camera.position.set(CAM_TARGET.x + 1.2, 1.1, CAM_TARGET.z + 1.0);
+    camera.lookAt(CAM_TARGET);
     xrRig.add(camera);
 
     const controls = new OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true; controls.dampingFactor = 0.08;
-    controls.target.set(0.33, 0.05, 0.35);
-    controls.maxPolarAngle = Math.PI / 2 + 0.15;
-    controls.minDistance = 0.3; controls.maxDistance = 10;
-    controls.mouseButtons = { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.PAN, RIGHT: THREE.MOUSE.DOLLY };
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.07;
+    controls.target.copy(CAM_TARGET);
+    controls.maxPolarAngle = Math.PI / 2 + 0.12; // slight below-table look allowed
+    controls.minDistance = 0.25;
+    controls.maxDistance = 8;
+    // Standard 3D-viewport conventions:
+    //   Left-drag  → orbit  (rotate around target)
+    //   Right-drag → pan    (translate camera + target together)
+    //   Scroll / Middle-drag → dolly (zoom in / out toward target)
+    controls.mouseButtons = {
+      LEFT:   THREE.MOUSE.ROTATE,
+      MIDDLE: THREE.MOUSE.DOLLY,
+      RIGHT:  THREE.MOUSE.PAN
+    };
 
     // ── Procedural Environment Map ──
     (function buildEnvMap() {
@@ -1386,13 +1470,10 @@
     scene.add(ambientLight);
 
     const dir = new THREE.DirectionalLight(0xfff4e0, 2.0);
-    dir.position.set(2.5, 6, 2); dir.castShadow = true;
-    dir.shadow.mapSize.set(2048, 2048);
-    dir.shadow.camera.left = -1.2; dir.shadow.camera.right = 1.2;
-    dir.shadow.camera.top = 1.2; dir.shadow.camera.bottom = -1.2;
-    dir.shadow.camera.near = 0.1; dir.shadow.camera.far = 12;
-    dir.shadow.bias = -0.0003;
-    dir.shadow.normalBias = 0.02;
+    dir.position.set(2.5, 6, 2);
+    // NOTE: castShadow intentionally disabled — renderer.shadowMap.enabled = false,
+    // so enabling it on the light just wastes setup work without producing shadows.
+    // dir.castShadow = true;
     scene.add(dir);
 
     const hemi = new THREE.HemisphereLight(0xfff0dd, 0x445566, 0.9);
@@ -1481,7 +1562,8 @@
       const maxAniso = renderer.capabilities.getMaxAnisotropy();
       root.traverse((node) => {
         if (!node.isMesh) return;
-        node.castShadow = true; node.receiveShadow = true;
+        node.castShadow = false; // shadows disabled globally; skip expensive setup
+        node.receiveShadow = false;
         const mats = Array.isArray(node.material) ? node.material : [node.material];
         mats.forEach((mat) => {
           if (!mat || !mat.isMeshStandardMaterial) return;
@@ -1489,21 +1571,14 @@
           [mat.map, mat.normalMap, mat.roughnessMap, mat.metalnessMap, mat.aoMap].forEach((t) => {
             if (t) { t.anisotropy = maxAniso; t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; }
           });
-          const col = mat.color;
-          const isTeal = col.r < 0.5 && col.g > 0.4 && col.b > 0.5;
-          const isDark = col.r < 0.15 && col.g < 0.15 && col.b < 0.15;
-          if (isTeal || isDark) {
-            node.material = new THREE.MeshPhysicalMaterial({
-              color: mat.color, roughness: Math.min(mat.roughness ?? 0.5, 0.45),
-              metalness: Math.max(mat.metalness ?? 0.1, 0.1), clearcoat: 0.85, clearcoatRoughness: 0.15,
-              map: mat.map, normalMap: mat.normalMap, normalScale: mat.normalScale,
-              roughnessMap: mat.roughnessMap, metalnessMap: mat.metalnessMap, aoMap: mat.aoMap,
-            });
-          } else {
-            mat.roughness = Math.min(mat.roughness ?? 0.5, 0.6);
-            mat.metalness = Math.max(mat.metalness ?? 0, 0.05);
-            mat.needsUpdate = true;
-          }
+          // ── PERF FIX: Avoid MeshPhysicalMaterial (clearcoat) ─────────────────
+          // MeshPhysicalMaterial requires its own GLSL program variant (clearcoat
+          // defines), which caused getProgramCacheKey() to dominate profiling at
+          // 1,669 ms. MeshStandardMaterial with boosted metalness produces a very
+          // similar appearance at a fraction of the shader-program cache cost.
+          mat.roughness  = Math.min(mat.roughness  ?? 0.5, 0.45);
+          mat.metalness  = Math.max(mat.metalness  ?? 0.1, 0.25);
+          mat.needsUpdate = true;
         });
       });
     }
@@ -1719,9 +1794,14 @@
 
     window.toggleCalibrationPlane = function () {
       window._guidesVisible = !window._guidesVisible;
+      // Legacy
       const btn = document.getElementById('sb-calib-guides-btn'), lbl = document.getElementById('sb-calib-guides-label');
       if (btn) btn.style.opacity = window._guidesVisible ? '1' : '0.55';
       if (lbl) lbl.textContent = window._guidesVisible ? '\u00a0Hide Target' : '\u00a0Show Target';
+      // Top bar
+      const tbBtn = document.getElementById('tb-calib-guides-btn'), tbLbl = document.getElementById('tb-calib-guides-label');
+      if (tbBtn) tbBtn.classList.toggle('dim', !window._guidesVisible);
+      if (tbLbl) tbLbl.textContent = window._guidesVisible ? 'Hide Target' : 'Show Target';
       boardMesh.visible = axesHelper.visible = window._guidesVisible;
       if (camCone) camCone.visible = window._guidesVisible;
       if (camFrustumLines) camFrustumLines.visible = window._guidesVisible;
@@ -1863,7 +1943,7 @@
 
       function onMove(e) {
         if (!dragging) return;
-        e.preventDefault(); hasMoved = true; panel.dataset.dragged = 'true';
+        e.preventDefault(); hasMoved = true; panel._justDragged = true;
         const { x, y } = getXY(e);
         panel.style.left = Math.max(0, Math.min(window.innerWidth - panel.offsetWidth, x - startX)) + 'px';
         panel.style.top = Math.max(0, Math.min(window.innerHeight - panel.offsetHeight, y - startY)) + 'px';
@@ -1871,7 +1951,7 @@
 
       function onEnd() {
         dragging = false;
-        if (hasMoved) { setTimeout(() => panel.dataset.dragged = 'false', 100); } else { panel.dataset.dragged = 'false'; }
+        if (hasMoved) { setTimeout(() => panel._justDragged = false, 200); } else { panel._justDragged = false; }
         document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onEnd);
         document.removeEventListener('touchmove', onMove); document.removeEventListener('touchend', onEnd);
         savePanelPositions();
@@ -1884,11 +1964,10 @@
       makeDraggable(document.getElementById('fk-panel'), document.getElementById('fk-header'));
       makeDraggable(document.getElementById('voice-panel'), document.getElementById('voice-header'));
       makeDraggable(document.getElementById('ctx-panel'), document.getElementById('ctx-header'));
-      makeDraggable(document.getElementById('orient-panel'), document.getElementById('orient-header'));
       makeDraggable(document.getElementById('hud'), document.querySelector('#hud .hud-header'));
 
       const ro = new ResizeObserver(() => savePanelPositions());
-      ['fk-panel', 'voice-panel', 'ctx-panel', 'orient-panel'].forEach(id => { const el = document.getElementById(id); if (el) ro.observe(el); });
+      ['fk-panel', 'voice-panel', 'ctx-panel'].forEach(id => { const el = document.getElementById(id); if (el) ro.observe(el); });
     })();
 
     // ── Cumulative Cost Tracker ──
@@ -1917,24 +1996,29 @@
       }
     };
 
-    window.toggleFkPanel = function () {
-      const p = document.getElementById('fk-panel');
-      if (p && p.dataset.dragged !== 'true') { p.classList.toggle('collapsed'); if (!p.classList.contains('collapsed')) p.style.height = ''; }
-    };
+    window.toggleFkPanel = function () { /* panel retired — no-op */ };
 
     window.toggleFreeze = function () {
       _feedFrozen = !_feedFrozen;
-      const btn = document.getElementById('sb-freeze-btn'), lbl = document.getElementById('sb-freeze-label');
+      // Legacy hidden panel
+      const lbl = document.getElementById('sb-freeze-label');
       if (lbl) lbl.textContent = _feedFrozen ? '\u00a0Frozen' : '\u00a0Live Feed';
-      if (btn) btn.style.opacity = _feedFrozen ? '0.55' : '1';
+      // Top bar
+      const tbBtn = document.getElementById('tb-freeze-btn'), tbLbl = document.getElementById('tb-freeze-label');
+      if (tbLbl) tbLbl.textContent = _feedFrozen ? 'Frozen' : 'Live Feed';
+      if (tbBtn) tbBtn.classList.toggle('dim', _feedFrozen);
       window.sendCommandToHost('freezeFeed', _feedFrozen);
     };
 
     window.toggleCalibFreeze = function () {
       _calibFrozen = !_calibFrozen;
-      const btn = document.getElementById('sb-calib-freeze-btn'), lbl = document.getElementById('sb-calib-freeze-label');
+      // Legacy
+      const lbl = document.getElementById('sb-calib-freeze-label');
       if (lbl) lbl.textContent = _calibFrozen ? '\u00a0Calib Frozen' : '\u00a0Calib Live';
-      if (btn) btn.style.opacity = _calibFrozen ? '0.55' : '1';
+      // Top bar
+      const tbBtn = document.getElementById('tb-calib-freeze-btn'), tbLbl = document.getElementById('tb-calib-freeze-label');
+      if (tbLbl) tbLbl.textContent = _calibFrozen ? 'Calib Frozen' : 'Calib Live';
+      if (tbBtn) tbBtn.classList.toggle('dim', _calibFrozen);
       window.sendCommandToHost('freezeCalib', _calibFrozen);
     };
 
@@ -1951,10 +2035,26 @@
 
     window.toggleFeedOpacity = function () {
       _feedOpacityHidden = !_feedOpacityHidden; window.setOpacityFromUser(_feedOpacityHidden ? 0 : 0.75);
+      // Auto-unfreeze when showing feed — feed should always be live when visible
+      if (!_feedOpacityHidden && _feedFrozen) {
+        _feedFrozen = false;
+        window.sendCommandToHost('freezeFeed', false);
+        const lbl = document.getElementById('sb-freeze-label'); if (lbl) lbl.textContent = '\u00a0Live Feed';
+      }
+      // Legacy label
       const lbl = document.getElementById('cp-feed-opacity-label'), btn = document.getElementById('cp-feed-opacity-btn');
       if (lbl) lbl.textContent = _feedOpacityHidden ? 'Show Live Feed' : 'Hide Live Feed';
       if (btn) btn.style.opacity = _feedOpacityHidden ? '0.55' : '1';
+      // Top bar
+      const tbBtn = document.getElementById('tb-feed-opacity-btn'), tbLbl = document.getElementById('tb-feed-opacity-label');
+      if (tbLbl) tbLbl.textContent = _feedOpacityHidden ? 'Show Feed' : 'Hide Feed';
+      if (tbBtn) tbBtn.classList.toggle('dim', _feedOpacityHidden);
+      // VR action bar
+      const vrLbl = document.getElementById('vr-ab-feed-label'), vrBtn = document.getElementById('vr-ab-feed-btn');
+      if (vrLbl) vrLbl.textContent = _feedOpacityHidden ? 'Show Video' : 'Hide Video';
+      if (vrBtn) vrBtn.classList.toggle('active', !_feedOpacityHidden);
     };
+
 
     // Live feed is hidden by default — user can reveal it via the button
     _feedOpacityHidden = true;
@@ -1963,6 +2063,9 @@
       const lbl = document.getElementById('cp-feed-opacity-label'), btn = document.getElementById('cp-feed-opacity-btn');
       if (lbl) lbl.textContent = 'Show Live Feed';
       if (btn) btn.style.opacity = '0.55';
+      const tbBtn = document.getElementById('tb-feed-opacity-btn'), tbLbl = document.getElementById('tb-feed-opacity-label');
+      if (tbLbl) tbLbl.textContent = 'Show Feed';
+      if (tbBtn) tbBtn.classList.add('dim');
     })();
 
     window.updateCameraFeed = function (base64Url) {
@@ -1978,8 +2081,7 @@
       _camImage.src = base64Url;
     };
 
-    window.toggleCtxPanel = function () { const p = document.getElementById('ctx-panel'); if (p && p.dataset.dragged !== 'true') p.classList.toggle('collapsed'); };
-    window.toggleOrientPanel = function () { const p = document.getElementById('orient-panel'); if (p && p.dataset.dragged !== 'true') p.classList.toggle('collapsed'); };
+    window.toggleCtxPanel = function () { const p = document.getElementById('ctx-panel'); if (!p || p._justDragged) return; p.classList.toggle('collapsed'); };
 
     // VR HTMLMesh redraw workaround: scrolling doesn't mutate DOM structurally, so
     // we must manually mutate a dataset attribute to force HTMLMesh's MutationObserver to redraw
@@ -2008,7 +2110,7 @@
 
     function renderCtxPhotos(items) {
       const strip = document.getElementById('ctx-photos'); if (!strip) return; strip.innerHTML = '';
-      const hasPhotos = items.some(i => i.cropBase64);
+      const hasPhotos = items.some(i => i.cropBase64 || i.orientImageUrl);
 
       // Adapt ctx-panel height: compact when no images, taller when photo grid shows
       const panel = document.getElementById('ctx-panel');
@@ -2021,32 +2123,33 @@
       }
 
       items.forEach(item => {
-        if (!item.cropBase64) return;
+        if (!item.cropBase64 && !item.orientImageUrl) return;
         const card = document.createElement('div'); card.className = 'ctx-photo-card'; card.title = item.label;
-        const img = document.createElement('img'); img.src = item.cropBase64; img.alt = item.label;
+        card.dataset.label = item.label;
+
+        // Show orient image if available, otherwise fall back to crop/banana image
+        const imgSrc = item.orientImageUrl || item.cropBase64;
+        const img = document.createElement('img'); img.src = imgSrc; img.alt = item.label;
+        img.dataset.role = 'ctx-thumb';
         const lbl = document.createElement('div'); lbl.className = 'ctx-photo-label'; lbl.textContent = item.label;
         const badge = document.createElement('div');
         if (item.hasModel) { badge.className = 'ctx-model-badge has-model'; badge.textContent = '✓ 3D Ready'; }
         else if (item.isInLibrary) { badge.className = 'ctx-model-badge not-in-library'; badge.textContent = '⟳ Update 3D'; badge.onclick = () => requestGenerate3D(item, badge); }
         else { badge.className = 'ctx-model-badge no-model'; badge.textContent = '⬡ Generate 3D'; badge.onclick = () => requestGenerate3D(item, badge); }
-        card.appendChild(img); card.appendChild(lbl); card.appendChild(badge); strip.appendChild(card);
+
+        card.appendChild(img); card.appendChild(lbl); card.appendChild(badge);
+
+        // Orient image indicator (shown only when orient image is present)
+        if (item.orientImageUrl) {
+          const tag = document.createElement('div'); tag.className = 'ctx-orient-tag';
+          tag.innerHTML = `<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2L2 14v8h8L22 10V2zM18 6L6 18"/></svg> Orient`;
+          card.appendChild(tag);
+        }
+
+        strip.appendChild(card);
       });
     }
 
-    function renderOrientPhotos(items) {
-      const strip = document.getElementById('orient-photos'); if (!strip) return; strip.innerHTML = '';
-      const hasPhotos = items.some(i => i.orientImageUrl);
-      const panel = document.getElementById('orient-panel');
-      if (panel && hasPhotos) panel.classList.remove('collapsed'); // pop open if there's data
-
-      items.forEach(item => {
-        if (!item.orientImageUrl) return;
-        const card = document.createElement('div'); card.className = 'orient-photo-card';
-        const img = document.createElement('img'); img.src = item.orientImageUrl;
-        const lbl = document.createElement('label'); lbl.textContent = item.label;
-        card.appendChild(img); card.appendChild(lbl); strip.appendChild(card);
-      });
-    }
 
     // Track active generation badges by label
     window._gen3DBadges = window._gen3DBadges || {};
@@ -2128,7 +2231,7 @@
         if (!Array.isArray(items)) return;
         // Deep-clone so mutations in loadModelGlb don't corrupt the original broadcast
         _lastSceneItems = items.map(i => Object.assign({}, i));
-        renderObjects(items); renderCtxPhotos(items); renderOrientPhotos(items);
+        renderObjects(items); renderCtxPhotos(items);
         document.getElementById('ctx-panel')?.classList.remove('collapsed');
         const statusEl = document.getElementById('ctx-status');
         if (statusEl) { statusEl.textContent = items.length ? `${items.length} object(s)` : 'No objects.'; statusEl.className = ''; }
@@ -2267,10 +2370,18 @@
         objGroup.add(rawBoxLine);
 
         function makeTextSprite(message, color) {
+          // PERF FIX: cache canvas textures by label to avoid recreating on every renderObjects() call
+          const cacheKey = message + '_' + color.getHexString();
+          if (renderObjects._spriteCache && renderObjects._spriteCache[cacheKey]) {
+            return renderObjects._spriteCache[cacheKey].clone();
+          }
           const canvas = document.createElement('canvas'), ctx = canvas.getContext('2d');
           canvas.width = 512; canvas.height = 128; ctx.fillStyle = '#' + color.getHexString(); ctx.font = 'bold 48px Arial, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(message, 256, 64);
           const texture = new THREE.CanvasTexture(canvas); texture.minFilter = THREE.LinearFilter;
-          const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false })); sprite.scale.set(0.15, 0.0375, 1); return sprite;
+          const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: texture, transparent: true, depthTest: false })); sprite.scale.set(0.15, 0.0375, 1);
+          if (!renderObjects._spriteCache) renderObjects._spriteCache = {};
+          renderObjects._spriteCache[cacheKey] = sprite;
+          return sprite.clone();
         }
 
         const labelSprite = makeTextSprite(item.label, col);
@@ -2361,7 +2472,9 @@
           if (!joint) return;
           joint.quaternion.copy(joint.userData.restQ);
           let renderAngle = FK_ANGLES[i]; if (i === 1) renderAngle -= 33; if (i === 2) renderAngle += 75;
-          joint.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(JOINT_AXES[i], THREE.MathUtils.degToRad(renderAngle)));
+          // PERF FIX: reuse pre-allocated scratch quaternion — no per-joint allocation
+          _fkQuat.setFromAxisAngle(JOINT_AXES[i], THREE.MathUtils.degToRad(renderAngle));
+          joint.quaternion.multiply(_fkQuat);
         });
       }
     }
@@ -2408,9 +2521,9 @@
             let renderAngle = clamped[i];
             if (i === 1) renderAngle -= 33;
             if (i === 2) renderAngle += 75;
-            joint.quaternion.multiply(
-              new THREE.Quaternion().setFromAxisAngle(JOINT_AXES[i], THREE.MathUtils.degToRad(renderAngle))
-            );
+            // Reuse pre-allocated scratch — no GC on every joint update
+            _fkQuat.setFromAxisAngle(JOINT_AXES[i], THREE.MathUtils.degToRad(renderAngle));
+            joint.quaternion.multiply(_fkQuat);
           });
         }
 
@@ -2504,13 +2617,36 @@
     let _vrCtxStatusCtrl = null;
     let _vrVoiceStatusCtrl = null;
 
-    // Config: which panels to show in VR and where to spawn them
-    // EXACT SAME SCALE applied to all so physical 3D dimensions match the CSS precisely width-per-pixel!
+    // ── HTMLMesh dirty-flag via MutationObserver ──────────────────────────
+    // Instead of re-uploading panel textures every N frames regardless,
+    // we watch the actual DOM for changes and only mark dirty when content
+    // truly mutates. Cost on a static frame = 0 GPU uploads.
+    let _vrPanelsDirty = true; // start true so first VR frame renders correctly
+    let _vrMutObs = null;
+
+    function _startVrPanelObserver() {
+      if (_vrMutObs) return;
+      // ctx-panel covers orient content since it is integrated there.
+      // vr-action-bar watched for feed/leave button active-state class changes.
+      const watched = ['ctx-panel', 'voice-panel', 'vr-action-bar'];
+      _vrMutObs = new MutationObserver(() => { _vrPanelsDirty = true; });
+      watched.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) _vrMutObs.observe(el, { subtree: true, childList: true, characterData: true, attributes: true });
+      });
+    }
+
+    function _stopVrPanelObserver() {
+      if (_vrMutObs) { _vrMutObs.disconnect(); _vrMutObs = null; }
+      _vrPanelsDirty = true; // reset so next VR session starts fresh
+    }
+
+    // Config: which panels to show in VR and where to spawn them.
+    // fk-panel retired → replaced by top-bar (2D) / vr-action-bar (VR 3D mesh).
     const VR_PANEL_CFG = [
-      { domId: 'fk-panel',    pos: [-0.65, 1.35, -0.60], rotY:  Math.PI / 8,  scale: 0.82 },
-      { domId: 'ctx-panel',   pos: [ 0.00, 1.35, -0.65], rotY:  0,            scale: 0.82 },
-      { domId: 'orient-panel',pos: [ 0.00, 1.85, -0.65], rotY:  0,            scale: 0.82 },
-      { domId: 'voice-panel', pos: [ 0.65, 1.45, -0.60], rotY: -Math.PI / 8,  scale: 0.82 },
+      { domId: 'ctx-panel',      pos: [-0.30, 1.35, -0.65], rotY:  Math.PI / 16, scale: 0.82 },
+      { domId: 'voice-panel',    pos: [ 0.40, 1.45, -0.60], rotY: -Math.PI / 8,  scale: 0.82 },
+      { domId: 'vr-action-bar',  pos: [ 0.05, 1.05, -0.55], rotY:  0,            scale: 0.70 },
     ];
 
     function buildVrPanel() {
@@ -2521,6 +2657,8 @@
       // width/height bounds for drawing textures and UI hit-testing.
       // Failing to do this causes hit tests to miss and UI canvas to clip.
       void document.body.offsetHeight;
+      _vrPanelsDirty = true; // ensure first frame uploads
+      _startVrPanelObserver();
 
       VR_PANEL_CFG.forEach((cfg) => {
         const domEl = document.getElementById(cfg.domId);
@@ -2566,6 +2704,7 @@
     }
 
     function destroyVrPanel() {
+      _stopVrPanelObserver();
       document.body.classList.remove('vr-mode');
       _vrPanels.forEach(vp => {
         vp.group.remove(vp.mesh);
@@ -2710,6 +2849,12 @@
       });
     });
 
+    // Pre-allocated scratch for tickWorldGrab — avoids per-frame heap allocation in VR
+    const _wg_mid    = new THREE.Vector3();
+    const _wg_delta  = new THREE.Vector3();
+    const _wg_deltaXZ = new THREE.Vector3();
+    const _wg_upAxis  = new THREE.Vector3(0, 1, 0);
+
     function tickWorldGrab() {
       if (!_grabbing || !_gripState[0] || !_gripState[1]) return;
       // Don't world-navigate while a panel is being grabbed
@@ -2717,26 +2862,27 @@
 
       const p0 = _xrGrips[0].position;
       const p1 = _xrGrips[1].position;
-      const currentMid = new THREE.Vector3().addVectors(p0, p1).multiplyScalar(0.5);
+      // PERF FIX: reuse scratch vectors — no allocation per frame
+      _wg_mid.addVectors(p0, p1).multiplyScalar(0.5);
       const currentAngle = Math.atan2(p1.x - p0.x, p1.z - p0.z);
 
       const angleDelta = currentAngle - _grabStartAngle;
       xrRig.rotation.y = _grabRigRot - angleDelta;
 
-      const delta = currentMid.clone().sub(_grabStartMid);
+      _wg_delta.copy(_wg_mid).sub(_grabStartMid);
 
       // Horizontal movement (XZ plane)
-      const deltaXZ = new THREE.Vector3(delta.x, 0, delta.z);
-      deltaXZ.applyAxisAngle(new THREE.Vector3(0, 1, 0), _grabRigRot);
+      _wg_deltaXZ.set(_wg_delta.x, 0, _wg_delta.z);
+      _wg_deltaXZ.applyAxisAngle(_wg_upAxis, _grabRigRot);
 
       // Vertical lift: moving both grips up/down raises/lowers the virtual scene
-      const deltaY = delta.y;
+      const deltaY = _wg_delta.y;
 
       // Moving the VR user in the opposite direction moves the scene
       xrRig.position.set(
-        _grabRigPos.x - deltaXZ.x,
+        _grabRigPos.x - _wg_deltaXZ.x,
         _grabRigPos.y - deltaY,   // lift: rig goes down when grips go up (scene goes up)
-        _grabRigPos.z - deltaXZ.z
+        _grabRigPos.z - _wg_deltaXZ.z
       );
     }
 
@@ -2784,19 +2930,20 @@
           _handGrab.rigRot = xrRig.rotation.y;
         } else {
           // ── Drag frame ────────────────────────────────────────────────────────
-          const currentMid   = new THREE.Vector3().addVectors(p0, p1).multiplyScalar(0.5);
+          // PERF FIX: reuse scratch vectors — no allocation per frame
+          _wg_mid.addVectors(p0, p1).multiplyScalar(0.5);
           const currentAngle = Math.atan2(p1.x - p0.x, p1.z - p0.z);
           const angleDelta   = currentAngle - _handGrab.startAngle;
           xrRig.rotation.y   = _handGrab.rigRot - angleDelta;
 
-          const delta   = currentMid.clone().sub(_handGrab.startMid);
-          const deltaXZ = new THREE.Vector3(delta.x, 0, delta.z)
-            .applyAxisAngle(new THREE.Vector3(0, 1, 0), _handGrab.rigRot);
+          _wg_delta.copy(_wg_mid).sub(_handGrab.startMid);
+          _wg_deltaXZ.set(_wg_delta.x, 0, _wg_delta.z)
+            .applyAxisAngle(_wg_upAxis, _handGrab.rigRot);
           // Lift: moving both hands up raises the scene (rig goes down)
           xrRig.position.set(
-            _handGrab.rigPos.x - deltaXZ.x,
-            _handGrab.rigPos.y - delta.y,
-            _handGrab.rigPos.z - deltaXZ.z
+            _handGrab.rigPos.x - _wg_deltaXZ.x,
+            _handGrab.rigPos.y - _wg_delta.y,
+            _handGrab.rigPos.z - _wg_deltaXZ.z
           );
         }
       } else {
@@ -2823,28 +2970,30 @@
     }));
 
     // Helper to get exact pinch point rather than the wrist
-    function getPinchWorldPos(hp) {
+    function getPinchWorldPos(hp, out) {
+      // out defaults to _vrik_pwp — no allocation ever
       const target = hp.children.length > 0 ? hp.children[0] : hp;
-      return target.getWorldPosition(new THREE.Vector3());
+      return target.getWorldPosition(out || _vrik_pwp);
     }
 
     function tickVrIk() {
       if (!_xrSession) return;
       IK_HANDLES.forEach(h => h.scale.setScalar(1.0)); // hover-size reset
 
-      // ── Controller ray-cast dragging (unchanged) ──────────────────────────
+      // ── Controller ray-cast dragging ──────────────────────────────────────
       _xrCtrls.forEach((ctrl, idx) => {
         if (_ctrlState[idx].attached) {
           _ctrlState[idx].attached.scale.setScalar(1.2);
           const handleIdx = IK_HANDLES.indexOf(_ctrlState[idx].attached);
 
           _tempMatrix.identity().extractRotation(ctrl.matrixWorld);
-          const dir = new THREE.Vector3(0, 0, -1).applyMatrix4(_tempMatrix);
-          const wp = new THREE.Vector3().setFromMatrixPosition(ctrl.matrixWorld);
-          wp.add(dir.multiplyScalar(_ctrlState[idx].dist));
-
-          _ctrlState[idx].attached.position.copy(scene.worldToLocal(wp.clone()));
-          IK_TARGET_POS[handleIdx].copy(_ctrlState[idx].attached.position);
+          _vrik_dir.set(0, 0, -1).applyMatrix4(_tempMatrix);
+          _vrik_wp.setFromMatrixPosition(ctrl.matrixWorld);
+          _vrik_wp.addScaledVector(_vrik_dir, _ctrlState[idx].dist);
+          _vrik_lpos.copy(_vrik_wp);
+          scene.worldToLocal(_vrik_lpos);
+          _ctrlState[idx].attached.position.copy(_vrik_lpos);
+          IK_TARGET_POS[handleIdx].copy(_vrik_lpos);
         }
       });
 
@@ -2857,8 +3006,8 @@
         if (hp.isPinched()) {
           if (drag.handleIdx < 0 && drag.panelIdx < 0) {
             // ── Grab start: find closest visible IK handle OR VR Panel ────────────────
-            const pointerWp = getPinchWorldPos(hp);
-            if (isNaN(pointerWp.x)) return;
+            getPinchWorldPos(hp, _vrik_pwp);
+            if (isNaN(_vrik_pwp.x)) return;
 
             let bestDist = Infinity, bestIdx = -1;
             IK_HANDLES.forEach((handle, idx) => {
@@ -2871,8 +3020,8 @@
 
             if (bestIdx >= 0) {
               if (!IK_ENABLED[bestIdx]) window.enableIk(bestIdx);
-              const handleWp = IK_HANDLES[bestIdx].getWorldPosition(new THREE.Vector3());
-              drag.grabOffset.subVectors(handleWp, pointerWp);
+              IK_HANDLES[bestIdx].getWorldPosition(_vrik_hwp);
+              drag.grabOffset.subVectors(_vrik_hwp, _vrik_pwp);
               drag.handleIdx = bestIdx;
             } else {
               // Try grabbing a VR Panel if no IK handle hit
@@ -2889,42 +3038,42 @@
               if (bestPnlIdx >= 0) {
                 const vp = _vrPanels[bestPnlIdx];
                 drag.panelIdx = bestPnlIdx;
-                
-                // Get rigid lock relative to pinch pointer tip (6-DOF)
+                // Get rigid lock relative to pinch pointer tip (6-DOF) — reuse scratch matrices
                 const pObj = hp.children.length > 0 ? hp.children[0] : hp;
-                const pObjInv = new THREE.Matrix4().copy(pObj.matrixWorld).invert();
-                vp.localOffsetMatrix.multiplyMatrices(pObjInv, vp.mesh.matrixWorld);
+                _vrik_m4a.copy(pObj.matrixWorld).invert();
+                vp.localOffsetMatrix.multiplyMatrices(_vrik_m4a, vp.mesh.matrixWorld);
                 vp.grabbed = true;
               }
             }
           } else if (drag.handleIdx >= 0) {
             // ── Drag frame: follow pointer + stored offset (IK Handle) ────────────────
-            const pointerWp = getPinchWorldPos(hp);
-            if (isNaN(pointerWp.x) || pointerWp.length() > 8) return;
+            getPinchWorldPos(hp, _vrik_pwp);
+            if (isNaN(_vrik_pwp.x) || _vrik_pwp.length() > 8) return;
 
-            const newHandleWp = pointerWp.clone().add(drag.grabOffset);
-            const localPos = scene.worldToLocal(newHandleWp);
-            localPos.x = Math.max(-1.5, Math.min(1.5, localPos.x));
-            localPos.y = Math.max(-0.1, Math.min(1.5, localPos.y));
-            localPos.z = Math.max(-1.5, Math.min(1.5, localPos.z));
+            _vrik_newWp.copy(_vrik_pwp).add(drag.grabOffset);
+            _vrik_lpos.copy(_vrik_newWp);
+            scene.worldToLocal(_vrik_lpos);
+            _vrik_lpos.x = Math.max(-1.5, Math.min(1.5, _vrik_lpos.x));
+            _vrik_lpos.y = Math.max(-0.1, Math.min(1.5, _vrik_lpos.y));
+            _vrik_lpos.z = Math.max(-1.5, Math.min(1.5, _vrik_lpos.z));
 
-            IK_HANDLES[drag.handleIdx].position.copy(localPos);
-            IK_TARGET_POS[drag.handleIdx].copy(localPos);
+            IK_HANDLES[drag.handleIdx].position.copy(_vrik_lpos);
+            IK_TARGET_POS[drag.handleIdx].copy(_vrik_lpos);
             IK_HANDLES[drag.handleIdx].scale.setScalar(1.2);
 
-            const handleWp2 = IK_HANDLES[drag.handleIdx].getWorldPosition(new THREE.Vector3());
-            hp.setCursor(pointerWp.distanceTo(handleWp2));
+            IK_HANDLES[drag.handleIdx].getWorldPosition(_vrik_hwp);
+            hp.setCursor(_vrik_pwp.distanceTo(_vrik_hwp));
           } else if (drag.panelIdx >= 0) {
             // ── Drag frame: VR Panel Hand Grab ────────────────
             const vp = _vrPanels[drag.panelIdx];
             const pObj = hp.children.length > 0 ? hp.children[0] : hp;
             if (isNaN(pObj.matrixWorld.elements[0])) return;
 
-            const newWorldMat = new THREE.Matrix4().multiplyMatrices(pObj.matrixWorld, vp.localOffsetMatrix);
-            const parentInv = new THREE.Matrix4().copy(vp.mesh.parent.matrixWorld).invert();
-            const newLocalMat = new THREE.Matrix4().multiplyMatrices(parentInv, newWorldMat);
-            
-            newLocalMat.decompose(vp.mesh.position, vp.mesh.quaternion, new THREE.Vector3());
+            // Reuse scratch Matrix4s — no allocation
+            _vrik_m4b.multiplyMatrices(pObj.matrixWorld, vp.localOffsetMatrix);
+            _vrik_m4c.copy(vp.mesh.parent.matrixWorld).invert();
+            _vrik_m4a.multiplyMatrices(_vrik_m4c, _vrik_m4b);
+            _vrik_m4a.decompose(vp.mesh.position, vp.mesh.quaternion, _vrik_sc);
             vp.mesh.scale.copy(vp.mesh.userData.baseScale); // RESTORE SCALE rigidly!
             hp.setCursor(0.01);
           }
@@ -2941,8 +3090,8 @@
           hp.setCursor(1.5);
         }
 
-        // Highlight hovered handles even when not dragging
-        if (!hp.isPinched() && drag.handleIdx < 0 && drag.panelIdx < 0) {
+        // Highlight hovered handles — throttled to every 3rd frame to save CPU
+        if (!hp.isPinched() && drag.handleIdx < 0 && drag.panelIdx < 0 && (_xrFrameCount % 3 === 0)) {
           IK_HANDLES.forEach((handle, idx) => {
             const hits = hp.intersectObject(handle, true);
             if (hits && hits.length > 0 && hits[0].distance < 2.0) {
@@ -2975,12 +3124,20 @@
         });
         _xrSession = session;
 
-        const btn = document.getElementById('sb-vr-btn');
-        const icon = document.getElementById('sb-vr-icon');
-        const lbl = document.getElementById('sb-vr-label');
-        if (btn) btn.classList.add('active');
-        if (icon) icon.textContent = '⏹️';
-        if (lbl) lbl.textContent = arOk ? '\u00a0Exit MR' : '\u00a0Exit VR';
+        // ── Update all VR/top-bar button states ──────────────────────────────
+        const sbBtn = document.getElementById('sb-vr-btn'), sbIcon = document.getElementById('sb-vr-icon'), sbLbl = document.getElementById('sb-vr-label');
+        const tbBtn = document.getElementById('tb-vr-btn'), tbLbl = document.getElementById('tb-vr-label');
+        if (sbBtn) sbBtn.classList.add('active');
+        if (sbIcon) sbIcon.textContent = '⏹️';
+        if (sbLbl) sbLbl.textContent = arOk ? '\u00a0Exit MR' : '\u00a0Exit VR';
+        if (tbBtn) tbBtn.classList.add('active');
+        if (tbLbl) tbLbl.textContent = arOk ? 'Exit MR' : 'Exit VR';
+
+        // Show VR action bar DOM element so it becomes visible for HTMLMesh capture.
+        // We do NOT use position:fixed here — the vr-mode CSS overrides it to static
+        // so buildVrPanel()'s HTMLMesh picks it up as a compact floating panel.
+        const vrBar = document.getElementById('vr-action-bar');
+        if (vrBar) vrBar.style.setProperty('display', 'flex', 'important');
 
         _savedBg = scene.background; _savedFog = scene.fog;
         if (_xrMode === 'immersive-ar') { scene.background = null; scene.fog = null; renderer.setClearColor(0x000000, 0); }
@@ -2988,14 +3145,12 @@
         renderer.shadowMap.enabled = false;
         renderer.toneMapping = THREE.NoToneMapping;
         scene.scale.setScalar(1);
-        renderer.xr.setFramebufferScaleFactor(1.8); // 80% higher resolution in headset
+        renderer.xr.setFramebufferScaleFactor(1.8);
         await renderer.xr.setSession(session);
         renderer.xr.setReferenceSpaceType('local-floor');
 
-        // Force panel layout recalculation to remove cutting/max-height issues
         if (window.renderObjects) setTimeout(() => renderCtxPhotos(window._lastSceneItems || []), 100);
 
-        // VR FIX: Spawns the user safely 0.8m backward from the table, preserving global Scene coordinates
         xrRig.position.set(TABLE_CX, 0, TABLE_CZ + 0.8);
         xrRig.rotation.set(0, 0, 0);
 
@@ -3009,24 +3164,39 @@
           scene.background = _savedBg || new THREE.Color(0x0a0a0c);
           scene.fog = _savedFog || null;
 
-          xrRig.position.set(0, 0, 0); xrRig.rotation.set(0, 0, 0); // Restore original 2D layout framing
-
+          xrRig.position.set(0, 0, 0); xrRig.rotation.set(0, 0, 0);
           renderer.setClearColor(0x000000, 1);
           _gripState[0] = _gripState[1] = false; _grabbing = false;
-          if (btn) btn.classList.remove('active');
-          if (icon) icon.textContent = '🥽';
-          if (lbl) lbl.textContent = arOk ? '\u00a0Enter MR' : '\u00a0Enter VR';
+
+          // Restore button states
+          if (sbBtn) sbBtn.classList.remove('active');
+          if (sbIcon) sbIcon.textContent = '🥽';
+          if (sbLbl) sbLbl.textContent = arOk ? '\u00a0Enter MR' : '\u00a0Enter VR';
+          if (tbBtn) tbBtn.classList.remove('active');
+          if (tbLbl) tbLbl.textContent = arOk ? 'Enter MR' : 'Enter VR';
+
+          // Hide VR action bar
+          if (vrBar) vrBar.style.removeProperty('display');
         });
       } catch (err) { showXrToast('XR failed: ' + (err.message || err)); }
     };
 
     (async () => {
-      const btn = document.getElementById('sb-vr-btn'), lbl = document.getElementById('sb-vr-label');
-      if (!navigator.xr) { if (btn) { btn.classList.add('unsupported'); btn.title = 'WebXR not available'; } return; }
+      const sbBtn = document.getElementById('sb-vr-btn'), sbLbl = document.getElementById('sb-vr-label');
+      const tbBtn = document.getElementById('tb-vr-btn'), tbLbl = document.getElementById('tb-vr-label');
+      if (!navigator.xr) {
+        [sbBtn, tbBtn].forEach(b => { if (b) { b.classList.add('unsupported'); b.title = 'WebXR not available'; b.disabled = true; } });
+        return;
+      }
       const arOk = await navigator.xr.isSessionSupported('immersive-ar').catch(() => false);
       const vrOk = await navigator.xr.isSessionSupported('immersive-vr').catch(() => false);
-      if (!arOk && !vrOk && btn) { btn.classList.add('unsupported'); btn.title = 'XR not supported — HTTPS required?'; }
-      else if (lbl) lbl.textContent = arOk ? '\u00a0Enter MR' : '\u00a0Enter VR';
+      if (!arOk && !vrOk) {
+        [sbBtn, tbBtn].forEach(b => { if (b) { b.classList.add('unsupported'); b.title = 'XR not supported — HTTPS required?'; b.disabled = true; } });
+      } else {
+        const label = arOk ? 'Enter MR' : 'Enter VR';
+        if (sbLbl) sbLbl.textContent = '\u00a0' + label;
+        if (tbLbl) tbLbl.textContent = label;
+      }
     })();
 
     // ── Render loop ──
@@ -3036,23 +3206,30 @@
     const IK_MOVE_THRESH = 0.001; // 1 mm — skip solve if handle hasn't moved more than this
 
     renderer.setAnimationLoop(() => {
+      // ── Stats.js begin ────────────────────────────────────────────────────
+      if (window._statsInstance) window._statsInstance.begin();
+
       if (_xrSession) {
         renderer.xr.updateCamera(camera);
         tickWorldGrab();
         tickHandSceneGrab();   // bimanual hand-tracking scene rotate/lift/translate
         _tickPanelGrabs();
-        tickVrIk();
+        // tickVrIk() is skipped: IK handle-dragging is never used in this
+        // semantic-to-motion system — robot motion comes from voice→script→FK.
+        // Skipping it saves all per-frame raycasts & pinch intersection tests.
       }
 
-      // Adaptive HTMLMesh refresh: faster when IK is dragging (every 3 frames),
-      // slower at rest (every 9 frames) to save GPU bandwidth.
-      const _ikAnyActive = _xrSession && (IK_ENABLED[0] || IK_ENABLED[1]);
-      const _vrRefreshEvery = _ikAnyActive ? 3 : 9;
-      if (_xrSession && _xrFrameCount % _vrRefreshEvery === 0) {
+      // ── HTMLMesh dirty-flag refresh ─────────────────────────────────────
+      // MutationObserver sets _vrPanelsDirty whenever a panel's DOM changes
+      // (new scan result, voice text, status update). On frames where nothing
+      // changed the texture re-upload cost is zero — far cheaper than the
+      // previous every-N-frames timer approach.
+      if (_xrSession && _vrPanelsDirty) {
         _vrPanels.forEach(vp => {
           if (vp.mesh && vp.mesh.material.map) vp.mesh.material.map.update();
         });
         if (window._vrPanelMesh && window._vrPanelMesh.material.map) window._vrPanelMesh.material.map.update();
+        _vrPanelsDirty = false;
       }
 
       // Sync IK angles → FK sliders so the 2D panel mirrors what VR is commanding.
@@ -3072,13 +3249,12 @@
 
       for (let i = 0; i < 2; i++) {
         if (!IK_ENABLED[i]) continue;
-        // IK visuals are hidden in VR — skip solving entirely
+
+        // In VR the robot is driven by FK from voice→script, not by IK handles.
+        // Skip IK solve entirely in XR to save CPU budget on the Quest.
         if (_xrSession) continue;
 
-        // ── Perf: in VR only solve every 2 frames (36 Hz vs 72 Hz) ──
-        if (_xrSession && (_xrFrameCount & 1)) continue;
-
-        // ── Perf: skip if handle hasn't moved ──
+        // ── Perf: skip if handle hasn't moved ──────────────────────────────
         const handlePos = IK_HANDLES[i]?.position;
         if (handlePos && _ikLastSolvedPos[i].distanceTo(handlePos) < IK_MOVE_THRESH) continue;
         if (handlePos) _ikLastSolvedPos[i].copy(handlePos);
@@ -3088,6 +3264,9 @@
       }
       controls.update();
       renderer.render(scene, camera);
+
+      // ── Stats.js end ──────────────────────────────────────────────────────
+      if (window._statsInstance) window._statsInstance.end();
     });
 
     window.addEventListener('resize', () => {
@@ -3242,9 +3421,24 @@
                 break;
               }
               case 'setOrientStatus': {
-                const statusEl = document.getElementById('orient-status');
-                if (statusEl) statusEl.textContent = msg.payload?.text ?? '';
-                document.getElementById('orient-panel')?.classList.remove('collapsed');
+                // Orient panel removed — update the card thumbnail in ctx-panel instead
+                // (the full scene push via PushObjectsToSceneAsync already handles photos)
+                break;
+              }
+              case 'setBananaImage': {
+                // When a banana/orient image arrives for a specific label, update its card image
+                const { label: bLabel, imageUrl } = msg.payload || {};
+                if (!bLabel || !imageUrl) break;
+                // Update any matching ctx-photo-card that doesn't yet have an orient image
+                document.querySelectorAll('.ctx-photo-card').forEach(card => {
+                  if (card.dataset.label === bLabel) {
+                    const thumb = card.querySelector('[data-role="ctx-thumb"]');
+                    if (thumb && !card.dataset.hasOrient) thumb.src = imageUrl;
+                  }
+                });
+                // Also update cached item so re-renders show it
+                const cachedItem = (window._lastSceneItems || []).find(i => i.label === bLabel);
+                if (cachedItem && !cachedItem.orientImageUrl) cachedItem.cropBase64 = imageUrl;
                 break;
               }
             }
@@ -3263,7 +3457,7 @@
       const pttBtn = document.getElementById('ptt-btn'), pttLabel = document.getElementById('ptt-label'), voiceOutput = document.getElementById('voice-output'), voiceStatus = document.getElementById('voice-status');
 
       window.toggleVoicePanel = function () {
-        const p = document.getElementById('voice-panel'); if (p && p.dataset.dragged !== 'true') p.classList.toggle('collapsed');
+        const p = document.getElementById('voice-panel'); if (!p || p._justDragged) return; p.classList.toggle('collapsed');
       };
 
       // Toggle record on click or spacebar

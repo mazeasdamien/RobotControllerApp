@@ -17,18 +17,61 @@ packages/
 *.nuget.props
 *.nuget.targets
 
+# WinUI 3 / MSIX packaging outputs
+AppPackages/
+BundleArtifacts/
+*.msix
+*.msixbundle
+*.appx
+*.appxbundle
+_pkginfo.txt
+*.cer
+
 # OS
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+.DS_Store
+$RECYCLE.BIN/
 
 # User Settings
 settings.json
 
-# Build logs
+# Build logs & diagnostics
 *.log
 build_*.txt
 errors*.txt
 msbuild.log
+msbuild.binlog
 full_build.log
 minimal_errors.log
+
+# Runtime-generated files
+deps.json
+
+# Scratch / API exploration files
+gradio_api*.json
+payload.json
+config.json
+
+# Scratch / one-off HTML files (not the main preview.html)
+preview-fixed.html
+
+# Python virtual environment (used by camera / ML scripts)
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# PowerShell temp/scratch files at repo root
+fix_xaml.ps1
+
+# Diagnostic text dumps at repo root
+codepoints.txt
+non_ascii.txt
+build_error.log
+
+# Local three.js copy (use CDN or npm instead)
+three.js/
