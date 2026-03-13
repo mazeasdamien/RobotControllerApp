@@ -249,8 +249,7 @@
     #ws-route-tip {
       position: absolute;
       top: calc(100% + 8px);
-      left: 50%;
-      transform: translateX(-50%);
+      left: 0;                /* anchored to left edge of badge — never clips off-screen */
       background: rgba(8, 8, 20, 0.96);
       border: 1px solid rgba(255, 255, 255, 0.10);
       border-radius: 10px;
@@ -261,7 +260,7 @@
       pointer-events: none;
       opacity: 0;
       transition: opacity 0.18s, transform 0.18s;
-      transform: translateX(-50%) translateY(4px);
+      transform: translateY(4px);
       z-index: 200;
       backdrop-filter: blur(14px);
       box-shadow: 0 8px 28px rgba(0,0,0,0.55);
@@ -269,7 +268,7 @@
 
     #ws-badge:hover #ws-route-tip {
       opacity: 1;
-      transform: translateX(-50%) translateY(0);
+      transform: translateY(0);
     }
 
     .ws-route-row {
@@ -1258,7 +1257,7 @@
             <div class="node-dot" style="background:#5599ff;"></div>
             <div>
               <span style="color:#88aaff;">Local Server</span>
-              <div id="ws-route-server-city" class="ws-route-city">🏠 Your Network</div>
+              <div id="ws-route-server-city" class="ws-route-city">…</div>
             </div>
           </div>
           <div class="ws-route-arrow">
