@@ -135,7 +135,7 @@ namespace RobotControllerApp.Services
 
             try
             {
-                capture = new VideoCapture(cameraIndex, VideoCaptureAPIs.DSHOW);
+                capture = new VideoCapture(cameraIndex, VideoCaptureAPIs.ANY);
                 if (!capture.IsOpened())
                 {
                     OnLog?.Invoke($"[Calib] Cannot open camera at index {cameraIndex}.");

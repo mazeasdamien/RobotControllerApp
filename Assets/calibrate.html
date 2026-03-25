@@ -139,14 +139,14 @@ gltfLoader.load('./ned.glb', (gltf) => {
   // Robot 1 (Top Right of desk, physically furthest from operator)
   const r1 = new THREE.Group();
   r1.add(model.clone());
-  r1.position.set(0.31, 0.58, 0); // 1cm right padding, 5cm top padding
+  r1.position.set(0.315, 0.5775, 0); // Exactly 1cm right padding, 5cm top padding
   r1.rotation.z = -Math.PI / 2; // Facing Left across the workspace
   scene.add(r1);
 
   // Robot 2 (Bottom Right of desk, physically nearest to operator)
   const r2 = new THREE.Group();
   r2.add(model.clone());
-  r2.position.set(-0.31, 0.58, 0); // 1cm left padding, 5cm top padding
+  r2.position.set(-0.315, 0.5775, 0); // Exactly 1cm left padding, 5cm top padding
   r2.rotation.z = -Math.PI / 2; // Facing Left across the workspace
   scene.add(r2);
 });
@@ -154,6 +154,7 @@ gltfLoader.load('./ned.glb', (gltf) => {
 // Camera frustum groups
 let frustumGroupCreative = new THREE.Group();
 let frustumGroupIntel = new THREE.Group();
+
 scene.add(frustumGroupCreative);
 scene.add(frustumGroupIntel);
 
@@ -191,6 +192,15 @@ function buildFrustum(group, color) {
   const dotMat = new THREE.MeshBasicMaterial({ color });
   group.add(new THREE.Mesh(dotGeo, dotMat));
 }
+
+// Initialize with default visible placeholders so user knows both cameras exist before ArUco locks
+buildFrustum(frustumGroupCreative, 0x00e5ff);
+frustumGroupCreative.position.set(0, -0.60, 0.40);
+frustumGroupCreative.rotation.x = Math.PI / 4;
+
+buildFrustum(frustumGroupIntel, 0x5599ff);
+frustumGroupIntel.position.set(0, -0.80, 0.60);
+frustumGroupIntel.rotation.x = Math.PI / 5;
 
 function updateFrustum(pose, type) {
   const isIntel = type === 'intel';
