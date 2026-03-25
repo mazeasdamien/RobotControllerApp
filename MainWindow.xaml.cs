@@ -2653,9 +2653,12 @@ namespace RobotControllerApp
             {
                 int creativeIdx = -1, intelIdx = -1;
                 for (int i = 0; i < _videoDevices?.Count; i++) {
-                    if (_videoDevices[i].Name.Contains("XiaoMi", StringComparison.OrdinalIgnoreCase)) creativeIdx = i;
-                    if (_videoDevices[i].Name.Contains("Intel", StringComparison.OrdinalIgnoreCase)) intelIdx = i;
+                    string n = _videoDevices[i].Name;
+                    if (n.Contains("XiaoMi", StringComparison.OrdinalIgnoreCase) || n.Contains("Creative", StringComparison.OrdinalIgnoreCase)) creativeIdx = i;
+                    if (n.Contains("Intel", StringComparison.OrdinalIgnoreCase) || n.Contains("RealSense", StringComparison.OrdinalIgnoreCase)) intelIdx = i;
                 }
+                if (creativeIdx == -1 && _videoDevices?.Count > 0) creativeIdx = intelIdx == 0 ? (_videoDevices.Count > 1 ? 1 : -1) : 0;
+                if (intelIdx == -1 && _videoDevices?.Count > 1) intelIdx = creativeIdx == 1 ? 0 : 1;
                 
                 if (creativeIdx >= 0) {
                     _creativeService.OnFrame -= OnCalibFrameCreative; _creativeService.OnPose -= OnCalibPoseCreative;
@@ -2684,7 +2687,7 @@ namespace RobotControllerApp
                         string b64 = Convert.ToBase64String(jpeg);
                         _ = _broadcastServer.BroadcastAsync("updateCameraFeed", $"\"data:image/jpeg;base64,{b64}\"");
                     }
-                    if (Preview3DView.Visibility == Visibility.Visible) CalibCameraPreviewCreative.Source = await LoadImageFromBytesAsync(jpeg);
+                    if (CalibOverlay.Visibility == Visibility.Visible) CalibCameraPreviewCreative.Source = await LoadImageFromBytesAsync(jpeg);
                 } catch { }
             });
         }
@@ -2698,7 +2701,7 @@ namespace RobotControllerApp
                         string b64 = Convert.ToBase64String(jpeg);
                         _ = _broadcastServer.BroadcastAsync("updateCameraFeed2", $"\"data:image/jpeg;base64,{b64}\"");
                     }
-                    if (Preview3DView.Visibility == Visibility.Visible) CalibCameraPreviewIntel.Source = await LoadImageFromBytesAsync(jpeg);
+                    if (CalibOverlay.Visibility == Visibility.Visible) CalibCameraPreviewIntel.Source = await LoadImageFromBytesAsync(jpeg);
                 } catch { }
             });
         }

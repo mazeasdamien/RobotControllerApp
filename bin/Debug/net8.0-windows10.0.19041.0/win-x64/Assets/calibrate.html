@@ -153,7 +153,7 @@ scene.add(axesHelper);
 const tableGeo = new THREE.BoxGeometry(0.8, 0.8, 0.05);
 const tableMat = new THREE.MeshStandardMaterial({ color: 0xcdba96, roughness: 0.9 });
 const tableMesh = new THREE.Mesh(tableGeo, tableMat);
-tableMesh.position.set(0, -0.25, -0.025); // ArUco is near front edge (y=0)
+tableMesh.position.set(-0.15, -0.25, -0.025); // ArUco sits in the top-left quadrant of the table layout
 scene.add(tableMesh);
 
 // Load actual robot models (ned.glb)
@@ -163,18 +163,18 @@ gltfLoader.load('./ned.glb', (gltf) => {
   // Convert standard GLTF Y-up to our Z-up scene
   model.rotation.x = Math.PI / 2;
 
-  // Robot 1 (left side of table, nearest from Creative view)
+  // Robot 1 (Top Right of desk, physically furthest from operator)
   const r1 = new THREE.Group();
   r1.add(model.clone());
-  r1.position.set(-0.35, -0.3, 0);
-  r1.rotation.z = -Math.PI / 4; // Facing toward the center workspace
+  r1.position.set(-0.45, -0.60, 0);
+  r1.rotation.z = Math.PI / 4; // Facing inwards towards workspace center (+45 deg)
   scene.add(r1);
 
-  // Robot 2 (right side of table, further back from Creative view)
+  // Robot 2 (Bottom Right of desk, physically nearest to operator)
   const r2 = new THREE.Group();
   r2.add(model.clone());
-  r2.position.set(0.35, -0.3, 0);
-  r2.rotation.z = Math.PI * 5 / 4;  // Facing toward the center workspace
+  r2.position.set(0.15, -0.60, 0);
+  r2.rotation.z = 3 * Math.PI / 4; // Facing inwards towards workspace center (+135 deg)
   scene.add(r2);
 });
 
