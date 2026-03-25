@@ -142,8 +142,8 @@ namespace RobotControllerApp.Services
                     return;
                 }
 
-                capture.Set(VideoCaptureProperties.FrameWidth, FrameW);
-                capture.Set(VideoCaptureProperties.FrameHeight, FrameH);
+                // capture.Set(VideoCaptureProperties.FrameWidth, FrameW);
+                // capture.Set(VideoCaptureProperties.FrameHeight, FrameH);
 
                 double[,] camData = { { Fx, 0, Cx }, { 0, Fy, Cy }, { 0, 0, 1 } };
                 cameraMatrix = Mat.FromArray(camData);
