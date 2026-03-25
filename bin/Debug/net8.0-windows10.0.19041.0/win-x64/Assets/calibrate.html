@@ -72,64 +72,13 @@ function connect() {
     if (env.type === 'setCameraPose') {
       try {
         const p = typeof env.payload === 'string' ? JSON.parse(env.payload) : env.payload;
-        updateFrustum(p);
+        updateFrustum(p, p.camType);
       } catch {}
     }
   };
   ws.onclose = () => setTimeout(connect, 2000);
 }
 connect();
-
-function setStatus(cls, txt) {
-  const dot = document.getElementById('status-dot');
-  dot.className = cls;
-  document.getElementById('status-text').textContent = txt;
-}
-
-// ── Camera feed ──────────────────────────────────────────────────────────────
-const camImg  = document.getElementById('cam-img');
-const noFeed  = document.getElementById('no-feed');
-let feedActive = false;
-
-function showFrame(dataUrl) {
-  if (!feedActive) { feedActive = true; camImg.style.display = 'block'; noFeed.style.display = 'none'; }
-  camImg.src = dataUrl;
-}
-
-// ── Freeze / Save ────────────────────────────────────────────────────────────
-let frozen = false;
-window.sendFreeze = function() {
-  frozen = !frozen;
-  const btn = document.getElementById('freeze-btn');
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify({ action: frozen ? 'freezeCalib' : 'unfreezeCalib', value: frozen }));
-  }
-  btn.textContent = frozen ? '▶ Resume Detection' : '❄ Freeze & Save';
-  btn.className   = frozen ? 'frozen' : '';
-};
-
-// ── Pose display ─────────────────────────────────────────────────────────────
-let lastPose = null;
-
-function updatePose(p) {
-  lastPose = p;
-  const fmt = v => (v !== undefined ? v.toFixed(4) : '—');
-  document.getElementById('px').textContent = fmt(p.X);
-  document.getElementById('py').textContent = fmt(p.Y);
-  document.getElementById('pz').textContent = fmt(p.Z);
-  document.getElementById('rx').textContent = fmt(p.Rx);
-  document.getElementById('ry').textContent = fmt(p.Ry);
-  document.getElementById('rz').textContent = fmt(p.Rz);
-  updateDetectBadge(true);
-  updateFrustum(p);
-}
-
-function updateDetectBadge(ok) {
-  const icon = document.getElementById('detect-icon');
-  const msg  = document.getElementById('detect-msg');
-  icon.className = ok ? 'ok' : 'bad';
-  msg.textContent = ok ? 'Grid detected — pose estimated ✓' : 'No grid detected';
-}
 
 // ── Three.js scene ───────────────────────────────────────────────────────────
 const canvas   = document.getElementById('threejs-canvas');
@@ -204,7 +153,7 @@ scene.add(axesHelper);
 const tableGeo = new THREE.BoxGeometry(0.8, 0.8, 0.05);
 const tableMat = new THREE.MeshStandardMaterial({ color: 0xcdba96, roughness: 0.9 });
 const tableMesh = new THREE.Mesh(tableGeo, tableMat);
-tableMesh.position.set(-0.35, 0.25, -0.025); // ArUco is near front-right corner
+tableMesh.position.set(0, -0.25, -0.025); // ArUco is near front edge (y=0)
 scene.add(tableMesh);
 
 // Load actual robot models (ned.glb)
@@ -214,27 +163,29 @@ gltfLoader.load('./ned.glb', (gltf) => {
   // Convert standard GLTF Y-up to our Z-up scene
   model.rotation.x = Math.PI / 2;
 
-  // Robot 1 (middle left of table)
+  // Robot 1 (left side of table, nearest from Creative view)
   const r1 = new THREE.Group();
   r1.add(model.clone());
-  r1.position.set(-0.65, 0.2, 0);
-  r1.rotation.z = -Math.PI / 6; // Facing slightly toward the middle
+  r1.position.set(-0.35, -0.3, 0);
+  r1.rotation.z = -Math.PI / 4; // Facing toward the center workspace
   scene.add(r1);
 
-  // Robot 2 (back right)
+  // Robot 2 (right side of table, further back from Creative view)
   const r2 = new THREE.Group();
   r2.add(model.clone());
-  r2.position.set(-0.2, 0.55, 0);
-  r2.rotation.z = Math.PI / 4;  // Facing somewhat forward
+  r2.position.set(0.35, -0.3, 0);
+  r2.rotation.z = Math.PI * 5 / 4;  // Facing toward the center workspace
   scene.add(r2);
 });
 
-// Camera frustum group (updated on pose)
-let frustumGroup = new THREE.Group();
-scene.add(frustumGroup);
+// Camera frustum groups
+let frustumGroupCreative = new THREE.Group();
+let frustumGroupIntel = new THREE.Group();
+scene.add(frustumGroupCreative);
+scene.add(frustumGroupIntel);
 
-function buildFrustum(color) {
-  frustumGroup.clear();
+function buildFrustum(group, color) {
+  group.clear();
 
   const fovH = 60 * Math.PI / 180;
   const fovV = 45 * Math.PI / 180;
@@ -260,20 +211,23 @@ function buildFrustum(color) {
   const geo = new THREE.BufferGeometry().setFromPoints(pts);
   geo.setIndex(indices);
   const mat = new THREE.LineBasicMaterial({ color });
-  frustumGroup.add(new THREE.LineSegments(geo, mat));
+  group.add(new THREE.LineSegments(geo, mat));
 
   // Dot at camera origin
   const dotGeo = new THREE.SphereGeometry(0.01, 8, 8);
   const dotMat = new THREE.MeshBasicMaterial({ color });
-  frustumGroup.add(new THREE.Mesh(dotGeo, dotMat));
+  group.add(new THREE.Mesh(dotGeo, dotMat));
 }
 
-function updateFrustum(pose) {
-  const color = camName.toLowerCase().includes('intel') ? 0x5599ff : 0x00e5ff;
-  buildFrustum(color);
+function updateFrustum(pose, type) {
+  const isIntel = type === 'intel';
+  const group = isIntel ? frustumGroupIntel : frustumGroupCreative;
+  const color = isIntel ? 0x5599ff : 0x00e5ff;
+  
+  buildFrustum(group, color);
 
   // Position: camera world position in board frame
-  frustumGroup.position.set(pose.X, pose.Y, pose.Z);
+  group.position.set(pose.X, pose.Y, pose.Z);
 
   // Orientation: rotation matrix columns
   const R = new THREE.Matrix4().set(
@@ -282,7 +236,7 @@ function updateFrustum(pose) {
     pose.R31, pose.R32, pose.R33, 0,
     0,        0,        0,        1
   );
-  frustumGroup.setRotationFromMatrix(R);
+  group.setRotationFromMatrix(R);
 }
 
 // ── Resize ───────────────────────────────────────────────────────────────────

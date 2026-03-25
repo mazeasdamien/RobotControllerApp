@@ -644,14 +644,11 @@ namespace RobotControllerApp
                 DispatcherQueue.TryEnqueue(() =>
                 {
                     DashboardCameraCombo.Items.Clear();
-                    CalibCameraComboBox.Items.Clear();
                     foreach (var dev in _videoDevices)
                     {
                         DashboardCameraCombo.Items.Add(dev.Name);
-                        CalibCameraComboBox.Items.Add(dev.Name);
                     }
                     if (creativeIdx >= 0) DashboardCameraCombo.SelectedIndex = creativeIdx;
-                    CalibCameraComboBox.SelectedIndex = creativeIdx >= 0 ? creativeIdx : 0;
 
                     // Update header labels with detected names
                     if (CreativeCamLabel != null && creativeIdx >= 0)
@@ -1935,7 +1932,6 @@ namespace RobotControllerApp
                     case "context": NavView.IsPaneOpen = true; ContextView.Visibility = Visibility.Visible; break;
                     case "preview3d":
                         NavView.IsPaneOpen = false; Preview3DView.Visibility = Visibility.Visible;
-                        if (CalibCameraComboBox.Items.Count == 0) PopulateCalibCameraList();
                         _ = StartScene3DServerAsync();
                         break;
                 }
@@ -2234,12 +2230,9 @@ namespace RobotControllerApp
                         // Flip the hub "REMOTE EXPERT" card to ACTIVE immediately on connect.
                         DispatcherQueue.TryEnqueue(() => UpdateExpertStatus(true));
 
-                        var pose = _lastValidPose ?? _savedPose;
-                        if (pose != null)
-                        {
-                            var poseObj = new { pose.X, pose.Y, pose.Z, pose.Rx, pose.Ry, pose.Rz, pose.R11, pose.R12, pose.R13, pose.R21, pose.R22, pose.R23, pose.R31, pose.R32, pose.R33 };
-                            await _broadcastServer.BroadcastAsync("setCameraPose", JsonSerializer.Serialize(poseObj));
-                        }
+                        if (_lastValidPoseCreative != null) await PushCameraPoseAsync(_lastValidPoseCreative, "creative");
+                        if (_lastValidPoseIntel != null) await PushCameraPoseAsync(_lastValidPoseIntel, "intel");
+                        
                         await PushObjectsToSceneAsync();
                     };
 
@@ -2257,13 +2250,22 @@ namespace RobotControllerApp
                     UpdateScene3dUrlCard();
                 }
 
-                if (File.Exists(CameraCalibrationService.SavedPosePath))
-                {
-                    string poseJson = await File.ReadAllTextAsync(CameraCalibrationService.SavedPosePath);
-                    _savedPose = JsonSerializer.Deserialize<CameraPose>(poseJson);
-                    _lastValidPose = _savedPose;
-                    _isCalibFrozen = true;
+                string dir = Path.GetDirectoryName(CameraCalibrationService.SavedPosePath)!;
+                string cp = Path.Combine(dir, "robot_camera_pose_creative.json");
+                string ip = Path.Combine(dir, "robot_camera_pose_intel.json");
 
+                if (File.Exists(cp)) {
+                    _savedPoseCreative = JsonSerializer.Deserialize<CameraPose>(await File.ReadAllTextAsync(cp));
+                    _lastValidPoseCreative = _savedPoseCreative;
+                }
+                if (File.Exists(ip)) {
+                    _savedPoseIntel = JsonSerializer.Deserialize<CameraPose>(await File.ReadAllTextAsync(ip));
+                    _lastValidPoseIntel = _savedPoseIntel;
+                }
+
+                if (_lastValidPoseCreative != null || _lastValidPoseIntel != null)
+                {
+                    _isCalibFrozen = true;
                     DispatcherQueue.TryEnqueue(() =>
                     {
                         FreezeCalibToggle.IsOn = true; FreezeCalibToggle.IsEnabled = true;
@@ -2275,7 +2277,8 @@ namespace RobotControllerApp
                 }
 
                 for (int i = 0; i < 10 && !_broadcastServer.IsRunning; i++) await Task.Delay(50);
-                if (_lastValidPose != null) await PushCameraPoseAsync(_lastValidPose);
+                if (_lastValidPoseCreative != null) await PushCameraPoseAsync(_lastValidPoseCreative, "creative");
+                if (_lastValidPoseIntel != null) await PushCameraPoseAsync(_lastValidPoseIntel, "intel");
                 await PushObjectsToSceneAsync();
             }
             catch (Exception ex) { Log($"[3D Preview] Server init failed: {ex.Message}"); }
@@ -2301,7 +2304,7 @@ namespace RobotControllerApp
                 double cx = CameraCalibrationService.Cx, cy = CameraCalibrationService.Cy;
                 int frameW = CameraCalibrationService.FrameW, frameH = CameraCalibrationService.FrameH;
 
-                var pose = _lastValidPose ?? _savedPose;
+                var pose = _lastValidPoseIntel;
                 double camX = pose?.X ?? 0, camY = pose?.Y ?? 0, camZ = pose?.Z ?? 1.0;
                 double r11 = pose?.R11 ?? 1.0, r12 = pose?.R12 ?? 0.0, r13 = pose?.R13 ?? 0.0;
                 double r21 = pose?.R21 ?? 0.0, r22 = pose?.R22 ?? 1.0, r23 = pose?.R23 ?? 0.0;
@@ -2393,29 +2396,21 @@ namespace RobotControllerApp
                 var costs = new { scanEur = 0.0, bananaEur = Math.Round(_totalBananaCost, 4), totalEur = Math.Round(_totalBananaCost, 4) };
                 _ = _broadcastServer.BroadcastAsync("setScanCosts", JsonSerializer.Serialize(costs));
 
-                if (_lastValidPose != null) await PushCameraPoseAsync(_lastValidPose);
+                if (_lastValidPoseCreative != null) await PushCameraPoseAsync(_lastValidPoseCreative, "creative");
+                if (_lastValidPoseIntel != null) await PushCameraPoseAsync(_lastValidPoseIntel, "intel");
             }
             catch (Exception ex) { Log($"[3D Preview] Push failed: {ex.Message}"); }
         }
 
-        private async Task PushCameraPoseAsync(CameraPose pose)
+        private async Task PushCameraPoseAsync(CameraPose pose, string camType = "unknown")
         {
             if (!_broadcastServer.IsRunning) return;
             try
             {
-                var poseObj = new { pose.X, pose.Y, pose.Z, pose.Rx, pose.Ry, pose.Rz, pose.R11, pose.R12, pose.R13, pose.R21, pose.R22, pose.R23, pose.R31, pose.R32, pose.R33 };
+                var poseObj = new { camType, pose.X, pose.Y, pose.Z, pose.Rx, pose.Ry, pose.Rz, pose.R11, pose.R12, pose.R13, pose.R21, pose.R22, pose.R23, pose.R31, pose.R32, pose.R33 };
                 _ = _broadcastServer.BroadcastAsync("setCameraPose", JsonSerializer.Serialize(poseObj));
             }
             catch { }
-        }
-
-        private async void LivePosePusher(CameraPose pose)
-        {
-            if (pose.IsValid)
-            {
-                await PushCameraPoseAsync(pose);
-                if (_detectedObjects.Count > 0) await PushObjectsToSceneAsync();
-            }
         }
 
         private static string BuildLearningModeCommand(bool activate) => JsonSerializer.Serialize(new
@@ -2613,60 +2608,22 @@ namespace RobotControllerApp
             return Microsoft.UI.Colors.White;
         }
 
-        private void PopulateCalibCameraList()
-        {
-            if (_videoDevices == null) return;
-            CalibCameraComboBox.Items.Clear();
-            foreach (var d in _videoDevices) CalibCameraComboBox.Items.Add(d.Name);
-            for (int i = 0; i < _videoDevices.Count; i++)
-            {
-                if (_videoDevices[i].Name.Contains("XiaoMi", StringComparison.OrdinalIgnoreCase) || _videoDevices[i].Name.Contains("Xiaomi", StringComparison.OrdinalIgnoreCase)) { CalibCameraComboBox.SelectedIndex = i; return; }
-            }
-            CalibCameraComboBox.SelectedIndex = _videoDevices.Count > 1 ? 1 : (_videoDevices.Count > 0 ? 0 : -1);
-        }
-
-        private void CalibCameraComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (_calibService != null) { _calibService.Stop(); SetCalibStopped(); }
-            StartCalibDetectionBtn.IsEnabled = CalibCameraComboBox.SelectedIndex >= 0;
-            if (_lastValidPose != null && _isCalibFrozen) { FreezeCalibToggle.IsOn = true; FreezeCalibToggle.IsEnabled = true; }
-
-            // Update camera badge and Three.js URL with selected camera name
-            string camName = CalibCameraComboBox.SelectedItem?.ToString() ?? "";
-            if (!string.IsNullOrEmpty(camName))
-            {
-                CalibCamBadgeText.Text = camName;
-                string calibUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/calibrate.html" +
-                                  $"?cam={Uri.EscapeDataString(camName)}";
-                try { CalibWebView.Source = new Uri(calibUrl); } catch { }
-            }
-        }
-
         private void ShowCalibrationPlaneToggle_Toggled(object sender, RoutedEventArgs e) { }
         private void CameraFeedOpacitySlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e) { }
-
         private void CameraFovSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
         {
-            if (_settings != null && Math.Abs(_settings.CameraFovScale - e.NewValue) > 0.001)
-            {
-                _settings.CameraFovScale = e.NewValue; _settings.Save();
-            }
+            if (_settings != null && Math.Abs(_settings.CameraFovScale - e.NewValue) > 0.001) { _settings.CameraFovScale = e.NewValue; _settings.Save(); }
         }
 
-        // Name of the camera currently being calibrated (used to name the pose file)
-        private string _calibCameraName = string.Empty;
+        private string _calibCameraName = "dual";
 
         // ── Calibration overlay open / close ────────────────────────────────
         private void OpenCalibrateBtn_Click(object sender, RoutedEventArgs e)
         {
-            // Populate camera list labelled by Creative / Intel
-            PopulateCalibCameraList();
-
             CalibOverlay.Visibility = Visibility.Visible;
             CalibDetectionBanner.Visibility = Visibility.Collapsed;
             CalibOfflineState.Visibility = Visibility.Visible;
-            CalibCamBadgeText.Text = "Select camera to begin";
-
+            
             // Navigate WebView2 to the Three.js calibration page served by the Kestrel server
             string calibUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/calibrate.html";
             try { CalibWebView.Source = new Uri(calibUrl); }
@@ -2679,7 +2636,9 @@ namespace RobotControllerApp
         private void CloseCalibOverlay()
         {
             // Stop detection if still running
-            if (_calibService?.IsRunning == true) { _calibService.Stop(); SetCalibStopped(); }
+            if (_creativeService?.IsRunning == true) _creativeService.Stop();
+            if (_intelService?.IsRunning == true) _intelService.Stop();
+            SetCalibStopped();
             CalibOverlay.Visibility = Visibility.Collapsed;
         }
 
