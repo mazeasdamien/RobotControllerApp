@@ -94,19 +94,6 @@ scene.add(dirLight);
 const SQ = 0.039;  // 3.9 cm
 const ML = 0.029;  // 2.9 cm
 
-// Workspace boundary rectangle
-const workW = 7 * SQ; // 7 squares wide
-const workH = 5 * SQ; // 5 squares tall
-const workGeo = new THREE.PlaneGeometry(workW, workH);
-const workMat = new THREE.MeshBasicMaterial({ color: 0x001a10, side: THREE.DoubleSide });
-const workPlane = new THREE.Mesh(workGeo, workMat);
-scene.add(workPlane);
-
-// Grid lines
-const gridHelper = new THREE.GridHelper(0.3, 6, 0x00cc6a, 0x003322);
-gridHelper.rotation.x = Math.PI / 2;
-scene.add(gridHelper);
-
 // ArUco marker positions (ids 0-16, 7×5 layout)
 const markerLayout = [
   [0,-2,2],[1,0,2],[2,2,2],
@@ -122,7 +109,6 @@ markerLayout.forEach(([id,u,v]) => {
   m.position.set(u * SQ, v * SQ, 0.001);
   scene.add(m);
 
-  // ID label approximation: small cross
   const geoCross = new THREE.BufferGeometry().setFromPoints([
     new THREE.Vector3(-ML*0.3, 0, 0), new THREE.Vector3(ML*0.3, 0, 0),
     new THREE.Vector3(0, -ML*0.3, 0), new THREE.Vector3(0, ML*0.3, 0)
@@ -140,7 +126,7 @@ scene.add(axesHelper);
 const tableGeo = new THREE.BoxGeometry(0.8, 0.8, 0.05);
 const tableMat = new THREE.MeshStandardMaterial({ color: 0xcdba96, roughness: 0.9 });
 const tableMesh = new THREE.Mesh(tableGeo, tableMat);
-tableMesh.position.set(0, 0.25, -0.025); // ArUco sits in the bottom-left edge
+tableMesh.position.set(0, 0.3025, -0.025); // ArUco sits directly bordering the bottom edge of the table mesh
 scene.add(tableMesh);
 
 // Load actual robot models (ned.glb)
@@ -153,14 +139,14 @@ gltfLoader.load('./ned.glb', (gltf) => {
   // Robot 1 (Top Right of desk, physically furthest from operator)
   const r1 = new THREE.Group();
   r1.add(model.clone());
-  r1.position.set(0.30, 0.55, 0);
+  r1.position.set(0.315, 0.5775, 0); // Exactly 1cm right padding, 5cm top padding
   r1.rotation.z = -Math.PI / 2; // Facing Left across the workspace
   scene.add(r1);
 
   // Robot 2 (Bottom Right of desk, physically nearest to operator)
   const r2 = new THREE.Group();
   r2.add(model.clone());
-  r2.position.set(-0.30, 0.55, 0);
+  r2.position.set(-0.315, 0.5775, 0); // Exactly 1cm left padding, 5cm top padding
   r2.rotation.z = -Math.PI / 2; // Facing Left across the workspace
   scene.add(r2);
 });
@@ -168,6 +154,7 @@ gltfLoader.load('./ned.glb', (gltf) => {
 // Camera frustum groups
 let frustumGroupCreative = new THREE.Group();
 let frustumGroupIntel = new THREE.Group();
+
 scene.add(frustumGroupCreative);
 scene.add(frustumGroupIntel);
 
@@ -205,6 +192,15 @@ function buildFrustum(group, color) {
   const dotMat = new THREE.MeshBasicMaterial({ color });
   group.add(new THREE.Mesh(dotGeo, dotMat));
 }
+
+// Initialize with default visible placeholders so user knows both cameras exist before ArUco locks
+buildFrustum(frustumGroupCreative, 0x00e5ff);
+frustumGroupCreative.position.set(0, -0.60, 0.40);
+frustumGroupCreative.rotation.x = Math.PI / 4;
+
+buildFrustum(frustumGroupIntel, 0x5599ff);
+frustumGroupIntel.position.set(0, -0.80, 0.60);
+frustumGroupIntel.rotation.x = Math.PI / 5;
 
 function updateFrustum(pose, type) {
   const isIntel = type === 'intel';
