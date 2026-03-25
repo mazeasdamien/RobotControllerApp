@@ -49,7 +49,14 @@
                                   Visibility="Collapsed"
                                   ToolTipService.ToolTip="Toggle continuous scene analysis"/>
 
-
+                    <!-- Top bar calibrate button -->
+                    <Button Click="OpenCalibrateBtn_Click" Background="#1a3a4a" BorderBrush="#3300e5ff" BorderThickness="1"
+                            CornerRadius="6" Padding="10,5" VerticalAlignment="Center" ToolTipService.ToolTip="Open Calibration Window">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xE7B3;" FontSize="13" Foreground="#00e5ff"/>
+                            <TextBlock Text="Calibrate" FontSize="12" Foreground="#00e5ff" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
 
                     <!-- Debug Mode: populate scene from library without camera -->
                     <ToggleButton x:Name="DebugModeToggle" Click="DebugModeToggle_Click"
@@ -505,31 +512,7 @@
                                            HorizontalAlignment="Center"/>
                             </StackPanel>
 
-                            <!-- Pose readout strip -->
-                            <Border Grid.Row="2" Background="#0A0A10" BorderBrush="#1AFFFFFF" BorderThickness="0,1,0,0" Padding="12,8">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="*"/>
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel>
-                                        <TextBlock Text="X" FontSize="9" Foreground="#555" CharacterSpacing="60"/>
-                                        <TextBlock x:Name="CalibPoseX" Text="—" FontSize="14" FontFamily="Consolas"
-                                                   Foreground="{StaticResource Brush.Primary}"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1">
-                                        <TextBlock Text="Y" FontSize="9" Foreground="#555" CharacterSpacing="60"/>
-                                        <TextBlock x:Name="CalibPoseY" Text="—" FontSize="14" FontFamily="Consolas"
-                                                   Foreground="{StaticResource Brush.Primary}"/>
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="2">
-                                        <TextBlock Text="Z / HEIGHT" FontSize="9" Foreground="#555" CharacterSpacing="60"/>
-                                        <TextBlock x:Name="CalibPoseZ" Text="—" FontSize="14" FontFamily="Consolas"
-                                                   Foreground="{StaticResource Brush.Primary}"/>
-                                    </StackPanel>
-                                </Grid>
-                            </Border>
+
                         </Grid>
 
                         <!-- Three.js 3D view via WebView2 -->

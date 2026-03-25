@@ -49,8 +49,8 @@ namespace RobotControllerApp.Services
         public const int GridCols = 4;
         public const int GridRows = 3;
 
-        public const float SquareLength = 0.0375f;       // 3.75 cm square side
-        public const float MarkerLength = 0.0275f;       // 2.75 cm marker side
+        public const float SquareLength = 0.039f;       // 3.9 cm square side
+        public const float MarkerLength = 0.029f;       // 2.9 cm marker side
         public const float MarkerGap = 0.01f;
         public const int MarkerCount = GridCols * GridRows;
 

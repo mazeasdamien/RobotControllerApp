@@ -2741,10 +2741,6 @@ namespace RobotControllerApp
                     CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     FreezeCalibToggle.IsEnabled = true;
-                    // Update pose readout strip in the calibration overlay
-                    CalibPoseX.Text = $"{pose.X:+0.0000;-0.0000} m";
-                    CalibPoseY.Text = $"{pose.Y:+0.0000;-0.0000} m";
-                    CalibPoseZ.Text = $"{pose.Z:+0.0000;-0.0000} m";
                 }
                 else
                 {
