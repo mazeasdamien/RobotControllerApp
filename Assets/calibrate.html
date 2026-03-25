@@ -27,14 +27,6 @@
 <body>
 
 <canvas id="threejs-canvas"></canvas>
-<div id="legend">
-  <div class="leg"><div class="leg-dot" id="frustum-dot" style="background:#00e5ff"></div> Camera frustum</div>
-  <div class="leg"><div class="leg-dot" style="background:#00cc6a"></div> Workspace grid</div>
-  <div class="leg"><div class="leg-dot" style="background:#ff8800"></div> ArUco markers</div>
-  <div class="leg"><div class="leg-dot" style="background:#888"></div> Robot base</div>
-</div>
-<div id="cam-tag">3D Workspace View</div>
-
 <script type="importmap">
 {
   "imports": {
@@ -54,11 +46,6 @@ const params  = new URLSearchParams(location.search);
 const camName = params.get('cam') || 'Camera';
 const isIntel = camName.toLowerCase().includes('intel');
 const camColor = isIntel ? 0x5599ff : 0x00e5ff;
-
-document.getElementById('cam-tag').textContent = isIntel 
-  ? '3D View — Intel RealSense (behind robots)'
-  : '3D View — Creative GestureCam';
-document.getElementById('frustum-dot').style.background = isIntel ? '#5599ff' : '#00e5ff';
 
 // ── WebSocket ────────────────────────────────────────────────────────────────
 const WS_URL = `ws://${location.hostname}:8181/scene3d-ws`;
@@ -153,7 +140,7 @@ scene.add(axesHelper);
 const tableGeo = new THREE.BoxGeometry(0.8, 0.8, 0.05);
 const tableMat = new THREE.MeshStandardMaterial({ color: 0xcdba96, roughness: 0.9 });
 const tableMesh = new THREE.Mesh(tableGeo, tableMat);
-tableMesh.position.set(-0.15, -0.25, -0.025); // ArUco sits in the top-left quadrant of the table layout
+tableMesh.position.set(0, 0.25, -0.025); // ArUco sits in the bottom-left edge
 scene.add(tableMesh);
 
 // Load actual robot models (ned.glb)
@@ -166,15 +153,15 @@ gltfLoader.load('./ned.glb', (gltf) => {
   // Robot 1 (Top Right of desk, physically furthest from operator)
   const r1 = new THREE.Group();
   r1.add(model.clone());
-  r1.position.set(-0.45, -0.60, 0);
-  r1.rotation.z = Math.PI / 4; // Facing inwards towards workspace center (+45 deg)
+  r1.position.set(0.30, 0.55, 0);
+  r1.rotation.z = -Math.PI / 2; // Facing Left across the workspace
   scene.add(r1);
 
   // Robot 2 (Bottom Right of desk, physically nearest to operator)
   const r2 = new THREE.Group();
   r2.add(model.clone());
-  r2.position.set(0.15, -0.60, 0);
-  r2.rotation.z = 3 * Math.PI / 4; // Facing inwards towards workspace center (+135 deg)
+  r2.position.set(-0.30, 0.55, 0);
+  r2.rotation.z = -Math.PI / 2; // Facing Left across the workspace
   scene.add(r2);
 });
 
