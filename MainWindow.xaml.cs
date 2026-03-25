@@ -2626,7 +2626,11 @@ namespace RobotControllerApp
             
             // Navigate WebView2 to the Three.js calibration page served by the Kestrel server
             string calibUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/calibrate.html";
-            try { CalibWebView.Source = new Uri(calibUrl); }
+            string arUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/ar.html?cam=creative";
+            try { 
+                CalibWebView.Source = new Uri(calibUrl); 
+                CalibARViewCreative.Source = new Uri(arUrl);
+            }
             catch { /* server might not be running yet; will retry on first connect */ }
         }
 

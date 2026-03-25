@@ -499,7 +499,10 @@
                                     <RowDefinition Height="*"/>
                                 </Grid.RowDefinitions>
                                 <Border Grid.Row="0" Background="#050508" ToolTipService.ToolTip="Creative GestureCam">
-                                    <Image x:Name="CalibCameraPreviewCreative" Stretch="Uniform"/>
+                                    <Grid>
+                                        <Image x:Name="CalibCameraPreviewCreative" Stretch="Uniform"/>
+                                        <WebView2 x:Name="CalibARViewCreative" DefaultBackgroundColor="Transparent"/>
+                                    </Grid>
                                 </Border>
                                 <Border Grid.Row="1" Background="#050508" BorderBrush="#1AFFFFFF" BorderThickness="0,1,0,0" ToolTipService.ToolTip="Intel RealSense">
                                     <Image x:Name="CalibCameraPreviewIntel" Stretch="Uniform"/>
