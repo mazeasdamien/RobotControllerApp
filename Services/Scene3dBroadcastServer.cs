@@ -25,8 +25,8 @@ namespace RobotControllerApp.Services
 {
     /// <summary>
     /// Lightweight Kestrel server that:
-    ///   • Serves preview.html and all Assets over HTTP so any device on the LAN can open the 3D preview.
-    ///   • Exposes a thread-safe WebSocket endpoint at /scene3d-ws.
+    ///   • Serves all Assets (GLB models, images) over HTTP for the Unity Windows app and LAN devices.
+    ///   • Exposes a thread-safe WebSocket endpoint at /scene3d-ws (consumed by the Unity viewer).
     ///   • Acts as a zero-allocation proxy for the Whisper API.
     /// </summary>
     public class Scene3dBroadcastServer
@@ -53,6 +53,7 @@ namespace RobotControllerApp.Services
 
         public event Action<string>? OnBrowserMessage;
         public event Func<Task>? OnClientConnected;
+        public event Action? OnClientDisconnected;
 
         // ── Thread-Safe WebSocket Wrapper ─────────────────────────────────────────
         // Uses a "latest-wins" slot per message type for high-frequency streams
@@ -78,7 +79,7 @@ namespace RobotControllerApp.Services
             // "pong" is droppable: a stale pong from the previous ping cycle must not
             // arrive after the client has already sent a newer ping.
             private static readonly HashSet<string> _droppableTypes =
-                new() { "updateCameraFeed", "setCameraPose", "setRobotJoints", "setCameraRobot", "pong" };
+                new() { "updateCameraFeed", "updateCameraFeed2", "setCameraPose", "setRobotJoints", "setCameraRobot", "pong" };
 
             private readonly CancellationTokenSource _cts = new();
             private readonly SemaphoreSlim _socketLock = new(1, 1);
@@ -415,13 +416,15 @@ namespace RobotControllerApp.Services
                         _clients.TryRemove(clientId, out _);
                         await client.DisposeAsync();
                         Log($"Browser disconnected — id={clientId} remaining={_clients.Count}");
+                        OnClientDisconnected?.Invoke();
                     }
                 });
 
-                app.MapGet("/", context =>
+                app.MapGet("/", async context =>
                 {
-                    context.Response.Redirect("/preview.html");
-                    return Task.CompletedTask;
+                    context.Response.ContentType = "application/json";
+                    context.Response.Headers.Append("Access-Control-Allow-Origin", "*");
+                    await context.Response.WriteAsync($"{{\"ok\":true,\"service\":\"Robot Orange Hub\",\"clients\":{_clients.Count},\"ws\":\"/scene3d-ws\"}}");
                 });
 
                 app.MapGet("/ping", async context =>

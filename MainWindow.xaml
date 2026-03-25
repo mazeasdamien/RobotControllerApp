@@ -37,18 +37,7 @@
                                        MaxWidth="380" TextTrimming="CharacterEllipsis"/>
                         </StackPanel>
                     </Border>
-                    <Button x:Name="CopyScene3dUrlBtn" Click="CopyScene3dUrlBtn_Click"
-                            Background="Transparent" BorderBrush="#28A9F0FF" BorderThickness="1"
-                            CornerRadius="6" Padding="8,4" VerticalAlignment="Center"
-                            ToolTipService.ToolTip="Copy WebXR URL">
-                        <FontIcon Glyph="&#xE8C8;" FontSize="13" Foreground="#A9F0FF"/>
-                    </Button>
-                    <Button x:Name="OpenScene3dBtn" Click="OpenScene3dBtn_Click"
-                            Background="Transparent" BorderBrush="#28A9F0FF" BorderThickness="1"
-                            CornerRadius="6" Padding="8,4" VerticalAlignment="Center"
-                            ToolTipService.ToolTip="Open in Browser">
-                        <FontIcon Glyph="&#xE8A7;" FontSize="13" Foreground="#A9F0FF"/>
-                    </Button>
+
                 </StackPanel>
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,148,0">
@@ -60,13 +49,7 @@
                                   Visibility="Collapsed"
                                   ToolTipService.ToolTip="Toggle continuous scene analysis"/>
 
-                    <StackPanel Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
-                                Visibility="Collapsed"
-                                ToolTipService.ToolTip="Freeze the current camera calibration pose">
-                        <TextBlock Text="Freeze Pose" FontSize="11" Foreground="#AAAAAA" VerticalAlignment="Center"/>
-                        <ToggleSwitch x:Name="FreezeCalibToggle" Toggled="FreezeCalibToggle_Toggled"
-                                      OnContent="" OffContent="" MinWidth="0" VerticalAlignment="Center"/>
-                    </StackPanel>
+
 
                     <!-- Debug Mode: populate scene from library without camera -->
                     <ToggleButton x:Name="DebugModeToggle" Click="DebugModeToggle_Click"
@@ -306,23 +289,82 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto"/>
                                 <RowDefinition Height="Auto"/>
-                                <RowDefinition Height="460"/>
+                                <RowDefinition Height="220"/>
+                                <RowDefinition Height="220"/>
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <TextBlock Text="Operator Camera" Style="{StaticResource Text.Headline3}" Margin="0,0,0,5"/>
+                            <!-- Live Cameras header + Calibrate button -->
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Live Cameras" Style="{StaticResource Text.Headline3}" Margin="0,0,0,5" VerticalAlignment="Center"/>
+                                <Button Grid.Column="1" x:Name="OpenCalibrateBtn" Click="OpenCalibrateBtn_Click"
+                                        Padding="10,5" CornerRadius="6" FontSize="11"
+                                        Background="#1a3a4a" Foreground="#00e5ff"
+                                        BorderBrush="#3300e5ff" BorderThickness="1"
+                                        ToolTipService.ToolTip="Open ArUco camera calibration window">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <FontIcon Glyph="&#xE7B3;" FontSize="11" Foreground="#00e5ff"/>
+                                        <TextBlock Text="Calibrate" FontSize="11"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
 
+
+                            <!-- Scene camera selector row -->
                             <Grid Grid.Row="1" Margin="0,0,0,6">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-                                <ComboBox x:Name="DashboardCameraCombo" HorizontalAlignment="Stretch" PlaceholderText="Select camera..." SelectionChanged="DashboardCameraCombo_SelectionChanged" FontSize="11"/>
+                                <ComboBox x:Name="DashboardCameraCombo" HorizontalAlignment="Stretch" PlaceholderText="Select scene camera..." SelectionChanged="DashboardCameraCombo_SelectionChanged" FontSize="11"/>
                                 <Button Grid.Column="1" Click="RefreshCamerasButton_Click" Background="Transparent" BorderThickness="0" Padding="8,4" Margin="4,0,0,0" ToolTipService.ToolTip="Refresh Cameras">
                                     <FontIcon Glyph="&#xE72C;" FontSize="12"/>
                                 </Button>
                             </Grid>
 
-                            <Border Grid.Row="2" Background="#0A0A0A" CornerRadius="8" BorderBrush="#1E1E1E" BorderThickness="1">
-                                <Image x:Name="ContextWebcamPreview" Stretch="Uniform"/>
-                            </Border>
+
+                            <!-- Dual camera row -->
+                            <Grid Grid.Row="2" ColumnSpacing="6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <!-- Creative cam -->
+                                <Grid Grid.Column="0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Border Background="#0AFFFFFF" CornerRadius="5" Padding="6,3" Margin="0,0,0,4">
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <Ellipse Width="7" Height="7" Fill="#00CC6A" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="CreativeCamLabel" Text="Creative GestureCam" FontSize="10" Foreground="#A9F0FF" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Row="1" Background="#0A0A0A" CornerRadius="6" BorderBrush="#1E1E1E" BorderThickness="1">
+                                        <Image x:Name="ContextWebcamPreview" Stretch="Uniform"/>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Intel RealSense RGB cam -->
+                                <Grid Grid.Column="1">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="*"/>
+                                    </Grid.RowDefinitions>
+                                    <Border Background="#0AFFFFFF" CornerRadius="5" Padding="6,3" Margin="0,0,0,4">
+                                        <StackPanel Orientation="Horizontal" Spacing="5">
+                                            <Ellipse Width="7" Height="7" Fill="#5599FF" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="IntelCamLabel" Text="Intel RealSense RGB" FontSize="10" Foreground="#A9F0FF" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Border Grid.Row="1" Background="#0A0A0A" CornerRadius="6" BorderBrush="#1E1E1E" BorderThickness="1">
+                                        <Image x:Name="IntelCamPreview" Stretch="Uniform"/>
+                                    </Border>
+                                </Grid>
+                            </Grid>
 
                             <!-- Asset Library Table -->
                             <Border Grid.Row="3" Background="{StaticResource Brush.Background.Card}"
@@ -395,6 +437,145 @@
                         </Grid>
                         </Grid>
                     </Border>
+        </Grid>
+
+        <!-- ══ Calibration Overlay ══════════════════════════════════════════ -->
+        <Grid x:Name="CalibOverlay" Visibility="Collapsed" Grid.RowSpan="2">
+            <Rectangle Fill="#D0000000" Tapped="CalibOverlayBackdrop_Tapped"/>
+            <Border Margin="24" CornerRadius="{StaticResource Radius.Medium}"
+                    Background="{StaticResource Brush.Background.Card}"
+                    BorderBrush="#1AFFFFFF" BorderThickness="1">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>   <!-- title -->
+                        <RowDefinition Height="*"/>      <!-- content -->
+                        <RowDefinition Height="Auto"/>   <!-- controls -->
+                    </Grid.RowDefinitions>
+
+                    <!-- Title bar -->
+                    <Border Padding="18,12" BorderBrush="#1AFFFFFF" BorderThickness="0,0,0,1">
+                        <Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                                <FontIcon Glyph="&#xE7B3;" FontSize="16" Foreground="{StaticResource Brush.Primary}"/>
+                                <TextBlock Text="CAMERA CALIBRATION" Style="{StaticResource Text.Headline2}" VerticalAlignment="Center"/>
+                                <Border x:Name="CalibCamBadge" Background="#10A9F0FF" CornerRadius="5" Padding="8,3"
+                                        BorderBrush="#28A9F0FF" BorderThickness="1" Margin="6,0,0,0">
+                                    <TextBlock x:Name="CalibCamBadgeText" Text="—" FontSize="11" Foreground="#A9F0FF"/>
+                                </Border>
+                                <Border x:Name="CalibDetectionBanner" Background="#10CC6A22" CornerRadius="5" Padding="8,3"
+                                        BorderBrush="#2800CC6A" BorderThickness="1" Margin="4,0,0,0" Visibility="Collapsed">
+                                    <StackPanel Orientation="Horizontal" Spacing="5">
+                                        <FontIcon x:Name="CalibDetectionIcon" Glyph="&#xE783;" FontSize="11" Foreground="#666"/>
+                                        <TextBlock x:Name="CalibDetectionStatus" Text="Waiting…" FontSize="11" Foreground="#888"/>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                            <Button HorizontalAlignment="Right" Click="CloseCalibOverlay_Click"
+                                    Background="Transparent" BorderThickness="0" Padding="8,6">
+                                <FontIcon Glyph="&#xE711;" FontSize="14"/>
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- Content: left=feed, right=3D -->
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="420"/>  <!-- camera feed -->
+                            <ColumnDefinition Width="*"/>    <!-- 3D view -->
+                        </Grid.ColumnDefinitions>
+
+                        <!-- Camera feed with ArUco overlay -->
+                        <Grid Grid.Column="0" BorderBrush="#1AFFFFFF" BorderThickness="0,0,1,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <Border Padding="12,7" Background="#08FFFFFF" BorderBrush="#0AFFFFFF" BorderThickness="0,0,0,1">
+                                <TextBlock Text="LIVE CAMERA — ARUCO OVERLAY" FontSize="9" FontWeight="Bold"
+                                           Foreground="#666" CharacterSpacing="80"/>
+                            </Border>
+                            <Border Grid.Row="1" Background="#050508">
+                                <Image x:Name="CalibCameraPreview" Stretch="Uniform"/>
+                            </Border>
+                            <StackPanel x:Name="CalibOfflineState" Grid.Row="1" HorizontalAlignment="Center"
+                                        VerticalAlignment="Center" Spacing="8">
+                                <FontIcon Glyph="&#xE7B3;" FontSize="32" Foreground="#333"/>
+                                <TextBlock Text="Start detection to see camera feed" FontSize="12" Foreground="#555"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Pose readout strip -->
+                            <Border Grid.Row="2" Background="#0A0A10" BorderBrush="#1AFFFFFF" BorderThickness="0,1,0,0" Padding="12,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock Text="X" FontSize="9" Foreground="#555" CharacterSpacing="60"/>
+                                        <TextBlock x:Name="CalibPoseX" Text="—" FontSize="14" FontFamily="Consolas"
+                                                   Foreground="{StaticResource Brush.Primary}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="Y" FontSize="9" Foreground="#555" CharacterSpacing="60"/>
+                                        <TextBlock x:Name="CalibPoseY" Text="—" FontSize="14" FontFamily="Consolas"
+                                                   Foreground="{StaticResource Brush.Primary}"/>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Z / HEIGHT" FontSize="9" Foreground="#555" CharacterSpacing="60"/>
+                                        <TextBlock x:Name="CalibPoseZ" Text="—" FontSize="14" FontFamily="Consolas"
+                                                   Foreground="{StaticResource Brush.Primary}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </Grid>
+
+                        <!-- Three.js 3D view via WebView2 -->
+                        <Border Grid.Column="1" Background="#050508">
+                            <WebView2 x:Name="CalibWebView" DefaultBackgroundColor="Transparent"/>
+                        </Border>
+                    </Grid>
+
+                    <!-- Controls bar -->
+                    <Border Grid.Row="2" Padding="16,10" BorderBrush="#1AFFFFFF" BorderThickness="0,1,0,0"
+                            Background="#08FFFFFF">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+
+                            <!-- Camera selector -->
+                            <TextBlock Text="Camera" FontSize="11" Foreground="#888" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <ComboBox Grid.Column="1" x:Name="CalibCameraComboBox"
+                                      MinWidth="200" PlaceholderText="Select calibration camera…"
+                                      SelectionChanged="CalibCameraComboBox_SelectionChanged" FontSize="11"/>
+
+                            <!-- Start/Stop -->
+                            <Button Grid.Column="3" x:Name="StartCalibDetectionBtn"
+                                    Content="▶  Start Detection"
+                                    Click="StartCalibDetectionBtn_Click"
+                                    Padding="12,6" Margin="12,0,0,0" CornerRadius="6"
+                                    IsEnabled="False"/>
+
+                            <!-- Freeze toggle -->
+                            <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8"
+                                        VerticalAlignment="Center" Margin="14,0,0,0">
+                                <TextBlock Text="Freeze &amp; Save" FontSize="11" Foreground="#888" VerticalAlignment="Center"/>
+                                <ToggleSwitch x:Name="FreezeCalibToggle"
+                                             Toggled="FreezeCalibToggle_Toggled"
+                                             OnContent="" OffContent="" MinWidth="0"
+                                             VerticalAlignment="Center" IsEnabled="False"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
         </Grid>
 
         <Grid x:Name="SettingsOverlay" Visibility="Collapsed" Grid.RowSpan="2">
@@ -482,16 +663,12 @@
 
             <Button x:Name="GenerateObjectImagesBtn" Click="GenerateObjectImagesBtn_Click"/>
             <Button x:Name="GenerateBananaProImagesBtn" Click="GenerateBananaProImagesBtn_Click"/>
-            <Button x:Name="StartCalibDetectionBtn" Click="StartCalibDetectionBtn_Click"/>
-
             <ToggleSwitch x:Name="ShowCalibrationPlaneToggle" Toggled="ShowCalibrationPlaneToggle_Toggled"/>
-            <ComboBox x:Name="CalibCameraComboBox" SelectionChanged="CalibCameraComboBox_SelectionChanged"/>
             <Slider x:Name="CameraFeedOpacitySlider" ValueChanged="CameraFeedOpacitySlider_ValueChanged"/>
             <Slider x:Name="LatencyScaleSlider" ValueChanged="LatencyScaleSlider_ValueChanged"/>
 
             <ProgressRing x:Name="GenerationProgress"/>
             <ProgressRing x:Name="BananaProgress"/>
-            <Image x:Name="CalibCameraPreview"/>
 
             <TextBlock x:Name="GeminiCostText"/>
             <TextBlock x:Name="BananaCostText"/>
@@ -529,17 +706,14 @@
             <TextBlock x:Name="QuestMaxText"/>
             <TextBlock x:Name="QuestAvgText"/>
             <TextBlock x:Name="PeakLabel"/>
-            <TextBlock x:Name="CalibDetectionStatus"/>
 
             <Ellipse x:Name="QuestRelayDot"/>
             <Ellipse x:Name="R1RelayDot"/>
             <Ellipse x:Name="R2RelayDot"/>
             <Ellipse x:Name="PeakDot"/>
-            <FontIcon x:Name="CalibDetectionIcon"/>
-            <StackPanel x:Name="CalibOfflineState"/>
-            <Border x:Name="CalibDetectionBanner"/>
 
             <Canvas x:Name="LatencyCanvas">
+
                 <Polyline x:Name="UnityPath"/>
             </Canvas>
 

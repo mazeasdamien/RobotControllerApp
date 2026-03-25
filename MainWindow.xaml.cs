@@ -142,13 +142,18 @@ namespace RobotControllerApp
             "[{\"box_2d\": [ymin, xmin, ymax, xmax], \"label\": \"<label>\", \"angle_degrees\": <degrees>}] " +
             "All box_2d values must be integers normalized to 0-1000.";
 
-        // ── Video Capture ──
+        // ── Video Capture ─ Camera 1 (Creative / main scene) ──
         private OpenCvSharp.VideoCapture? _cvCapture;
         private CancellationTokenSource? _cvCaptureCts;
         private Task? _cameraTask;
-        private int _operatorFpsCount = 0;
-        private int _operatorFramesTotal = 0;
         private DateTime _operatorLastFpsReset = DateTime.Now;
+
+        // ── Video Capture ─ Camera 2 (Intel RealSense RGB) ──
+        private OpenCvSharp.VideoCapture? _cvCapture2;
+        private CancellationTokenSource? _cvCaptureCts2;
+        private Task? _cameraTask2;
+        private DateTime _cam2LastFpsReset = DateTime.Now;
+
         private Windows.Devices.Enumeration.DeviceInformationCollection? _videoDevices;
 
         private readonly CameraCalibrationService _calibService = new();
@@ -462,8 +467,11 @@ namespace RobotControllerApp
                 try
                 {
                     _cvCaptureCts?.Cancel();
+                    _cvCaptureCts2?.Cancel();
                     if (_cameraTask != null) { try { await _cameraTask; } catch { } }
+                    if (_cameraTask2 != null) { try { await _cameraTask2; } catch { } }
                     if (_cvCapture != null) { try { _cvCapture.Release(); _cvCapture.Dispose(); } catch { } _cvCapture = null; }
+                    if (_cvCapture2 != null) { try { _cvCapture2.Release(); _cvCapture2.Dispose(); } catch { } _cvCapture2 = null; }
 
                     await _robotBridge.StopAsync();
                     await _robotBridge2.StopAsync();
@@ -480,128 +488,155 @@ namespace RobotControllerApp
         // CAMERA HANDLING (DIRECTSHOW via OPENCV)
         // ════════════════════════════════════════════════════════════════════════
 
+        /// <summary>
+        /// Core camera capture loop. Reads frames from <paramref name="captureIndex"/> (DirectShow),
+        /// pushes each JPEG to <paramref name="previewImage"/> and broadcasts it under
+        /// <paramref name="broadcastType"/>.
+        /// </summary>
+        private async Task StartCameraCoreAsync(
+            int captureIndex,
+            string cameraName,
+            string broadcastType,
+            Image? previewImage,
+            bool isMainCam,
+            Action<OpenCvSharp.VideoCapture?> setCapture,
+            CancellationToken token)
+        {
+            try
+            {
+                Log($"[Webcam] Attempting to start stream: {cameraName}");
+                using var capture = new OpenCvSharp.VideoCapture(captureIndex, OpenCvSharp.VideoCaptureAPIs.DSHOW);
+                if (!capture.IsOpened())
+                {
+                    Log($"[Webcam] Failed to open stream for '{cameraName}' (DirectShow)");
+                    return;
+                }
+                capture.Set(OpenCvSharp.VideoCaptureProperties.FrameWidth, 1280);
+                capture.Set(OpenCvSharp.VideoCaptureProperties.FrameHeight, 720);
+                setCapture(capture);
+
+                int fpsCount = 0, totalFrames = 0;
+                var lastFpsReset = DateTime.Now;
+
+                using var mat = new OpenCvSharp.Mat();
+                while (!token.IsCancellationRequested && capture.IsOpened())
+                {
+                    if (capture.Read(mat) && !mat.Empty())
+                    {
+                        fpsCount++; totalFrames++;
+                        bool updateCounters = false;
+                        int currentFps = fpsCount;
+
+                        if ((DateTime.Now - lastFpsReset).TotalSeconds >= 1)
+                        {
+                            currentFps = fpsCount;
+                            fpsCount = 0;
+                            lastFpsReset = DateTime.Now;
+                            updateCounters = true;
+                        }
+
+                        byte[] frameBytes = mat.ToBytes(".jpg");
+
+                        if (isMainCam)
+                        {
+                            RelayServerHost.CurrentManager?.UpdateLatestOperatorImage(frameBytes);
+                            _latestWebcamFrameBytes = frameBytes;
+                        }
+
+                        DispatcherQueue?.TryEnqueue(async () =>
+                        {
+                            if (token.IsCancellationRequested) return;
+                            try
+                            {
+                                if (updateCounters && isMainCam)
+                                {
+                                    TelemOperatorFps.Text = currentFps.ToString("0.0");
+                                    TelemOperatorTotalImages.Text = totalFrames.ToString();
+                                }
+                                if (previewImage != null)
+                                    previewImage.Source = await LoadImageFromBytesAsync(frameBytes);
+
+                                if (!_feedFrozen && _broadcastServer != null && _broadcastServer.ConnectedClients > 0)
+                                {
+                                    // Do NOT use JsonSerializer.Serialize here — it escapes '/' '+' '=' as \uXXXX
+                                    // which breaks Unity's base64 parser. Base64 chars are all JSON-safe.
+                                    string b64 = Convert.ToBase64String(frameBytes);
+                                    _ = _broadcastServer.BroadcastAsync(broadcastType, $"\"data:image/jpeg;base64,{b64}\"");
+                                }
+                            }
+                            catch { }
+                        });
+                    }
+                    try { await Task.Delay(33, token).ConfigureAwait(false); } catch (TaskCanceledException) { break; }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log($"[Webcam] Worker thread crashed ({cameraName}): {ex.Message}");
+            }
+            finally { setCapture(null); }
+        }
+
         private async Task StartCameraByIndex(int index)
         {
             if (_videoDevices == null || index < 0 || index >= _videoDevices.Count) return;
 
-            // Safely stop previous task to avoid OpenCV lock violations
             _cvCaptureCts?.Cancel();
-            if (_cameraTask != null)
-            {
-                try { await _cameraTask; } catch { }
-            }
-
-            if (_cvCapture != null)
-            {
-                try { _cvCapture.Release(); _cvCapture.Dispose(); } catch { }
-                _cvCapture = null;
-            }
-
+            if (_cameraTask != null) { try { await _cameraTask; } catch { } }
+            if (_cvCapture != null) { try { _cvCapture.Release(); _cvCapture.Dispose(); } catch { } _cvCapture = null; }
             TelemOperatorFps.Text = "0.0";
-            _operatorFpsCount = 0;
 
-            try
-            {
-                var selected = _videoDevices[index];
-                Log($"[Webcam] Attempting to start stream: {selected.Name}");
+            _cvCaptureCts = new CancellationTokenSource();
+            var token = _cvCaptureCts.Token;
+            var name = _videoDevices[index].Name;
+            _cameraTask = Task.Run(async () =>
+                await StartCameraCoreAsync(index, name, "updateCameraFeed", ContextWebcamPreview, true, c => _cvCapture = c, token), token);
+        }
 
-                _cvCaptureCts = new CancellationTokenSource();
-                var token = _cvCaptureCts.Token;
-                _operatorLastFpsReset = DateTime.Now;
+        private async Task StartCamera2ByIndex(int index)
+        {
+            if (_videoDevices == null || index < 0 || index >= _videoDevices.Count) return;
 
-                // Move VideoCapture instantiation to background thread to prevent UI freeze
-                _cameraTask = Task.Run(async () =>
-                {
-                    try
-                    {
-                        using var capture = new OpenCvSharp.VideoCapture(index, OpenCvSharp.VideoCaptureAPIs.DSHOW);
-                        if (!capture.IsOpened())
-                        {
-                            Log($"[Webcam] Failed to open stream for '{selected.Name}' (DirectShow)");
-                            return;
-                        }
+            _cvCaptureCts2?.Cancel();
+            if (_cameraTask2 != null) { try { await _cameraTask2; } catch { } }
+            if (_cvCapture2 != null) { try { _cvCapture2.Release(); _cvCapture2.Dispose(); } catch { } _cvCapture2 = null; }
 
-                        capture.Set(OpenCvSharp.VideoCaptureProperties.FrameWidth, 1280);
-                        capture.Set(OpenCvSharp.VideoCaptureProperties.FrameHeight, 720);
-
-                        DispatcherQueue.TryEnqueue(() => _cvCapture = capture);
-
-                        using var mat = new OpenCvSharp.Mat();
-                        while (!token.IsCancellationRequested && capture.IsOpened())
-                        {
-                            if (capture.Read(mat) && !mat.Empty())
-                            {
-                                Interlocked.Increment(ref _operatorFramesTotal);
-                                Interlocked.Increment(ref _operatorFpsCount);
-
-                                int currentFps = _operatorFpsCount;
-                                int total = _operatorFramesTotal;
-                                bool updateCounters = false;
-
-                                if ((DateTime.Now - _operatorLastFpsReset).TotalSeconds >= 1)
-                                {
-                                    currentFps = Interlocked.Exchange(ref _operatorFpsCount, 0);
-                                    _operatorLastFpsReset = DateTime.Now;
-                                    updateCounters = true;
-                                }
-
-                                byte[] frameBytes = mat.ToBytes(".jpg");
-                                RelayServerHost.CurrentManager?.UpdateLatestOperatorImage(frameBytes);
-
-                                DispatcherQueue?.TryEnqueue(async () =>
-                                {
-                                    if (token.IsCancellationRequested) return;
-
-                                    try
-                                    {
-                                        if (updateCounters)
-                                        {
-                                            TelemOperatorFps.Text = currentFps.ToString("0.0");
-                                            TelemOperatorTotalImages.Text = total.ToString();
-                                        }
-
-                                        if (ContextWebcamPreview != null) ContextWebcamPreview.Source = await LoadImageFromBytesAsync(frameBytes);
-
-                                        if (!_feedFrozen && _broadcastServer != null && _broadcastServer.ConnectedClients > 0)
-                                        {
-                                            string b64 = Convert.ToBase64String(frameBytes);
-                                            _ = _broadcastServer.BroadcastAsync("updateCameraFeed", JsonSerializer.Serialize($"data:image/jpeg;base64,{b64}"));
-                                        }
-
-                                        _latestWebcamFrameBytes = frameBytes;
-                                    }
-                                    catch { }
-                                });
-                            }
-                            try { await Task.Delay(33, token).ConfigureAwait(false); } catch (TaskCanceledException) { break; }
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        Log($"[Webcam] Worker thread crashed: {ex.Message}");
-                    }
-                }, token);
-            }
-            catch (Exception ex)
-            {
-                Log($"[Webcam] Initialization failed: {ex.Message}");
-            }
+            _cvCaptureCts2 = new CancellationTokenSource();
+            var token2 = _cvCaptureCts2.Token;
+            var name2 = _videoDevices[index].Name;
+            _cameraTask2 = Task.Run(async () =>
+                await StartCameraCoreAsync(index, name2, "updateCameraFeed2", IntelCamPreview, false, c => _cvCapture2 = c, token2), token2);
         }
 
         private async Task LoadCameraList()
         {
             try
             {
-                _videoDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(Windows.Devices.Enumeration.DeviceClass.VideoCapture);
+                _videoDevices = await Windows.Devices.Enumeration.DeviceInformation.FindAllAsync(
+                    Windows.Devices.Enumeration.DeviceClass.VideoCapture);
                 if (_videoDevices.Count == 0) { Log("[Webcam] No cameras found."); return; }
 
-                int defaultIdx = 0;
+                // Auto-detect Intel RealSense RGB and Creative cam by name
+                int creativeIdx = -1, intelIdx = -1;
                 for (int i = 0; i < _videoDevices.Count; i++)
                 {
-                    if (_videoDevices[i].Name.Contains("Creative", StringComparison.OrdinalIgnoreCase)) { defaultIdx = i; break; }
+                    string n = _videoDevices[i].Name;
+                    if (intelIdx < 0 && n.Contains("RealSense", StringComparison.OrdinalIgnoreCase) && n.Contains("RGB", StringComparison.OrdinalIgnoreCase))
+                        intelIdx = i;
+                    if (creativeIdx < 0 && n.Contains("Creative", StringComparison.OrdinalIgnoreCase))
+                        creativeIdx = i;
                 }
 
-                Log($"[Webcam] {_videoDevices.Count} camera(s) found. Selected: {_videoDevices[defaultIdx].Name}");
+                // Fallback: if no explicit match, use first two different cameras
+                if (creativeIdx < 0 && intelIdx < 0)
+                {
+                    creativeIdx = 0;
+                    intelIdx = _videoDevices.Count > 1 ? 1 : -1;
+                }
+                else if (creativeIdx < 0) creativeIdx = intelIdx == 0 ? (_videoDevices.Count > 1 ? 1 : -1) : 0;
+                else if (intelIdx < 0) intelIdx = creativeIdx == 0 ? (_videoDevices.Count > 1 ? 1 : -1) : 0;
+
+                Log($"[Webcam] {_videoDevices.Count} camera(s) found. Creative idx={creativeIdx}, Intel idx={intelIdx}");
 
                 DispatcherQueue.TryEnqueue(() =>
                 {
@@ -612,10 +647,20 @@ namespace RobotControllerApp
                         DashboardCameraCombo.Items.Add(dev.Name);
                         CalibCameraComboBox.Items.Add(dev.Name);
                     }
-                    DashboardCameraCombo.SelectedIndex = defaultIdx;
-                    CalibCameraComboBox.SelectedIndex = defaultIdx;
+                    if (creativeIdx >= 0) DashboardCameraCombo.SelectedIndex = creativeIdx;
+                    CalibCameraComboBox.SelectedIndex = creativeIdx >= 0 ? creativeIdx : 0;
+
+                    // Update header labels with detected names
+                    if (CreativeCamLabel != null && creativeIdx >= 0)
+                        CreativeCamLabel.Text = _videoDevices[creativeIdx].Name;
+                    if (IntelCamLabel != null && intelIdx >= 0)
+                        IntelCamLabel.Text = intelIdx >= 0 ? _videoDevices[intelIdx].Name : "Intel RGB";
                 });
-                await StartCameraByIndex(defaultIdx);
+
+                // Start both camera streams in parallel
+                var t1 = creativeIdx >= 0 ? StartCameraByIndex(creativeIdx) : Task.CompletedTask;
+                var t2 = intelIdx >= 0 ? StartCamera2ByIndex(intelIdx) : Task.CompletedTask;
+                await Task.WhenAll(t1, t2);
             }
             catch (Exception ex) { Log($"[Webcam] Enumeration failed: {ex.Message}"); }
         }
@@ -2183,6 +2228,9 @@ namespace RobotControllerApp
 
                     _broadcastServer.OnClientConnected += async () =>
                     {
+                        // Flip the hub "REMOTE EXPERT" card to ACTIVE immediately on connect.
+                        DispatcherQueue.TryEnqueue(() => UpdateExpertStatus(true));
+
                         var pose = _lastValidPose ?? _savedPose;
                         if (pose != null)
                         {
@@ -2190,6 +2238,13 @@ namespace RobotControllerApp
                             await _broadcastServer.BroadcastAsync("setCameraPose", JsonSerializer.Serialize(poseObj));
                         }
                         await PushObjectsToSceneAsync();
+                    };
+
+                    _broadcastServer.OnClientDisconnected += () =>
+                    {
+                        // Flip back to WAITING as soon as the last expert tab disconnects.
+                        if (_broadcastServer.ConnectedClients == 0)
+                            DispatcherQueue.TryEnqueue(() => UpdateExpertStatus(false));
                     };
 
                     _ = Task.Run(() => _broadcastServer.StartAsync());
@@ -2493,7 +2548,8 @@ namespace RobotControllerApp
             var mutedBrush = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
             var warnBrush = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
 
-            bool expertActive = isExpertWsConnected || isExpertReachable;
+            // Expert is active if: VR relay connected, ping reachable, OR browser has the preview open.
+            bool expertActive = isExpertWsConnected || isExpertReachable || _broadcastServer.ConnectedClients > 0;
             RelayActiveText.Text = expertActive ? "ACTIVE" : "WAITING";
             RelayActiveText.Foreground = RelayIcon.Foreground = expertActive ? successBrush : mutedBrush;
             if (RelayStatusIndicator != null) RelayStatusIndicator.Visibility = expertActive ? Visibility.Visible : Visibility.Collapsed;
@@ -2571,6 +2627,16 @@ namespace RobotControllerApp
             if (_calibService != null) { _calibService.Stop(); SetCalibStopped(); }
             StartCalibDetectionBtn.IsEnabled = CalibCameraComboBox.SelectedIndex >= 0;
             if (_lastValidPose != null && _isCalibFrozen) { FreezeCalibToggle.IsOn = true; FreezeCalibToggle.IsEnabled = true; }
+
+            // Update camera badge and Three.js URL with selected camera name
+            string camName = CalibCameraComboBox.SelectedItem?.ToString() ?? "";
+            if (!string.IsNullOrEmpty(camName))
+            {
+                CalibCamBadgeText.Text = camName;
+                string calibUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/calibrate.html" +
+                                  $"?cam={Uri.EscapeDataString(camName)}";
+                try { CalibWebView.Source = new Uri(calibUrl); } catch { }
+            }
         }
 
         private void ShowCalibrationPlaneToggle_Toggled(object sender, RoutedEventArgs e) { }
@@ -2584,6 +2650,36 @@ namespace RobotControllerApp
             }
         }
 
+        // Name of the camera currently being calibrated (used to name the pose file)
+        private string _calibCameraName = string.Empty;
+
+        // ── Calibration overlay open / close ────────────────────────────────
+        private void OpenCalibrateBtn_Click(object sender, RoutedEventArgs e)
+        {
+            // Populate camera list labelled by Creative / Intel
+            PopulateCalibCameraList();
+
+            CalibOverlay.Visibility = Visibility.Visible;
+            CalibDetectionBanner.Visibility = Visibility.Collapsed;
+            CalibOfflineState.Visibility = Visibility.Visible;
+            CalibCamBadgeText.Text = "Select camera to begin";
+
+            // Navigate WebView2 to the Three.js calibration page served by the Kestrel server
+            string calibUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/calibrate.html";
+            try { CalibWebView.Source = new Uri(calibUrl); }
+            catch { /* server might not be running yet; will retry on first connect */ }
+        }
+
+        private void CloseCalibOverlay_Click(object sender, RoutedEventArgs e) => CloseCalibOverlay();
+        private void CalibOverlayBackdrop_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e) => CloseCalibOverlay();
+
+        private void CloseCalibOverlay()
+        {
+            // Stop detection if still running
+            if (_calibService?.IsRunning == true) { _calibService.Stop(); SetCalibStopped(); }
+            CalibOverlay.Visibility = Visibility.Collapsed;
+        }
+
         private void StartCalibDetectionBtn_Click(object sender, RoutedEventArgs e)
         {
             if (_calibService == null) return;
@@ -2591,6 +2687,7 @@ namespace RobotControllerApp
             else
             {
                 int idx = CalibCameraComboBox.SelectedIndex; if (idx < 0) return;
+                _calibCameraName = CalibCameraComboBox.SelectedItem?.ToString() ?? $"camera_{idx}";
                 try
                 {
                     _calibService.OnFrame -= OnCalibFrame; _calibService.OnPose -= OnCalibPose; _calibService.OnPose -= LivePosePusher;
@@ -2598,11 +2695,13 @@ namespace RobotControllerApp
                     _calibService.StartDetection(idx);
                     _isCalibFrozen = false; FreezeCalibToggle.IsOn = false; FreezeCalibToggle.IsEnabled = false;
                     CalibOfflineState.Visibility = Visibility.Collapsed; CalibDetectionBanner.Visibility = Visibility.Visible;
-                    StartCalibDetectionBtn.Content = "■  Stop Detection"; Log($"[Calib] Detection started (camera index {idx})");
+                    StartCalibDetectionBtn.Content = "\u25a0  Stop Detection";
+                    Log($"[Calib] Detection started — {_calibCameraName} (index {idx})");
                 }
                 catch (Exception ex) { Log($"[Calib] Failed to start detection: {ex.Message}"); }
             }
         }
+
 
         private void OnCalibFrame(byte[] jpeg)
         {
@@ -2612,18 +2711,23 @@ namespace RobotControllerApp
                 try
                 {
                     if (!_feedFrozen && _broadcastServer != null && _broadcastServer.ConnectedClients > 0)
-                        _ = _broadcastServer.BroadcastAsync("updateCameraFeed", JsonSerializer.Serialize($"data:image/jpeg;base64,{Convert.ToBase64String(jpeg)}"));
+                    {
+                        string b64 = Convert.ToBase64String(jpeg);
+                        // Manual JSON string — avoids JsonSerializer escaping '/' '+' '=' as \uXXXX
+                        _ = _broadcastServer.BroadcastAsync("updateCameraFeed", $"\"data:image/jpeg;base64,{b64}\"");
+                        // calibFrame channel: consumed by calibrate.html (ArUco-annotated feed)
+                        _ = _broadcastServer.BroadcastAsync("calibFrame", $"\"data:image/jpeg;base64,{b64}\"");
+                    }
 
                     if (Preview3DView.Visibility == Visibility.Visible)
-                    {
                         CalibCameraPreview.Source = await LoadImageFromBytesAsync(jpeg);
-                    }
 
                     ContextWebcamPreview.Source = await LoadImageFromBytesAsync(jpeg);
                 }
                 catch { }
             });
         }
+
 
         private void OnCalibPose(CameraPose pose)
         {
@@ -2637,6 +2741,10 @@ namespace RobotControllerApp
                     CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     FreezeCalibToggle.IsEnabled = true;
+                    // Update pose readout strip in the calibration overlay
+                    CalibPoseX.Text = $"{pose.X:+0.0000;-0.0000} m";
+                    CalibPoseY.Text = $"{pose.Y:+0.0000;-0.0000} m";
+                    CalibPoseZ.Text = $"{pose.Z:+0.0000;-0.0000} m";
                 }
                 else
                 {
@@ -2671,18 +2779,25 @@ namespace RobotControllerApp
             if (_lastValidPose == null) { FreezeCalibToggle.IsOn = false; return; }
             try
             {
+                // Save to shared pose file AND a per-camera file so Creative / Intel don't overwrite each other
                 string jsonPath = CameraCalibrationService.SavedPosePath;
+                string camKey = string.IsNullOrEmpty(_calibCameraName) ? "unknown"
+                    : (_calibCameraName.Contains("Intel", StringComparison.OrdinalIgnoreCase) ? "intel" : "creative");
+                string perCamPath = Path.Combine(
+                    Path.GetDirectoryName(jsonPath)!,
+                    $"robot_camera_pose_{camKey}.json");
                 string json = JsonSerializer.Serialize(new { _lastValidPose.X, _lastValidPose.Y, _lastValidPose.Z, _lastValidPose.Rx, _lastValidPose.Ry, _lastValidPose.Rz, _lastValidPose.TvecX, _lastValidPose.TvecY, _lastValidPose.TvecZ, _lastValidPose.R11, _lastValidPose.R12, _lastValidPose.R13, _lastValidPose.R21, _lastValidPose.R22, _lastValidPose.R23, _lastValidPose.R31, _lastValidPose.R32, _lastValidPose.R33 });
 
                 _ = Task.Run(async () =>
                 {
-                    await File.WriteAllTextAsync(jsonPath, json);
+                    await File.WriteAllTextAsync(perCamPath, json);   // per-camera (intel / creative)
+                    await File.WriteAllTextAsync(jsonPath, json);      // shared active pose
                     DispatcherQueue.TryEnqueue(() =>
                     {
                         _isCalibFrozen = true;
                         if (_calibService != null) _calibService.OnPose -= LivePosePusher;
                         FreezeCalibToggle.IsEnabled = true;
-                        Log($"[Calib] Pose saved to {jsonPath}");
+                        Log($"[Calib] Pose saved → {perCamPath}");
                     });
                 });
             }
@@ -3027,23 +3142,13 @@ namespace RobotControllerApp
 
         private void UpdateScene3dUrlCard()
         {
-            const string publicUrl = "https://scene3d.dmzs-lab.com/preview.html";
-            DispatcherQueue.TryEnqueue(() => { Scene3dUrlText.Text = publicUrl; Scene3dUrlText.Tag = publicUrl; });
+            // The 3D viewer is now the Unity Windows app (Robot_Orange-main).
+            // Point the URL card at the hub WebSocket endpoint that the Unity app connects to.
+            const string hubWsUrl = "wss://scene3d.dmzs-lab.com/scene3d-ws";
+            DispatcherQueue.TryEnqueue(() => { Scene3dUrlText.Text = hubWsUrl; Scene3dUrlText.Tag = hubWsUrl; });
         }
 
-        private void CopyScene3dUrlBtn_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-        {
-            var url = Scene3dUrlText.Tag as string ?? Scene3dUrlText.Text;
-            if (string.IsNullOrEmpty(url)) return;
-            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage(); dp.SetText(url); Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp);
-            CopyScene3dUrlBtn.Content = "\uE8FB"; _ = Task.Delay(1500).ContinueWith(_ => DispatcherQueue.TryEnqueue(() => CopyScene3dUrlBtn.Content = "\uE8C8"));
-        }
 
-        private void OpenScene3dBtn_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e)
-        {
-            var url = Scene3dUrlText.Tag as string ?? Scene3dUrlText.Text;
-            if (!string.IsNullOrEmpty(url)) try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true }); } catch (Exception ex) { Log($"[Scene3D] Browser failed: {ex.Message}"); }
-        }
 
         // ════════════════════════════════════════════════════════════════════════
         // ROBOT STATUS HELPERS
