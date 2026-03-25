@@ -1593,7 +1593,7 @@ namespace RobotControllerApp
                 string dataUrl = "data:image/png;base64," + Convert.ToBase64String(imageBytes);
 
                 var imgObj = new { url = dataUrl, meta = new { _type = "gradio.FileData" } };
-                var payload = new { data = new object[] { imgObj, null, true } };
+                var payload = new { data = new object?[] { imgObj, null, true } };
 
                 using var triggerReq = new HttpRequestMessage(HttpMethod.Post, "https://viglong-orient-anything-v2.hf.space/gradio_api/call/run_inference")
                 {
@@ -2615,7 +2615,7 @@ namespace RobotControllerApp
             if (_settings != null && Math.Abs(_settings.CameraFovScale - e.NewValue) > 0.001) { _settings.CameraFovScale = e.NewValue; _settings.Save(); }
         }
 
-        private string _calibCameraName = "dual";
+
 
         // ── Calibration overlay open / close ────────────────────────────────
         private void OpenCalibrateBtn_Click(object sender, RoutedEventArgs e)
@@ -2714,7 +2714,7 @@ namespace RobotControllerApp
                     CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     FreezeCalibToggle.IsEnabled = true;
-                    PushCameraPoseAsync(pose, "creative");
+                    _ = PushCameraPoseAsync(pose, "creative");
                 }
             });
         }
@@ -2730,7 +2730,7 @@ namespace RobotControllerApp
                     CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     FreezeCalibToggle.IsEnabled = true;
-                    PushCameraPoseAsync(pose, "intel");
+                    _ = PushCameraPoseAsync(pose, "intel");
                 }
             });
         }

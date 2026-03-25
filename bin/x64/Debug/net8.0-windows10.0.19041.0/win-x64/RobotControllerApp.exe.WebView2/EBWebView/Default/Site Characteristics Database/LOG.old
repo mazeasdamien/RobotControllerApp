@@ -1,4 +1,3 @@
-2026/03/25-17:27:43.545 3f20 Creating DB C:\Users\QYTH4815\Documents\GitHub\RobotControllerApp\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\RobotControllerApp.exe.WebView2\EBWebView\Default\Site Characteristics Database since it was missing.
-2026/03/25-17:27:43.575 3f20 Reusing MANIFEST C:\Users\QYTH4815\Documents\GitHub\RobotControllerApp\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\RobotControllerApp.exe.WebView2\EBWebView\Default\Site Characteristics Database/MANIFEST-000001
-2026/03/25-17:27:43.576 3f20 Recovering log #3
-2026/03/25-17:27:43.578 3f20 Reusing old log C:\Users\QYTH4815\Documents\GitHub\RobotControllerApp\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\RobotControllerApp.exe.WebView2\EBWebView\Default\Site Characteristics Database/000003.log 
+2026/03/25-17:39:07.602 f4c Reusing MANIFEST C:\Users\QYTH4815\Documents\GitHub\RobotControllerApp\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\RobotControllerApp.exe.WebView2\EBWebView\Default\Site Characteristics Database/MANIFEST-000001
+2026/03/25-17:39:07.604 f4c Recovering log #3
+2026/03/25-17:39:07.605 f4c Reusing old log C:\Users\QYTH4815\Documents\GitHub\RobotControllerApp\bin\x64\Debug\net8.0-windows10.0.19041.0\win-x64\RobotControllerApp.exe.WebView2\EBWebView\Default\Site Characteristics Database/000003.log 

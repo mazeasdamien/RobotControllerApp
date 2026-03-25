@@ -33,3 +33,24 @@
 0:06:07 Tab1 PageLoad
 0:06:30 Memory Pressure: Critical
 0:08:09 Microsoft.UnloadController.IsUnclosableApp_IsNotWebApp
+0:00:00 Startup
+0:00:00 Microsoft.DeleteProfileHelper.CleanUpEphemeralProfiles
+0:00:00 Microsoft.DeleteProfileHelper.CleanUpDeletedProfiles
+0:00:00 Microsoft.NewBrowser_Popup
+0:00:00 Microsoft.BrowserList.AddBrowser
+0:00:00 Browser1 Insert active Tab1 at 0
+0:00:00 Tab1 StartNav1 #auto_toplevel
+0:00:00 Tab1 StartNav2 #typed
+0:00:00 Tab1 FinishNav1
+0:00:00 Tab1 PageLoad
+0:00:01 Tab1 FinishNav2
+0:00:01 Tab1 PageLoad
+0:01:13 Memory Pressure: Critical
+1:32:09 Tab1 StartNav3 #typed
+1:32:09 Tab1 FinishNav3
+1:32:09 Tab1 PageLoad
+1:34:09 Memory Pressure: Critical
+4:38:11 Tab1 StartNav4 #typed
+4:38:12 Tab1 FinishNav4
+4:38:12 Tab1 PageLoad
+4:38:33 Memory Pressure: Critical

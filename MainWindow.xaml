@@ -308,16 +308,7 @@
                                     <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Live Cameras" Style="{StaticResource Text.Headline3}" Margin="0,0,0,5" VerticalAlignment="Center"/>
-                                <Button Grid.Column="1" x:Name="OpenCalibrateBtn" Click="OpenCalibrateBtn_Click"
-                                        Padding="10,5" CornerRadius="6" FontSize="11"
-                                        Background="#1a3a4a" Foreground="#00e5ff"
-                                        BorderBrush="#3300e5ff" BorderThickness="1"
-                                        ToolTipService.ToolTip="Open ArUco camera calibration window">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <FontIcon Glyph="&#xE7B3;" FontSize="11" Foreground="#00e5ff"/>
-                                        <TextBlock Text="Calibrate" FontSize="11"/>
-                                    </StackPanel>
-                                </Button>
+
                             </Grid>
 
 
