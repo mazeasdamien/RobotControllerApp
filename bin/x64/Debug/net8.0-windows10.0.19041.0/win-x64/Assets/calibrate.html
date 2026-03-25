@@ -2,131 +2,38 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <title>Camera Calibration — Remote Assist Hub</title>
+  <title>Calibration 3D View</title>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    :root {
-      --bg:      #0a0a0d;
-      --card:    #12131a;
-      --border:  rgba(255,255,255,0.08);
-      --primary: #00e5ff;
-      --green:   #00cc6a;
-      --red:     #ff4444;
-      --text:    #e0e0e0;
-      --muted:   #666;
-    }
-    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif;
-           display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+    body { background: #050508; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
+           margin: 0; overflow: hidden; width: 100vw; height: 100vh; }
 
-    /* ── Header ── */
-    header { display:flex; align-items:center; gap:12px; padding:10px 20px;
-             background:var(--card); border-bottom:1px solid var(--border); flex-shrink:0; }
-    header h1 { font-size:13px; font-weight:700; letter-spacing:.08em; color:var(--primary); }
-    #cam-badge { font-size:11px; background:rgba(0,229,255,.1); border:1px solid rgba(0,229,255,.25);
-                 border-radius:5px; padding:3px 10px; color:var(--primary); }
-    #status-dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex-shrink:0; }
-    #status-dot.connected { background:var(--green); }
-    #status-dot.error     { background:var(--red); }
-    #status-text { font-size:11px; color:var(--muted); }
-    #freeze-btn  { margin-left:auto; padding:6px 18px; border:none; border-radius:6px; cursor:pointer;
-                   font-size:12px; font-weight:600; background:#1a3a4a; color:var(--primary);
-                   border:1px solid rgba(0,229,255,.3); transition:background .2s; }
-    #freeze-btn:hover  { background:#1f4c63; }
-    #freeze-btn.frozen { background:rgba(0,204,106,.15); color:var(--green); border-color:rgba(0,204,106,.4); }
-
-    /* ── Main split ── */
-    main { display:flex; flex:1; gap:0; overflow:hidden; }
-
-    /* Left: camera feed */
-    .cam-panel { display:flex; flex-direction:column; width:480px; flex-shrink:0;
-                 border-right:1px solid var(--border); background:var(--card); }
-    .panel-header { padding:8px 14px; font-size:10px; font-weight:700; letter-spacing:.1em;
-                    color:var(--muted); border-bottom:1px solid var(--border); text-transform:uppercase; }
-    #cam-feed-wrap { flex:1; display:flex; align-items:center; justify-content:center;
-                     background:#050507; overflow:hidden; position:relative; }
-    #cam-img { width:100%; height:100%; object-fit:contain; display:block; }
-    #no-feed  { position:absolute; text-align:center; color:var(--muted); font-size:12px;
-                pointer-events:none; }
-    #no-feed span { display:block; font-size:28px; margin-bottom:8px; }
-
-    /* Pose info panel below feed */
-    .pose-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:1px;
-                 background:var(--border); border-top:1px solid var(--border); }
-    .pose-cell { background:var(--card); padding:8px 12px; }
-    .pose-cell label { display:block; font-size:9px; color:var(--muted); letter-spacing:.08em; margin-bottom:2px; }
-    .pose-cell span  { font-size:13px; font-weight:600; font-family:Consolas,monospace; color:var(--primary); }
-    #detect-row { padding:8px 14px; font-size:11px; border-top:1px solid var(--border);
-                  display:flex; align-items:center; gap:8px; }
-    #detect-icon { width:8px; height:8px; border-radius:50%; background:var(--muted); flex-shrink:0; }
-    #detect-icon.ok  { background:var(--green); }
-    #detect-icon.bad { background:var(--red); }
-    #detect-msg { color:var(--muted); font-size:11px; }
-
-    /* Right: Three.js */
-    .threejs-panel { flex:1; position:relative; overflow:hidden; }
     #threejs-canvas { width:100%; height:100%; display:block; }
 
     /* Overlay legend */
     #legend { position:absolute; top:12px; right:14px; background:rgba(10,10,13,.8);
-              border:1px solid var(--border); border-radius:6px; padding:8px 12px;
-              font-size:10px; line-height:1.8; }
+              border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:8px 12px;
+              font-size:10px; line-height:1.8; pointer-events:none; }
     .leg { display:flex; align-items:center; gap:6px; }
     .leg-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
 
     /* Camera label tag */
     #cam-tag { position:absolute; bottom:14px; left:14px;
                background:rgba(0,229,255,.1); border:1px solid rgba(0,229,255,.25);
-               border-radius:5px; padding:4px 10px; font-size:10px; color:var(--primary); }
+               border-radius:5px; padding:4px 10px; font-size:10px; color:#00e5ff; pointer-events:none; }
   </style>
 </head>
 <body>
 
-<header>
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#00e5ff" stroke-width="2">
-    <path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>
-  </svg>
-  <h1>CAMERA CALIBRATION</h1>
-  <div id="cam-badge">—</div>
-  <div id="status-dot"></div>
-  <span id="status-text">Connecting…</span>
-  <button id="freeze-btn" onclick="sendFreeze()">❄ Freeze &amp; Save</button>
-</header>
-
-<main>
-  <!-- Left: camera feed + pose -->
-  <div class="cam-panel">
-    <div class="panel-header">Live Camera — ArUco Overlay</div>
-    <div id="cam-feed-wrap">
-      <img id="cam-img" style="display:none"/>
-      <div id="no-feed"><span>📷</span>Waiting for camera feed…</div>
-    </div>
-    <div id="detect-row">
-      <div id="detect-icon"></div>
-      <span id="detect-msg">No pose detected</span>
-    </div>
-    <div class="pose-grid">
-      <div class="pose-cell"><label>X (m)</label><span id="px">—</span></div>
-      <div class="pose-cell"><label>Y (m)</label><span id="py">—</span></div>
-      <div class="pose-cell"><label>Z / Height (m)</label><span id="pz">—</span></div>
-      <div class="pose-cell"><label>Rx (rad)</label><span id="rx">—</span></div>
-      <div class="pose-cell"><label>Ry (rad)</label><span id="ry">—</span></div>
-      <div class="pose-cell"><label>Rz (rad)</label><span id="rz">—</span></div>
-    </div>
-  </div>
-
-  <!-- Right: Three.js 3D view -->
-  <div class="threejs-panel">
-    <canvas id="threejs-canvas"></canvas>
-    <div id="legend">
-      <div class="leg"><div class="leg-dot" style="background:#00e5ff"></div> Camera frustum</div>
-      <div class="leg"><div class="leg-dot" style="background:#00cc6a"></div> Workspace grid</div>
-      <div class="leg"><div class="leg-dot" style="background:#ff8800"></div> ArUco markers</div>
-      <div class="leg"><div class="leg-dot" style="background:#888"></div> Robot base</div>
-    </div>
-    <div id="cam-tag">3D Workspace View</div>
-  </div>
-</main>
+<canvas id="threejs-canvas"></canvas>
+<div id="legend">
+  <div class="leg"><div class="leg-dot" id="frustum-dot" style="background:#00e5ff"></div> Camera frustum</div>
+  <div class="leg"><div class="leg-dot" style="background:#00cc6a"></div> Workspace grid</div>
+  <div class="leg"><div class="leg-dot" style="background:#ff8800"></div> ArUco markers</div>
+  <div class="leg"><div class="leg-dot" style="background:#888"></div> Robot base</div>
+</div>
+<div id="cam-tag">3D Workspace View</div>
 
 <script type="importmap">
 {
@@ -140,15 +47,18 @@
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 // ── URL params ──────────────────────────────────────────────────────────────
 const params  = new URLSearchParams(location.search);
 const camName = params.get('cam') || 'Camera';
-document.getElementById('cam-badge').textContent = camName;
-document.getElementById('cam-tag').textContent   =
-  camName.toLowerCase().includes('intel') ? '3D View — Intel RealSense (behind robots)'
-                                          : '3D View — Creative GestureCam';
-document.title = `Calibration — ${camName}`;
+const isIntel = camName.toLowerCase().includes('intel');
+const camColor = isIntel ? 0x5599ff : 0x00e5ff;
+
+document.getElementById('cam-tag').textContent = isIntel 
+  ? '3D View — Intel RealSense (behind robots)'
+  : '3D View — Creative GestureCam';
+document.getElementById('frustum-dot').style.background = isIntel ? '#5599ff' : '#00e5ff';
 
 // ── WebSocket ────────────────────────────────────────────────────────────────
 const WS_URL = `ws://${location.hostname}:8181/scene3d-ws`;
@@ -156,33 +66,17 @@ let ws;
 
 function connect() {
   ws = new WebSocket(WS_URL);
-
-  ws.onopen = () => {
-    setStatus('connected', 'Connected');
-  };
-
-  ws.onclose = () => {
-    setStatus('', 'Reconnecting…');
-    setTimeout(connect, 2000);
-  };
-
-  ws.onerror = () => setStatus('error', 'Connection error');
-
   ws.onmessage = (ev) => {
     let env;
     try { env = JSON.parse(ev.data); } catch { return; }
-    if (env.type === 'calibFrame' || env.type === 'updateCameraFeed') {
-      const dataUrl = typeof env.payload === 'string'
-        ? (env.payload.startsWith('"') ? JSON.parse(env.payload) : env.payload)
-        : env.payload;
-      showFrame(dataUrl);
-    } else if (env.type === 'setCameraPose') {
+    if (env.type === 'setCameraPose') {
       try {
         const p = typeof env.payload === 'string' ? JSON.parse(env.payload) : env.payload;
-        updatePose(p);
+        updateFrustum(p);
       } catch {}
     }
   };
+  ws.onclose = () => setTimeout(connect, 2000);
 }
 connect();
 
@@ -259,14 +153,14 @@ const dirLight = new THREE.DirectionalLight(0x88ccff, 0.8);
 dirLight.position.set(1, 1, 2);
 scene.add(dirLight);
 
-// Grid (Niryo workspace) — 7×5 ArUco grid, square=3.75cm
+// Grid (Niryo workspace) — 7×5 ArUco grid, square=39mm, marker=29mm
 // Cols: u ∈ {-3,-2,-1,0,1,2,3}  Rows: v ∈ {-2,-1,0,1,2}
-const SQ = 0.0375; // 3.75 cm
-const ML = 0.0275; // 2.75 cm
+const SQ = 0.039;  // 3.9 cm
+const ML = 0.029;  // 2.9 cm
 
 // Workspace boundary rectangle
-const workW = 6 * SQ; // 6 squares wide
-const workH = 4 * SQ; // 4 squares tall
+const workW = 7 * SQ; // 7 squares wide
+const workH = 5 * SQ; // 5 squares tall
 const workGeo = new THREE.PlaneGeometry(workW, workH);
 const workMat = new THREE.MeshBasicMaterial({ color: 0x001a10, side: THREE.DoubleSide });
 const workPlane = new THREE.Mesh(workGeo, workMat);
@@ -306,13 +200,34 @@ markerLayout.forEach(([id,u,v]) => {
 const axesHelper = new THREE.AxesHelper(0.1);
 scene.add(axesHelper);
 
-// Robot base cylinder (placeholder)
-const robotGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.12, 16);
-const robotMat = new THREE.MeshStandardMaterial({ color: 0x395a8c });
-const robotMesh = new THREE.Mesh(robotGeo, robotMat);
-robotMesh.rotation.x = Math.PI / 2;
-robotMesh.position.set(0, 0, 0.06);
-scene.add(robotMesh);
+// 80x80cm Table (Wood color)
+const tableGeo = new THREE.BoxGeometry(0.8, 0.8, 0.05);
+const tableMat = new THREE.MeshStandardMaterial({ color: 0xcdba96, roughness: 0.9 });
+const tableMesh = new THREE.Mesh(tableGeo, tableMat);
+tableMesh.position.set(-0.35, 0.25, -0.025); // ArUco is near front-right corner
+scene.add(tableMesh);
+
+// Load actual robot models (ned.glb)
+const gltfLoader = new GLTFLoader();
+gltfLoader.load('./ned.glb', (gltf) => {
+  const model = gltf.scene;
+  // Convert standard GLTF Y-up to our Z-up scene
+  model.rotation.x = Math.PI / 2;
+
+  // Robot 1 (middle left of table)
+  const r1 = new THREE.Group();
+  r1.add(model.clone());
+  r1.position.set(-0.65, 0.2, 0);
+  r1.rotation.z = -Math.PI / 6; // Facing slightly toward the middle
+  scene.add(r1);
+
+  // Robot 2 (back right)
+  const r2 = new THREE.Group();
+  r2.add(model.clone());
+  r2.position.set(-0.2, 0.55, 0);
+  r2.rotation.z = Math.PI / 4;  // Facing somewhat forward
+  scene.add(r2);
+});
 
 // Camera frustum group (updated on pose)
 let frustumGroup = new THREE.Group();

@@ -156,9 +156,12 @@ namespace RobotControllerApp
 
         private Windows.Devices.Enumeration.DeviceInformationCollection? _videoDevices;
 
-        private readonly CameraCalibrationService _calibService = new();
-        private CameraPose? _lastValidPose;
-        private CameraPose? _savedPose;
+        private readonly CameraCalibrationService _creativeService = new();
+        private readonly CameraCalibrationService _intelService = new();
+        private CameraPose? _lastValidPoseCreative;
+        private CameraPose? _lastValidPoseIntel;
+        private CameraPose? _savedPoseCreative;
+        private CameraPose? _savedPoseIntel;
 
         // ════════════════════════════════════════════════════════════════════════
         // INITIALIZATION
@@ -2682,130 +2685,135 @@ namespace RobotControllerApp
 
         private void StartCalibDetectionBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (_calibService == null) return;
-            if (StartCalibDetectionBtn.Content?.ToString()?.StartsWith('\u25a0') == true) { _calibService.Stop(); SetCalibStopped(); }
+            if (_creativeService == null || _intelService == null) return;
+            if (StartCalibDetectionBtn.Content?.ToString()?.StartsWith('\u25a0') == true) 
+            { 
+                _creativeService.Stop(); _intelService.Stop(); SetCalibStopped(); 
+            }
             else
             {
-                int idx = CalibCameraComboBox.SelectedIndex; if (idx < 0) return;
-                _calibCameraName = CalibCameraComboBox.SelectedItem?.ToString() ?? $"camera_{idx}";
-                try
-                {
-                    _calibService.OnFrame -= OnCalibFrame; _calibService.OnPose -= OnCalibPose; _calibService.OnPose -= LivePosePusher;
-                    _calibService.OnFrame += OnCalibFrame; _calibService.OnPose += OnCalibPose; _calibService.OnPose += LivePosePusher;
-                    _calibService.StartDetection(idx);
-                    _isCalibFrozen = false; FreezeCalibToggle.IsOn = false; FreezeCalibToggle.IsEnabled = false;
-                    CalibOfflineState.Visibility = Visibility.Collapsed; CalibDetectionBanner.Visibility = Visibility.Visible;
-                    StartCalibDetectionBtn.Content = "\u25a0  Stop Detection";
-                    Log($"[Calib] Detection started — {_calibCameraName} (index {idx})");
+                int creativeIdx = -1, intelIdx = -1;
+                for (int i = 0; i < _videoDevices?.Count; i++) {
+                    if (_videoDevices[i].Name.Contains("XiaoMi", StringComparison.OrdinalIgnoreCase)) creativeIdx = i;
+                    if (_videoDevices[i].Name.Contains("Intel", StringComparison.OrdinalIgnoreCase)) intelIdx = i;
                 }
-                catch (Exception ex) { Log($"[Calib] Failed to start detection: {ex.Message}"); }
+                
+                if (creativeIdx >= 0) {
+                    _creativeService.OnFrame -= OnCalibFrameCreative; _creativeService.OnPose -= OnCalibPoseCreative;
+                    _creativeService.OnFrame += OnCalibFrameCreative; _creativeService.OnPose += OnCalibPoseCreative;
+                    _creativeService.StartDetection(creativeIdx);
+                }
+                if (intelIdx >= 0) {
+                    _intelService.OnFrame -= OnCalibFrameIntel; _intelService.OnPose -= OnCalibPoseIntel;
+                    _intelService.OnFrame += OnCalibFrameIntel; _intelService.OnPose += OnCalibPoseIntel;
+                    _intelService.StartDetection(intelIdx);
+                }
+
+                _isCalibFrozen = false; FreezeCalibToggle.IsOn = false; FreezeCalibToggle.IsEnabled = false;
+                CalibOfflineState.Visibility = Visibility.Collapsed; CalibDetectionBanner.Visibility = Visibility.Visible;
+                StartCalibDetectionBtn.Content = "\u25a0  Stop Dual Detection";
+                Log($"[Calib] Dual detection started");
             }
         }
 
-
-        private void OnCalibFrame(byte[] jpeg)
+        private void OnCalibFrameCreative(byte[] jpeg)
         {
-            _latestWebcamFrameBytes = jpeg;
             DispatcherQueue?.TryEnqueue(async () =>
             {
-                try
-                {
-                    if (!_feedFrozen && _broadcastServer != null && _broadcastServer.ConnectedClients > 0)
-                    {
+                try {
+                    if (!_feedFrozen && _broadcastServer != null && _broadcastServer.ConnectedClients > 0) {
                         string b64 = Convert.ToBase64String(jpeg);
-                        // Manual JSON string — avoids JsonSerializer escaping '/' '+' '=' as \uXXXX
                         _ = _broadcastServer.BroadcastAsync("updateCameraFeed", $"\"data:image/jpeg;base64,{b64}\"");
-                        // calibFrame channel: consumed by calibrate.html (ArUco-annotated feed)
-                        _ = _broadcastServer.BroadcastAsync("calibFrame", $"\"data:image/jpeg;base64,{b64}\"");
                     }
-
-                    if (Preview3DView.Visibility == Visibility.Visible)
-                        CalibCameraPreview.Source = await LoadImageFromBytesAsync(jpeg);
-
-                    ContextWebcamPreview.Source = await LoadImageFromBytesAsync(jpeg);
-                }
-                catch { }
+                    if (Preview3DView.Visibility == Visibility.Visible) CalibCameraPreviewCreative.Source = await LoadImageFromBytesAsync(jpeg);
+                } catch { }
             });
         }
 
+        private void OnCalibFrameIntel(byte[] jpeg)
+        {
+            DispatcherQueue?.TryEnqueue(async () =>
+            {
+                try {
+                    if (!_feedFrozen && _broadcastServer != null && _broadcastServer.ConnectedClients > 0) {
+                        string b64 = Convert.ToBase64String(jpeg);
+                        _ = _broadcastServer.BroadcastAsync("updateCameraFeed2", $"\"data:image/jpeg;base64,{b64}\"");
+                    }
+                    if (Preview3DView.Visibility == Visibility.Visible) CalibCameraPreviewIntel.Source = await LoadImageFromBytesAsync(jpeg);
+                } catch { }
+            });
+        }
 
-        private void OnCalibPose(CameraPose pose)
+        private void OnCalibPoseCreative(CameraPose pose)
         {
             DispatcherQueue?.TryEnqueue(() =>
             {
                 if (_isCalibFrozen) return;
-                if (pose.IsValid)
-                {
-                    _lastValidPose = pose;
-                    CalibDetectionIcon.Glyph = "\uE73E"; CalibDetectionStatus.Text = "Grid detected — pose estimated";
+                if (pose.IsValid) {
+                    _lastValidPoseCreative = pose;
+                    CalibDetectionIcon.Glyph = "\uE73E"; CalibDetectionStatus.Text = "Grid detected by Creative";
                     CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     FreezeCalibToggle.IsEnabled = true;
-                }
-                else
-                {
-                    CalibDetectionIcon.Glyph = "\uE783"; CalibDetectionStatus.Text = "Grid not detected";
-                    CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 68, 68));
-                    CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 68, 68));
-                    if (_lastValidPose == null) FreezeCalibToggle.IsEnabled = false;
+                    PushCameraPoseAsync(pose, "creative");
                 }
             });
         }
 
-        private void CalibCopyBtn_Click(object sender, RoutedEventArgs e)
+        private void OnCalibPoseIntel(CameraPose pose)
         {
-            if (_lastValidPose == null) return;
-            var dp = new Windows.ApplicationModel.DataTransfer.DataPackage();
-            dp.SetText($"tvec: X={_lastValidPose.X:0.000} Y={_lastValidPose.Y:0.000} Z={_lastValidPose.Z:0.000}\n" +
-                       $"rvec: Rx={_lastValidPose.Rx:0.000} Ry={_lastValidPose.Ry:0.000} Rz={_lastValidPose.Rz:0.000}");
-            Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dp); Log("[Calib] Pose copied to clipboard.");
+            DispatcherQueue?.TryEnqueue(() =>
+            {
+                if (_isCalibFrozen) return;
+                if (pose.IsValid) {
+                    _lastValidPoseIntel = pose;
+                    CalibDetectionIcon.Glyph = "\uE73E"; CalibDetectionStatus.Text = "Grid detected by Intel";
+                    CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
+                    CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
+                    FreezeCalibToggle.IsEnabled = true;
+                    PushCameraPoseAsync(pose, "intel");
+                }
+            });
         }
+
+        private void CalibCopyBtn_Click(object sender, RoutedEventArgs e) { }
 
         private void FreezeCalibToggle_Toggled(object sender, RoutedEventArgs e)
         {
-            if (FreezeCalibToggle.IsOn != true)
-            {
-                _isCalibFrozen = false; FreezeCalibToggle.IsEnabled = _lastValidPose != null;
+            if (FreezeCalibToggle.IsOn != true) {
+                _isCalibFrozen = false; FreezeCalibToggle.IsEnabled = _lastValidPoseCreative != null || _lastValidPoseIntel != null;
                 CalibDetectionIcon.Glyph = "\uE783"; CalibDetectionStatus.Text = "Grid not detected (Refreshing...)";
                 CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 68, 68));
-                if (_calibService != null) { _calibService.OnPose -= LivePosePusher; _calibService.OnPose += LivePosePusher; }
                 return;
             }
 
-            if (_lastValidPose == null) { FreezeCalibToggle.IsOn = false; return; }
-            try
-            {
-                // Save to shared pose file AND a per-camera file so Creative / Intel don't overwrite each other
-                string jsonPath = CameraCalibrationService.SavedPosePath;
-                string camKey = string.IsNullOrEmpty(_calibCameraName) ? "unknown"
-                    : (_calibCameraName.Contains("Intel", StringComparison.OrdinalIgnoreCase) ? "intel" : "creative");
-                string perCamPath = Path.Combine(
-                    Path.GetDirectoryName(jsonPath)!,
-                    $"robot_camera_pose_{camKey}.json");
-                string json = JsonSerializer.Serialize(new { _lastValidPose.X, _lastValidPose.Y, _lastValidPose.Z, _lastValidPose.Rx, _lastValidPose.Ry, _lastValidPose.Rz, _lastValidPose.TvecX, _lastValidPose.TvecY, _lastValidPose.TvecZ, _lastValidPose.R11, _lastValidPose.R12, _lastValidPose.R13, _lastValidPose.R21, _lastValidPose.R22, _lastValidPose.R23, _lastValidPose.R31, _lastValidPose.R32, _lastValidPose.R33 });
-
-                _ = Task.Run(async () =>
-                {
-                    await File.WriteAllTextAsync(perCamPath, json);   // per-camera (intel / creative)
-                    await File.WriteAllTextAsync(jsonPath, json);      // shared active pose
-                    DispatcherQueue.TryEnqueue(() =>
-                    {
+            if (_lastValidPoseCreative == null && _lastValidPoseIntel == null) { FreezeCalibToggle.IsOn = false; return; }
+            try {
+                string dir = Path.GetDirectoryName(CameraCalibrationService.SavedPosePath)!;
+                
+                _ = Task.Run(async () => {
+                    if (_lastValidPoseCreative != null) {
+                        string cp = Path.Combine(dir, "robot_camera_pose_creative.json");
+                        await File.WriteAllTextAsync(cp, JsonSerializer.Serialize(new { _lastValidPoseCreative.X, _lastValidPoseCreative.Y, _lastValidPoseCreative.Z, _lastValidPoseCreative.Rx, _lastValidPoseCreative.Ry, _lastValidPoseCreative.Rz, _lastValidPoseCreative.R11, _lastValidPoseCreative.R12, _lastValidPoseCreative.R13, _lastValidPoseCreative.R21, _lastValidPoseCreative.R22, _lastValidPoseCreative.R23, _lastValidPoseCreative.R31, _lastValidPoseCreative.R32, _lastValidPoseCreative.R33 }));
+                    }
+                    if (_lastValidPoseIntel != null) {
+                        string ip = Path.Combine(dir, "robot_camera_pose_intel.json");
+                        await File.WriteAllTextAsync(ip, JsonSerializer.Serialize(new { _lastValidPoseIntel.X, _lastValidPoseIntel.Y, _lastValidPoseIntel.Z, _lastValidPoseIntel.Rx, _lastValidPoseIntel.Ry, _lastValidPoseIntel.Rz, _lastValidPoseIntel.R11, _lastValidPoseIntel.R12, _lastValidPoseIntel.R13, _lastValidPoseIntel.R21, _lastValidPoseIntel.R22, _lastValidPoseIntel.R23, _lastValidPoseIntel.R31, _lastValidPoseIntel.R32, _lastValidPoseIntel.R33 }));
+                    }
+                    
+                    DispatcherQueue.TryEnqueue(() => {
                         _isCalibFrozen = true;
-                        if (_calibService != null) _calibService.OnPose -= LivePosePusher;
-                        FreezeCalibToggle.IsEnabled = true;
-                        Log($"[Calib] Pose saved → {perCamPath}");
+                        Log($"[Calib] Dual poses saved.");
                     });
                 });
-            }
-            catch (Exception ex) { FreezeCalibToggle.IsOn = false; Log($"[Calib] Save failed: {ex.Message}"); }
+            } catch (Exception ex) { FreezeCalibToggle.IsOn = false; Log($"[Calib] Save failed: {ex.Message}"); }
         }
 
         private void SetCalibStopped()
         {
-            if (_calibService != null) _calibService.OnPose -= LivePosePusher;
-            if (!_isCalibFrozen) { FreezeCalibToggle.IsOn = false; FreezeCalibToggle.IsEnabled = _lastValidPose != null; }
-            StartCalibDetectionBtn.Content = "▶  Start Detection"; CalibDetectionBanner.Visibility = Visibility.Collapsed;
-            Log("[Calib] Detection stopped.");
+            if (!_isCalibFrozen) { FreezeCalibToggle.IsOn = false; FreezeCalibToggle.IsEnabled = false; }
+            StartCalibDetectionBtn.Content = "▶  Start Dual Detection"; CalibDetectionBanner.Visibility = Visibility.Collapsed;
+            Log("[Calib] Dual detection stopped.");
         }
 
         private void HandleClientBrowserMessage(string jsonStr)

@@ -502,17 +502,24 @@
                                 <TextBlock Text="LIVE CAMERA — ARUCO OVERLAY" FontSize="9" FontWeight="Bold"
                                            Foreground="#666" CharacterSpacing="80"/>
                             </Border>
-                            <Border Grid.Row="1" Background="#050508">
-                                <Image x:Name="CalibCameraPreview" Stretch="Uniform"/>
-                            </Border>
+                            <Grid Grid.Row="1">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <Border Grid.Row="0" Background="#050508" ToolTipService.ToolTip="Creative GestureCam">
+                                    <Image x:Name="CalibCameraPreviewCreative" Stretch="Uniform"/>
+                                </Border>
+                                <Border Grid.Row="1" Background="#050508" BorderBrush="#1AFFFFFF" BorderThickness="0,1,0,0" ToolTipService.ToolTip="Intel RealSense">
+                                    <Image x:Name="CalibCameraPreviewIntel" Stretch="Uniform"/>
+                                </Border>
+                            </Grid>
                             <StackPanel x:Name="CalibOfflineState" Grid.Row="1" HorizontalAlignment="Center"
                                         VerticalAlignment="Center" Spacing="8">
                                 <FontIcon Glyph="&#xE7B3;" FontSize="32" Foreground="#333"/>
-                                <TextBlock Text="Start detection to see camera feed" FontSize="12" Foreground="#555"
+                                <TextBlock Text="Start detection to see both camera feeds" FontSize="12" Foreground="#555"
                                            HorizontalAlignment="Center"/>
                             </StackPanel>
-
-
                         </Grid>
 
                         <!-- Three.js 3D view via WebView2 -->
@@ -526,28 +533,20 @@
                             Background="#08FFFFFF">
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
 
-                            <!-- Camera selector -->
-                            <TextBlock Text="Camera" FontSize="11" Foreground="#888" VerticalAlignment="Center" Margin="0,0,8,0"/>
-                            <ComboBox Grid.Column="1" x:Name="CalibCameraComboBox"
-                                      MinWidth="200" PlaceholderText="Select calibration camera…"
-                                      SelectionChanged="CalibCameraComboBox_SelectionChanged" FontSize="11"/>
-
                             <!-- Start/Stop -->
-                            <Button Grid.Column="3" x:Name="StartCalibDetectionBtn"
-                                    Content="▶  Start Detection"
+                            <Button Grid.Column="1" x:Name="StartCalibDetectionBtn"
+                                    Content="▶  Start Dual Detection"
                                     Click="StartCalibDetectionBtn_Click"
                                     Padding="12,6" Margin="12,0,0,0" CornerRadius="6"
-                                    IsEnabled="False"/>
+                                    IsEnabled="True"/>
 
                             <!-- Freeze toggle -->
-                            <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8"
+                            <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
                                         VerticalAlignment="Center" Margin="14,0,0,0">
                                 <TextBlock Text="Freeze &amp; Save" FontSize="11" Foreground="#888" VerticalAlignment="Center"/>
                                 <ToggleSwitch x:Name="FreezeCalibToggle"
