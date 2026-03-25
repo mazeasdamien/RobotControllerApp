@@ -1,33 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8"/>
-  <title>Calibration 3D View</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #050508; color: #e0e0e0; font-family: 'Segoe UI', sans-serif;
-           margin: 0; overflow: hidden; width: 100vw; height: 100vh; }
 
-    #threejs-canvas { width:100%; height:100%; display:block; }
+<head>
+  <meta charset="UTF-8" />
+  <title>Calibration 3D View</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: #050508;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #threejs-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
 
     /* Overlay legend */
-    #legend { position:absolute; top:12px; right:14px; background:rgba(10,10,13,.8);
-              border:1px solid rgba(255,255,255,0.08); border-radius:6px; padding:8px 12px;
-              font-size:10px; line-height:1.8; pointer-events:none; }
-    .leg { display:flex; align-items:center; gap:6px; }
-    .leg-dot { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+    #legend {
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      background: rgba(10, 10, 13, .8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 10px;
+      line-height: 1.8;
+      pointer-events: none;
+    }
+
+    .leg {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .leg-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
 
     /* Camera label tag */
-    #cam-tag { position:absolute; bottom:14px; left:14px;
-               background:rgba(0,229,255,.1); border:1px solid rgba(0,229,255,.25);
-               border-radius:5px; padding:4px 10px; font-size:10px; color:#00e5ff; pointer-events:none; }
+    #cam-tag {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      background: rgba(0, 229, 255, .1);
+      border: 1px solid rgba(0, 229, 255, .25);
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: 10px;
+      color: #00e5ff;
+      pointer-events: none;
+    }
   </style>
 </head>
+
 <body>
 
-<canvas id="threejs-canvas"></canvas>
-<script type="importmap">
+  <canvas id="threejs-canvas"></canvas>
+  <script type="importmap">
 {
   "imports": {
     "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
@@ -36,208 +85,227 @@
 }
 </script>
 
-<script type="module">
-import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// ── URL params ──────────────────────────────────────────────────────────────
-const params  = new URLSearchParams(location.search);
-const camName = params.get('cam') || 'Camera';
-const isIntel = camName.toLowerCase().includes('intel');
-const camColor = isIntel ? 0x5599ff : 0x00e5ff;
+    // ── URL params ──────────────────────────────────────────────────────────────
+    const params = new URLSearchParams(location.search);
+    const camName = params.get('cam') || 'Camera';
+    const isIntel = camName.toLowerCase().includes('intel');
+    const camColor = isIntel ? 0x5599ff : 0x00e5ff;
 
-// ── WebSocket ────────────────────────────────────────────────────────────────
-const WS_URL = `ws://${location.hostname}:8181/scene3d-ws`;
-let ws;
+    // ── WebSocket ────────────────────────────────────────────────────────────────
+    const WS_URL = `ws://${location.hostname}:8181/scene3d-ws`;
+    let ws;
 
-function connect() {
-  ws = new WebSocket(WS_URL);
-  ws.onmessage = (ev) => {
-    let env;
-    try { env = JSON.parse(ev.data); } catch { return; }
-    if (env.type === 'setCameraPose') {
-      try {
-        const p = typeof env.payload === 'string' ? JSON.parse(env.payload) : env.payload;
-        updateFrustum(p, p.camType);
-      } catch {}
+    function connect() {
+      ws = new WebSocket(WS_URL);
+      ws.onmessage = (ev) => {
+        let env;
+        try { env = JSON.parse(ev.data); } catch { return; }
+        if (env.type === 'setCameraPose') {
+          try {
+            const p = typeof env.payload === 'string' ? JSON.parse(env.payload) : env.payload;
+            updateFrustum(p, p.camType);
+          } catch { }
+        }
+        else if (env.type === 'setRobotJoints') {
+          try {
+            const p = typeof env.payload === 'string' ? JSON.parse(env.payload) : env.payload;
+            if (window.robotJointRefs && window.robotJointRefs[p.robotIdx]) {
+                const j = window.robotJointRefs[p.robotIdx];
+                for(let i=0; i<6; i++) if (j[i]) j[i].rotation.z = p.angles[i] * Math.PI / 180.0;
+            }
+          } catch { }
+        }
+      };
+      ws.onclose = () => setTimeout(connect, 2000);
     }
-  };
-  ws.onclose = () => setTimeout(connect, 2000);
-}
-connect();
+    connect();
 
-// ── Three.js scene ───────────────────────────────────────────────────────────
-const canvas   = document.getElementById('threejs-canvas');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
-renderer.setPixelRatio(devicePixelRatio);
-renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.setClearColor(0x080810);
+    // ── Three.js scene ───────────────────────────────────────────────────────────
+    const canvas = document.getElementById('threejs-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(devicePixelRatio);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.setClearColor(0x080810);
 
-const scene  = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20);
-camera.position.set(0.5, -0.8, 0.7);
-camera.up.set(0, 0, 1);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20);
+    camera.position.set(0.5, -0.8, 0.7);
+    camera.up.set(0, 0, 1);
 
-const controls = new OrbitControls(camera, canvas);
-controls.target.set(0, 0, 0);
-controls.enableDamping = true;
+    const controls = new OrbitControls(camera, canvas);
+    controls.target.set(0, 0, 0);
+    controls.enableDamping = true;
 
-// Lighting
-scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-const dirLight = new THREE.DirectionalLight(0x88ccff, 0.8);
-dirLight.position.set(1, 1, 2);
-scene.add(dirLight);
+    // Lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const dirLight = new THREE.DirectionalLight(0x88ccff, 0.8);
+    dirLight.position.set(1, 1, 2);
+    scene.add(dirLight);
 
-// Grid (Niryo workspace) — 7×5 ArUco grid, square=39mm, marker=29mm
-// Cols: u ∈ {-3,-2,-1,0,1,2,3}  Rows: v ∈ {-2,-1,0,1,2}
-const SQ = 0.039;  // 3.9 cm
-const ML = 0.029;  // 2.9 cm
+    // Grid (Niryo workspace) — 7×5 ArUco grid, square=39mm, marker=29mm
+    // Cols: u ∈ {-3,-2,-1,0,1,2,3}  Rows: v ∈ {-2,-1,0,1,2}
+    const SQ = 0.039;  // 3.9 cm
+    const ML = 0.029;  // 2.9 cm
 
-// ArUco marker positions (ids 0-16, 7×5 layout)
-const markerLayout = [
-  [0,-2,2],[1,0,2],[2,2,2],
-  [3,-3,1],[4,-1,1],[5,1,1],[6,3,1],
-  [7,-2,0],[8,0,0],[9,2,0],
-  [10,-3,-1],[11,-1,-1],[12,1,-1],[13,3,-1],
-  [14,-2,-2],[15,0,-2],[16,2,-2]
-];
-const markerGeo = new THREE.PlaneGeometry(ML, ML);
-const markerMat = new THREE.MeshBasicMaterial({ color: 0xff8800, side: THREE.DoubleSide });
-markerLayout.forEach(([id,u,v]) => {
-  const m = new THREE.Mesh(markerGeo, markerMat.clone());
-  m.position.set(u * SQ, v * SQ, 0.001);
-  scene.add(m);
+    // ArUco marker positions (ids 0-16, 7×5 layout)
+    const markerLayout = [
+      [0, -2, 2], [1, 0, 2], [2, 2, 2],
+      [3, -3, 1], [4, -1, 1], [5, 1, 1], [6, 3, 1],
+      [7, -2, 0], [8, 0, 0], [9, 2, 0],
+      [10, -3, -1], [11, -1, -1], [12, 1, -1], [13, 3, -1],
+      [14, -2, -2], [15, 0, -2], [16, 2, -2]
+    ];
+    const markerGeo = new THREE.PlaneGeometry(ML, ML);
+    const markerMat = new THREE.MeshBasicMaterial({ color: 0xff8800, side: THREE.DoubleSide });
+    markerLayout.forEach(([id, u, v]) => {
+      const m = new THREE.Mesh(markerGeo, markerMat.clone());
+      m.position.set(u * SQ, v * SQ, 0.001);
+      scene.add(m);
 
-  const geoCross = new THREE.BufferGeometry().setFromPoints([
-    new THREE.Vector3(-ML*0.3, 0, 0), new THREE.Vector3(ML*0.3, 0, 0),
-    new THREE.Vector3(0, -ML*0.3, 0), new THREE.Vector3(0, ML*0.3, 0)
-  ]);
-  const cross = new THREE.LineSegments(geoCross, new THREE.LineBasicMaterial({ color: 0x000000 }));
-  cross.position.copy(m.position);
-  scene.add(cross);
-});
+      const geoCross = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(-ML * 0.3, 0, 0), new THREE.Vector3(ML * 0.3, 0, 0),
+        new THREE.Vector3(0, -ML * 0.3, 0), new THREE.Vector3(0, ML * 0.3, 0)
+      ]);
+      const cross = new THREE.LineSegments(geoCross, new THREE.LineBasicMaterial({ color: 0x000000 }));
+      cross.position.copy(m.position);
+      scene.add(cross);
+    });
 
-// World axes
-const axesHelper = new THREE.AxesHelper(0.1);
-scene.add(axesHelper);
+    // World axes
+    const axesHelper = new THREE.AxesHelper(0.1);
+    scene.add(axesHelper);
 
-// 80x80cm Table (Wood color)
-const tableGeo = new THREE.BoxGeometry(0.8, 0.8, 0.05);
-const tableMat = new THREE.MeshStandardMaterial({ color: 0xcdba96, roughness: 0.9 });
-const tableMesh = new THREE.Mesh(tableGeo, tableMat);
-tableMesh.position.set(0, 0.3025, -0.025); // ArUco sits directly bordering the bottom edge of the table mesh
-scene.add(tableMesh);
+    // 80x80cm Table (Wood color)
+    const tableGeo = new THREE.BoxGeometry(0.8, 0.8, 0.05);
+    const tableMat = new THREE.MeshStandardMaterial({ color: 0xcdba96, roughness: 0.9 });
+    const tableMesh = new THREE.Mesh(tableGeo, tableMat);
+    tableMesh.position.set(0, 0.3025, -0.025); // ArUco sits directly bordering the bottom edge of the table mesh
+    scene.add(tableMesh);
 
-// Load actual robot models (ned.glb)
-const gltfLoader = new GLTFLoader();
-gltfLoader.load('./ned.glb', (gltf) => {
-  const model = gltf.scene;
-  // Convert standard GLTF Y-up to our Z-up scene
-  model.rotation.x = Math.PI / 2;
+    // Load actual robot models (ned.glb)
+    const gltfLoader = new GLTFLoader();
+    window.robotJointRefs = [[], []]; // Global cache for IK runtime streaming
+    gltfLoader.load('./ned.glb', (gltf) => {
+      const model = gltf.scene;
+      // Convert standard GLTF Y-up to our Z-up scene
+      model.rotation.x = Math.PI / 2;
 
-  // Robot 1 (Top Right of desk, physically furthest from operator)
-  const r1 = new THREE.Group();
-  r1.add(model.clone());
-  r1.position.set(0.285, 0.5775, 0); // Exactly 4cm inside padding, 5cm top padding
-  r1.rotation.z = -Math.PI / 2; // Facing Left across the workspace
-  scene.add(r1);
+      // Robot 1 (Top Right of desk, physically furthest from operator)
+      const r1 = new THREE.Group();
+      const m1 = model.clone();
+      r1.add(m1);
+      r1.position.set(0.29, 0.53, 0); // Exactly 4cm inside padding, 5cm top padding
+      r1.rotation.z = -Math.PI / 2; // Facing Left across the workspace
+      scene.add(r1);
 
-  // Robot 2 (Bottom Right of desk, physically nearest to operator)
-  const r2 = new THREE.Group();
-  r2.add(model.clone());
-  r2.position.set(-0.285, 0.5775, 0); // Exactly 4cm inside padding, 5cm top padding
-  r2.rotation.z = -Math.PI / 2; // Facing Left across the workspace
-  scene.add(r2);
-});
+      // Robot 2 (Bottom Right of desk, physically nearest to operator)
+      const r2 = new THREE.Group();
+      const m2 = model.clone();
+      r2.add(m2);
+      r2.position.set(-0.29, 0.53, 0); // Exactly 4cm inside padding, 5cm top padding
+      r2.rotation.z = -Math.PI / 2; // Facing Left across the workspace
+      scene.add(r2);
+      
+      // Map all 6 joint objects from both clones (Standard URDF node designations)
+      for(let i=1; i<=6; i++) {
+          window.robotJointRefs[0].push(m1.getObjectByName('joint_' + i));
+          window.robotJointRefs[1].push(m2.getObjectByName('joint_' + i));
+      }
+    });
 
-// Camera frustum groups
-let frustumGroupCreative = new THREE.Group();
-let frustumGroupIntel = new THREE.Group();
+    // Camera frustum groups
+    let frustumGroupCreative = new THREE.Group();
+    let frustumGroupIntel = new THREE.Group();
 
-scene.add(frustumGroupCreative);
-scene.add(frustumGroupIntel);
+    scene.add(frustumGroupCreative);
+    scene.add(frustumGroupIntel);
 
-function buildFrustum(group, color) {
-  group.clear();
+    function buildFrustum(group, color) {
+      group.clear();
 
-  const fovH = 60 * Math.PI / 180;
-  const fovV = 45 * Math.PI / 180;
-  const near = 0.02, far = 0.45;
+      const fovH = 60 * Math.PI / 180;
+      const fovV = 45 * Math.PI / 180;
+      const near = 0.02, far = 0.45;
 
-  const hw = Math.tan(fovH / 2);
-  const hv = Math.tan(fovV / 2);
+      const hw = Math.tan(fovH / 2);
+      const hv = Math.tan(fovV / 2);
 
-  const pts = [
-    // near rectangle
-    new THREE.Vector3(-near*hw, -near*hv, near), new THREE.Vector3( near*hw, -near*hv, near),
-    new THREE.Vector3( near*hw,  near*hv, near), new THREE.Vector3(-near*hw,  near*hv, near),
-    // far rectangle
-    new THREE.Vector3(-far*hw, -far*hv, far),   new THREE.Vector3( far*hw, -far*hv, far),
-    new THREE.Vector3( far*hw,  far*hv, far),   new THREE.Vector3(-far*hw,  far*hv, far),
-  ];
+      const pts = [
+        // near rectangle
+        new THREE.Vector3(-near * hw, -near * hv, near), new THREE.Vector3(near * hw, -near * hv, near),
+        new THREE.Vector3(near * hw, near * hv, near), new THREE.Vector3(-near * hw, near * hv, near),
+        // far rectangle
+        new THREE.Vector3(-far * hw, -far * hv, far), new THREE.Vector3(far * hw, -far * hv, far),
+        new THREE.Vector3(far * hw, far * hv, far), new THREE.Vector3(-far * hw, far * hv, far),
+      ];
 
-  const indices = [
-    0,1, 1,2, 2,3, 3,0,     // near rect
-    4,5, 5,6, 6,7, 7,4,     // far rect
-    0,4, 1,5, 2,6, 3,7      // edges
-  ];
-  const geo = new THREE.BufferGeometry().setFromPoints(pts);
-  geo.setIndex(indices);
-  const mat = new THREE.LineBasicMaterial({ color });
-  group.add(new THREE.LineSegments(geo, mat));
+      const indices = [
+        0, 1, 1, 2, 2, 3, 3, 0,     // near rect
+        4, 5, 5, 6, 6, 7, 7, 4,     // far rect
+        0, 4, 1, 5, 2, 6, 3, 7      // edges
+      ];
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      geo.setIndex(indices);
+      const mat = new THREE.LineBasicMaterial({ color });
+      group.add(new THREE.LineSegments(geo, mat));
 
-  // Dot at camera origin
-  const dotGeo = new THREE.SphereGeometry(0.01, 8, 8);
-  const dotMat = new THREE.MeshBasicMaterial({ color });
-  group.add(new THREE.Mesh(dotGeo, dotMat));
-}
+      // Dot at camera origin
+      const dotGeo = new THREE.SphereGeometry(0.01, 8, 8);
+      const dotMat = new THREE.MeshBasicMaterial({ color });
+      group.add(new THREE.Mesh(dotGeo, dotMat));
+    }
 
-// Initialize with default visible placeholders so user knows both cameras exist before ArUco locks
-buildFrustum(frustumGroupCreative, 0x00e5ff);
-frustumGroupCreative.position.set(0, -0.60, 0.40);
-frustumGroupCreative.rotation.x = Math.PI / 4;
+    // Initialize with default visible placeholders so user knows both cameras exist before ArUco locks
+    buildFrustum(frustumGroupCreative, 0x00e5ff);
+    frustumGroupCreative.position.set(0, -0.60, 0.40);
+    frustumGroupCreative.rotation.x = Math.PI / 4;
 
-buildFrustum(frustumGroupIntel, 0x5599ff);
-frustumGroupIntel.position.set(0, -0.80, 0.60);
-frustumGroupIntel.rotation.x = Math.PI / 5;
+    buildFrustum(frustumGroupIntel, 0x5599ff);
+    frustumGroupIntel.position.set(0, -0.80, 0.60);
+    frustumGroupIntel.rotation.x = Math.PI / 5;
 
-function updateFrustum(pose, type) {
-  const isIntel = type === 'intel';
-  const group = isIntel ? frustumGroupIntel : frustumGroupCreative;
-  const color = isIntel ? 0x5599ff : 0x00e5ff;
-  
-  buildFrustum(group, color);
+    function updateFrustum(pose, type) {
+      const isIntel = type === 'intel';
+      const group = isIntel ? frustumGroupIntel : frustumGroupCreative;
+      const color = isIntel ? 0x5599ff : 0x00e5ff;
 
-  // Position: camera world position in board frame
-  group.position.set(pose.X, pose.Y, pose.Z);
+      buildFrustum(group, color);
 
-  // Orientation: rotation matrix columns
-  const R = new THREE.Matrix4().set(
-    pose.R11, pose.R12, pose.R13, 0,
-    pose.R21, pose.R22, pose.R23, 0,
-    pose.R31, pose.R32, pose.R33, 0,
-    0,        0,        0,        1
-  );
-  group.setRotationFromMatrix(R);
-}
+      // Position: camera world position in board frame
+      group.position.set(pose.X, pose.Y, pose.Z);
 
-// ── Resize ───────────────────────────────────────────────────────────────────
-function resize() {
-  const { clientWidth: w, clientHeight: h } = canvas.parentElement;
-  renderer.setSize(w, h);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-}
-new ResizeObserver(resize).observe(canvas.parentElement);
-resize();
+      // Orientation: rotation matrix columns
+      const R = new THREE.Matrix4().set(
+        pose.R11, pose.R12, pose.R13, 0,
+        pose.R21, pose.R22, pose.R23, 0,
+        pose.R31, pose.R32, pose.R33, 0,
+        0, 0, 0, 1
+      );
+      group.setRotationFromMatrix(R);
+    }
 
-// ── Render loop ──────────────────────────────────────────────────────────────
-(function loop() {
-  requestAnimationFrame(loop);
-  controls.update();
-  renderer.render(scene, camera);
-})();
-</script>
+    // ── Resize ───────────────────────────────────────────────────────────────────
+    function resize() {
+      const { clientWidth: w, clientHeight: h } = canvas.parentElement;
+      renderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    new ResizeObserver(resize).observe(canvas.parentElement);
+    resize();
+
+    // ── Render loop ──────────────────────────────────────────────────────────────
+    (function loop() {
+      requestAnimationFrame(loop);
+      controls.update();
+      renderer.render(scene, camera);
+    })();
+  </script>
 </body>
+
 </html>

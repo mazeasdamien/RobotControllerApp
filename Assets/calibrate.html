@@ -111,6 +111,15 @@
             updateFrustum(p, p.camType);
           } catch { }
         }
+        else if (env.type === 'setRobotJoints') {
+          try {
+            const p = typeof env.payload === 'string' ? JSON.parse(env.payload) : env.payload;
+            if (window.robotJointRefs && window.robotJointRefs[p.robotIdx]) {
+                const j = window.robotJointRefs[p.robotIdx];
+                for(let i=0; i<6; i++) if (j[i]) j[i].rotation.z = p.angles[i] * Math.PI / 180.0;
+            }
+          } catch { }
+        }
       };
       ws.onclose = () => setTimeout(connect, 2000);
     }
@@ -180,6 +189,7 @@
 
     // Load actual robot models (ned.glb)
     const gltfLoader = new GLTFLoader();
+    window.robotJointRefs = [[], []]; // Global cache for IK runtime streaming
     gltfLoader.load('./ned.glb', (gltf) => {
       const model = gltf.scene;
       // Convert standard GLTF Y-up to our Z-up scene
@@ -187,17 +197,25 @@
 
       // Robot 1 (Top Right of desk, physically furthest from operator)
       const r1 = new THREE.Group();
-      r1.add(model.clone());
-      r1.position.set(0.28, 0.55, 0); // Exactly 4cm inside padding, 5cm top padding
+      const m1 = model.clone();
+      r1.add(m1);
+      r1.position.set(0.29, 0.53, 0); // Exactly 4cm inside padding, 5cm top padding
       r1.rotation.z = -Math.PI / 2; // Facing Left across the workspace
       scene.add(r1);
 
       // Robot 2 (Bottom Right of desk, physically nearest to operator)
       const r2 = new THREE.Group();
-      r2.add(model.clone());
-      r2.position.set(-0.28, 0.55, 0); // Exactly 4cm inside padding, 5cm top padding
+      const m2 = model.clone();
+      r2.add(m2);
+      r2.position.set(-0.29, 0.53, 0); // Exactly 4cm inside padding, 5cm top padding
       r2.rotation.z = -Math.PI / 2; // Facing Left across the workspace
       scene.add(r2);
+      
+      // Map all 6 joint objects from both clones (Standard URDF node designations)
+      for(let i=1; i<=6; i++) {
+          window.robotJointRefs[0].push(m1.getObjectByName('joint_' + i));
+          window.robotJointRefs[1].push(m2.getObjectByName('joint_' + i));
+      }
     });
 
     // Camera frustum groups
