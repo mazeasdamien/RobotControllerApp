@@ -124,17 +124,25 @@
       // Apply gorgeous transparent holographic styling
       model.traverse((child) => {
         if (child.isMesh) {
-          child.material = new THREE.MeshPhysicalMaterial({
-            color: 0x00e5ff,
-            emissive: 0x003366,
+          child.material = new THREE.MeshBasicMaterial({
+            color: 0x00ccff,
             transparent: true,
-            opacity: 0.65,
-            roughness: 0.2,
-            metalness: 0.1,
-            transmission: 0.9,
-            ior: 1.5,
-            side: THREE.DoubleSide
+            opacity: 0.2,
+            wireframe: false,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false
           });
+          
+          // Add glowing outline wireframe for structure
+          const edges = new THREE.EdgesGeometry(child.geometry);
+          const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.5,
+            blending: THREE.AdditiveBlending
+          }));
+          child.add(line);
         }
       });
 

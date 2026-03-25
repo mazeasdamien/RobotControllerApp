@@ -135,15 +135,19 @@ namespace RobotControllerApp.Services
 
             try
             {
-                capture = new VideoCapture(cameraIndex, VideoCaptureAPIs.ANY);
+                capture = new VideoCapture();
+                capture.Open(cameraIndex, VideoCaptureAPIs.DSHOW);
+                
                 if (!capture.IsOpened())
                 {
                     OnLog?.Invoke($"[Calib] Cannot open camera at index {cameraIndex}.");
                     return;
                 }
 
-                // capture.Set(VideoCaptureProperties.FrameWidth, FrameW);
-                // capture.Set(VideoCaptureProperties.FrameHeight, FrameH);
+                // Strictly demand Motion-JPEG compression to prevent dual-1080p USB bandwidth starvation (black frames)
+                capture.Set(VideoCaptureProperties.FourCC, VideoWriter.FourCC('M', 'J', 'P', 'G'));
+                capture.Set(VideoCaptureProperties.FrameWidth, FrameW);
+                capture.Set(VideoCaptureProperties.FrameHeight, FrameH);
 
                 double[,] camData = { { Fx, 0, Cx }, { 0, Fy, Cy }, { 0, 0, 1 } };
                 cameraMatrix = Mat.FromArray(camData);
