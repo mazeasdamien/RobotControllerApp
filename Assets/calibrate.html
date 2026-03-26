@@ -208,7 +208,7 @@
       const m2 = model.clone();
       r2.add(m2);
       r2.position.set(-0.29, -0.53, 0); // Flipped to bottom side
-      r2.rotation.z = -Math.PI / 2; // Facing Left (parallel to r1)
+      r2.rotation.z = Math.PI / 2; // Facing Right (opposite to r1)
       scene.add(r2);
       
       // Map all 6 joint objects from both clones (Standard URDF node designations)

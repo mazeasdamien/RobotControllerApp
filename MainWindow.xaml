@@ -42,6 +42,16 @@
 
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="0,0,148,0">
 
+                    <!-- Robot Control launcher -->
+                    <Button x:Name="RobotControlPanelBtn" Click="RobotControlPanelBtn_Click"
+                            Background="#1a2a1a" BorderBrush="#3300CC44" BorderThickness="1"
+                            CornerRadius="6" Padding="10,5" VerticalAlignment="Center" ToolTipService.ToolTip="Robot Control Panels">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <FontIcon Glyph="&#xEBC5;" FontSize="13" Foreground="#00CC44"/>
+                            <TextBlock Text="Robot Control" FontSize="12" Foreground="#00CC44" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
 
                     <ToggleButton x:Name="AutoScanToggle" Click="AutoScanToggle_Click"
                                   Content="Auto-Scan" FontSize="11" Padding="10,5"
@@ -698,10 +708,433 @@
                 <Polyline x:Name="UnityPath"/>
             </Canvas>
 
+            <!-- Ghost controls referenced from code-behind for RobotControl panels -->
+            <TextBlock x:Name="TeleopStatusText"/>
+            <TextBlock x:Name="WhisperTranscriptText"/>
+            <TextBlock x:Name="SisSelectedLabel"/>
+            <TextBlock x:Name="IntelScanStatusText"/>
+            <Slider x:Name="TeleopSpeedSlider" Minimum="1" Maximum="100" Value="30"/>
+            <ToggleSwitch x:Name="TeleopEnableToggle"/>
+            <Button x:Name="WhisperRecordBtn" Click="WhisperRecordBtn_Click"/>
+            <Button x:Name="ContextScanBtn" Click="ContextScanBtn_Click"/>
+            <Button x:Name="SimulateIKBtn" Click="SimulateIKBtn_Click"/>
+            <Button x:Name="ExecuteTrajectoryBtn" Click="ExecuteTrajectoryBtn_Click"/>
             <GridView x:Name="DetectedObjectsList"/>
             <GridView x:Name="SelectedObjectsList"/>
             <GridView x:Name="BananaImagesList"/>
         </StackPanel>
 
     </Grid>
+
+    <!-- ══════════════════════════════════════════════════════════════════════════
+         ROBOT CONTROL SIDE PANEL (slides in from right)
+    ══════════════════════════════════════════════════════════════════════════ -->
+    <Canvas x:Name="RobotControlOverlay" Visibility="Collapsed" Grid.RowSpan="2"
+            HorizontalAlignment="Right" VerticalAlignment="Stretch">
+        <!-- Backdrop dim -->
+        <Rectangle x:Name="RobotControlBackdrop" Canvas.Left="-9999" Canvas.Top="0"
+                   Width="9999" Height="2000" Fill="#70000000"
+                   Tapped="RobotControlBackdrop_Tapped"/>
+
+        <!-- Side Panel Container -->
+        <Border x:Name="RobotControlPanel"
+                Background="{StaticResource Brush.Background.Card}"
+                BorderBrush="#2200CC44" BorderThickness="1,0,0,0"
+                Width="420"
+                Canvas.Top="0">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>  <!-- Header -->
+                    <RowDefinition Height="*"/>     <!-- Scrollable content -->
+                </Grid.RowDefinitions>
+
+                <!-- ── Panel Header ── -->
+                <Border Padding="16,12" BorderBrush="#1AFFFFFF" BorderThickness="0,0,0,1"
+                        Background="#0A00CC44">
+                    <Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <FontIcon Glyph="&#xEBC5;" FontSize="16" Foreground="#00CC44"/>
+                            <TextBlock Text="ROBOT CONTROL" FontSize="13" FontWeight="Bold"
+                                       Foreground="#00CC44" VerticalAlignment="Center" CharacterSpacing="60"/>
+                        </StackPanel>
+                        <Button HorizontalAlignment="Right" Click="CloseRobotControlPanel_Click"
+                                Background="Transparent" BorderThickness="0" Padding="8,6">
+                            <FontIcon Glyph="&#xE711;" FontSize="14"/>
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- ── Scrollable Panel Body ── -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="0">
+
+                        <!-- ════════════════════════════════════════
+                             PANEL 1: TELEOPERATION
+                        ════════════════════════════════════════ -->
+                        <Border BorderBrush="#15FFFFFF" BorderThickness="0,0,0,1" Padding="16,14">
+                            <StackPanel Spacing="12">
+                                <!-- Section header -->
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE7D6;" FontSize="14" Foreground="#00E5FF"/>
+                                    <TextBlock Text="TELEOPERATION" FontSize="11" FontWeight="Bold"
+                                               Foreground="#00E5FF" VerticalAlignment="Center" CharacterSpacing="80"/>
+                                </StackPanel>
+
+                                <!-- Enable toggle + status -->
+                                <Border Background="#0A000000" CornerRadius="8" Padding="12,10"
+                                        BorderBrush="#1A00E5FF" BorderThickness="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="IK Teleoperation" FontSize="13" FontWeight="SemiBold"/>
+                                            <TextBlock x:Name="TeleopStatusLabel" Text="Disabled — learning mode active"
+                                                       FontSize="11" Opacity="0.6" Margin="0,2,0,0"/>
+                                        </StackPanel>
+                                        <ToggleSwitch x:Name="TeleopToggle"
+                                                      Grid.Column="1" OnContent="ON" OffContent="OFF"
+                                                      MinWidth="0" VerticalAlignment="Center"
+                                                      Toggled="TeleopToggle_Toggled"/>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Speed slider -->
+                                <StackPanel Spacing="6">
+                                    <Grid>
+                                        <TextBlock Text="Follow Speed" FontSize="12" Opacity="0.75"/>
+                                        <TextBlock x:Name="TeleopSpeedLabel" Text="30%"
+                                                   HorizontalAlignment="Right" FontSize="12"
+                                                   Foreground="#00E5FF" FontWeight="SemiBold"/>
+                                    </Grid>
+                                    <Slider x:Name="TeleopPanelSpeedSlider"
+                                            Minimum="1" Maximum="100" Value="30"
+                                            StepFrequency="1"
+                                            ValueChanged="TeleopSpeedSlider_ValueChanged"/>
+                                    <Grid>
+                                        <TextBlock Text="Slow" FontSize="10" Opacity="0.4"/>
+                                        <TextBlock Text="Fast" HorizontalAlignment="Right" FontSize="10" Opacity="0.4"/>
+                                    </Grid>
+                                </StackPanel>
+
+                                <!-- Robot selector -->
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="Target Robot:" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
+                                    <RadioButton x:Name="TeleopR1Radio" Content="Robot 1" IsChecked="True"
+                                                 GroupName="TeleopRobotGroup" FontSize="12"/>
+                                    <RadioButton x:Name="TeleopR2Radio" Content="Robot 2"
+                                                 GroupName="TeleopRobotGroup" FontSize="12"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ════════════════════════════════════════
+                             PANEL 2: VOICE / WHISPER
+                        ════════════════════════════════════════ -->
+                        <Border BorderBrush="#15FFFFFF" BorderThickness="0,0,0,1" Padding="16,14">
+                            <StackPanel Spacing="12">
+                                <!-- Section header -->
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE720;" FontSize="14" Foreground="#FF9800"/>
+                                    <TextBlock Text="VOICE INPUT (WHISPER)" FontSize="11" FontWeight="Bold"
+                                               Foreground="#FF9800" VerticalAlignment="Center" CharacterSpacing="80"/>
+                                </StackPanel>
+
+                                <!-- Record button + status -->
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <Border Background="#0AFFFFFF" CornerRadius="6" Padding="10,8"
+                                            BorderBrush="#15FFFFFF" BorderThickness="1">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Ellipse x:Name="WhisperRecordDot" Width="8" Height="8"
+                                                     Fill="#444" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="WhisperStatusLabel"
+                                                       Text="Ready to record" FontSize="12" Opacity="0.75"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                    <Button x:Name="WhisperPanelRecordBtn"
+                                            Grid.Column="1"
+                                            Click="WhisperRecordBtn_Click"
+                                            CornerRadius="8" Padding="12,8"
+                                            Background="#1AFF9800" BorderBrush="#44FF9800" BorderThickness="1">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon x:Name="WhisperRecordIcon" Glyph="&#xE720;" FontSize="14" Foreground="#FF9800"/>
+                                            <TextBlock x:Name="WhisperRecordLabel" Text="Record" FontSize="12" Foreground="#FF9800"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+
+                                <!-- Transcript display + edit -->
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="Transcript" FontSize="11" Opacity="0.5" CharacterSpacing="40"/>
+                                    <TextBox x:Name="WhisperTranscriptBox"
+                                             PlaceholderText="Transcribed text appears here — edit if needed…"
+                                             HorizontalAlignment="Stretch" TextWrapping="Wrap"
+                                             MinHeight="72" AcceptsReturn="True"
+                                             Background="#0A000000" BorderBrush="#1AFFFFFF"/>
+                                </StackPanel>
+
+                                <!-- Send transcript action -->
+                                <Button Click="WhisperSendTranscript_Click"
+                                        HorizontalAlignment="Stretch" CornerRadius="6" Padding="0,8"
+                                        Background="#1AFF9800" BorderBrush="#33FF9800" BorderThickness="1">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE724;" FontSize="13" Foreground="#FF9800"/>
+                                        <TextBlock Text="Send to Robot" FontSize="12" Foreground="#FF9800"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ════════════════════════════════════════
+                             PANEL 3: CONTEXT / SCENE SCAN
+                        ════════════════════════════════════════ -->
+                        <Border BorderBrush="#15FFFFFF" BorderThickness="0,0,0,1" Padding="16,14">
+                            <StackPanel Spacing="12">
+                                <!-- Section header -->
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE7C5;" FontSize="14" Foreground="#A9F0FF"/>
+                                    <TextBlock Text="CONTEXT SCAN" FontSize="11" FontWeight="Bold"
+                                               Foreground="#A9F0FF" VerticalAlignment="Center" CharacterSpacing="80"/>
+                                    <Border Background="#18A9F0FF" CornerRadius="4" Padding="6,2">
+                                        <TextBlock Text="Gemini Flash" FontSize="9" Foreground="#A9F0FF"/>
+                                    </Border>
+                                </StackPanel>
+
+                                <!-- Intel camera preview with bounding box overlay -->
+                                <Border CornerRadius="8" Background="#0A0A0A"
+                                        BorderBrush="#1E1E1E" BorderThickness="1"
+                                        Height="160" ClipToBounds="True">
+                                    <Grid>
+                                        <Image x:Name="ScanCameraPreview" Stretch="Uniform"/>
+                                        <!-- Bounding boxes drawn via WebView overlay -->
+                                        <Canvas x:Name="ScanBoundingBoxCanvas" IsHitTestVisible="False"/>
+                                        <!-- Placeholder when no frame -->
+                                        <StackPanel x:Name="ScanNoFrameState"
+                                                    HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                    Spacing="6">
+                                            <FontIcon Glyph="&#xE722;" FontSize="28" Foreground="#333"/>
+                                            <TextBlock Text="Intel RealSense" FontSize="11" Foreground="#444"
+                                                       HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+
+                                <!-- Scan button + status -->
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="ScanStatusLabel"
+                                               Text="Ready to scan" FontSize="11" Opacity="0.6"
+                                               VerticalAlignment="Center" TextWrapping="Wrap"/>
+                                    <Button x:Name="ScanPanelBtn"
+                                            Grid.Column="1"
+                                            Click="ContextScanBtn_Click"
+                                            CornerRadius="8" Padding="12,6"
+                                            Background="#1AA9F0FF" BorderBrush="#44A9F0FF" BorderThickness="1">
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <FontIcon x:Name="ScanBtnIcon" Glyph="&#xE773;" FontSize="13" Foreground="#A9F0FF"/>
+                                            <TextBlock Text="Scan" FontSize="12" Foreground="#A9F0FF"/>
+                                        </StackPanel>
+                                    </Button>
+                                </Grid>
+
+                                <!-- Detected objects list -->
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="Detected Objects" FontSize="11" Opacity="0.5" CharacterSpacing="40"/>
+                                    <ScrollViewer MaxHeight="120" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl x:Name="ScanDetectedList">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border BorderBrush="#10FFFFFF" BorderThickness="0,0,0,1" Padding="2,4">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <Ellipse Width="6" Height="6" Fill="#00E5FF"
+                                                                     VerticalAlignment="Center"/>
+                                                            <TextBlock Text="{Binding}" FontSize="11" Opacity="0.8"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ════════════════════════════════════════
+                             PANEL 4: SIS — SAEH TAXONOMY + SIMULATE
+                        ════════════════════════════════════════ -->
+                        <Border BorderBrush="#15FFFFFF" BorderThickness="0,0,0,1" Padding="16,14">
+                            <StackPanel Spacing="14">
+                                <!-- Section header -->
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE9D9;" FontSize="14" Foreground="#FFD700"/>
+                                    <TextBlock Text="SIS — SAEH TAXONOMY" FontSize="11" FontWeight="Bold"
+                                               Foreground="#FFD700" VerticalAlignment="Center" CharacterSpacing="80"/>
+                                </StackPanel>
+
+                                <!-- SAEH quadrant circle selector -->
+                                <Grid HorizontalAlignment="Center">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <!-- Circle container -->
+                                    <Grid Width="200" Height="200">
+                                        <!-- Outer ring -->
+                                        <Ellipse Width="200" Height="200" Stroke="#30FFD700" StrokeThickness="1"/>
+                                        <!-- Inner separator lines -->
+                                        <Line X1="100" Y1="0" X2="100" Y2="200"
+                                              Stroke="#30FFFFFF" StrokeThickness="1"/>
+                                        <Line X1="0" Y1="100" X2="200" Y2="100"
+                                              Stroke="#30FFFFFF" StrokeThickness="1"/>
+
+                                        <!-- S — Safe (top-left) -->
+                                        <Button x:Name="SaehSBtn"
+                                                Tag="S" Click="SaehQuadrant_Click"
+                                                Width="96" Height="96"
+                                                HorizontalAlignment="Left" VerticalAlignment="Top"
+                                                Margin="2,2,0,0"
+                                                CornerRadius="96,2,2,2"
+                                                Background="#15FFD700" BorderBrush="#25FFD700" BorderThickness="1"
+                                                Padding="0">
+                                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
+                                                <TextBlock Text="S" FontSize="20" FontWeight="Bold" Foreground="#FFD700" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Safe" FontSize="9" Foreground="#AAFFAABB" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- A — Abnormal (top-right) -->
+                                        <Button x:Name="SaehABtn"
+                                                Tag="A" Click="SaehQuadrant_Click"
+                                                Width="96" Height="96"
+                                                HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                Margin="0,2,2,0"
+                                                CornerRadius="2,96,2,2"
+                                                Background="#15FF9800" BorderBrush="#25FF9800" BorderThickness="1"
+                                                Padding="0">
+                                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
+                                                <TextBlock Text="A" FontSize="20" FontWeight="Bold" Foreground="#FF9800" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Abnormal" FontSize="9" Foreground="#AAFF9800" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- E — Emergency (bottom-left) -->
+                                        <Button x:Name="SaehEBtn"
+                                                Tag="E" Click="SaehQuadrant_Click"
+                                                Width="96" Height="96"
+                                                HorizontalAlignment="Left" VerticalAlignment="Bottom"
+                                                Margin="2,0,0,2"
+                                                CornerRadius="2,2,2,96"
+                                                Background="#15FF4444" BorderBrush="#25FF4444" BorderThickness="1"
+                                                Padding="0">
+                                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
+                                                <TextBlock Text="E" FontSize="20" FontWeight="Bold" Foreground="#FF4444" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Emergency" FontSize="9" Foreground="#AAFF4444" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- H — Hazard (bottom-right) -->
+                                        <Button x:Name="SaehHBtn"
+                                                Tag="H" Click="SaehQuadrant_Click"
+                                                Width="96" Height="96"
+                                                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                                Margin="0,0,2,2"
+                                                CornerRadius="2,2,96,2"
+                                                Background="#15AA44FF" BorderBrush="#25AA44FF" BorderThickness="1"
+                                                Padding="0">
+                                            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="2">
+                                                <TextBlock Text="H" FontSize="20" FontWeight="Bold" Foreground="#AA44FF" HorizontalAlignment="Center"/>
+                                                <TextBlock Text="Hazard" FontSize="9" Foreground="#AAAA44FF" HorizontalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+
+                                        <!-- Center dot -->
+                                        <Ellipse Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                 Fill="#FFD700" Opacity="0.4"/>
+                                    </Grid>
+
+                                    <!-- Selected state label -->
+                                    <Border Grid.Row="1" Margin="0,10,0,0" CornerRadius="6" Padding="12,6"
+                                            Background="#10FFD700" BorderBrush="#25FFD700" BorderThickness="1">
+                                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                            <TextBlock Text="Selected:" FontSize="11" Opacity="0.6" VerticalAlignment="Center"/>
+                                            <TextBlock x:Name="SaehSelectedLabel" Text="None"
+                                                       FontSize="13" FontWeight="Bold" Foreground="#FFD700"
+                                                       VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+
+                                <!-- Simulate IK button -->
+                                <Button Click="SimulateIKBtn_Click"
+                                        HorizontalAlignment="Stretch" CornerRadius="8" Padding="0,10"
+                                        Background="#1AFFD700" BorderBrush="#44FFD700" BorderThickness="1">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE768;" FontSize="14" Foreground="#FFD700"/>
+                                        <TextBlock Text="Simulate Robot IK" FontSize="13" Foreground="#FFD700" FontWeight="SemiBold"/>
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock x:Name="SimulateStatusLabel" Text=""
+                                           FontSize="11" Opacity="0.6" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- ════════════════════════════════════════
+                             PANEL 5: EXECUTE TRAJECTORY
+                        ════════════════════════════════════════ -->
+                        <Border Padding="16,14">
+                            <StackPanel Spacing="12">
+                                <!-- Section header -->
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <FontIcon Glyph="&#xE7C3;" FontSize="14" Foreground="#00CC44"/>
+                                    <TextBlock Text="EXECUTE TRAJECTORY" FontSize="11" FontWeight="Bold"
+                                               Foreground="#00CC44" VerticalAlignment="Center" CharacterSpacing="80"/>
+                                </StackPanel>
+
+                                <!-- Warning card -->
+                                <Border CornerRadius="8" Padding="12,10"
+                                        Background="#10FF6600" BorderBrush="#33FF6600" BorderThickness="1">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <FontIcon Glyph="&#xE814;" FontSize="14" Foreground="#FF8800"
+                                                  VerticalAlignment="Center"/>
+                                        <TextBlock Text="This will physically move the real robot. Ensure the workspace is clear."
+                                                   FontSize="11" Foreground="#FF8800" TextWrapping="Wrap"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- Execute button -->
+                                <Button x:Name="ExecutePanelBtn"
+                                        Click="ExecuteTrajectoryBtn_Click"
+                                        HorizontalAlignment="Stretch" CornerRadius="8" Padding="0,14"
+                                        Background="#2000CC44" BorderBrush="#6600CC44" BorderThickness="2">
+                                    <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                                        <FontIcon Glyph="&#xE768;" FontSize="16" Foreground="#00CC44"/>
+                                        <TextBlock Text="EXECUTE ON REAL ROBOT" FontSize="14"
+                                                   Foreground="#00CC44" FontWeight="Bold"/>
+                                    </StackPanel>
+                                </Button>
+
+                                <!-- Execution status -->
+                                <TextBlock x:Name="ExecuteStatusLabel" Text=""
+                                           FontSize="11" HorizontalAlignment="Center" Opacity="0.7"/>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </Border>
+    </Canvas>
+
 </Window>
