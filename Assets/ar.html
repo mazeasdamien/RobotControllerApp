@@ -15,7 +15,7 @@
     }
 
     body {
-      background: #050508;
+      background: transparent;
       color: #e0e0e0;
       font-family: 'Segoe UI', sans-serif;
       margin: 0;
@@ -125,9 +125,9 @@
       model.traverse((child) => {
         if (child.isMesh) {
           child.material = new THREE.MeshBasicMaterial({
-            color: 0x00ccff,
+            color: 0x0088cc,
             transparent: true,
-            opacity: 0.2,
+            opacity: 0.10,
             wireframe: false,
             blending: THREE.AdditiveBlending,
             side: THREE.DoubleSide,
@@ -139,27 +139,27 @@
           const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
             color: 0x00ffff,
             transparent: true,
-            opacity: 0.5,
+            opacity: 0.25,
             blending: THREE.AdditiveBlending
           }));
           child.add(line);
         }
       });
 
-      // Robot 1
+      // Robot 1 (Right physically, X = Positive)
       const r1 = new THREE.Group();
       const m1 = model.clone();
       r1.add(m1);
-      r1.position.set(0.29, 0.53, 0);
-      r1.rotation.z = -Math.PI / 2;
+      r1.position.set(0.29, -0.53, 0); // Flipped to bottom side
+      r1.rotation.z = -Math.PI / 2; // Facing Left (Inwards to center)
       scene.add(r1);
 
-      // Robot 2
+      // Robot 2 (Left physically, X = Negative)
       const r2 = new THREE.Group();
       const m2 = model.clone();
       r2.add(m2);
-      r2.position.set(-0.29, 0.53, 0);
-      r2.rotation.z = -Math.PI / 2;
+      r2.position.set(-0.29, -0.53, 0); // Flipped to bottom side
+      r2.rotation.z = Math.PI / 2; // Facing Right (Inwards to center)
       scene.add(r2);
       
       for(let i=1; i<=6; i++) {
