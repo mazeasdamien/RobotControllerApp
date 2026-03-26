@@ -118,22 +118,6 @@
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20);
 
-    // ── Persistent video-feed background texture ──────────────────────────────
-    // ONE off-screen canvas lives for the page lifetime → ONE stable GPU handle
-    const bgCanvas = document.createElement('canvas');
-    bgCanvas.width = 1280; bgCanvas.height = 720;
-    const bgCtx = bgCanvas.getContext('2d');
-    bgCtx.fillStyle = '#000'; bgCtx.fillRect(0, 0, 1280, 720);
-    const bgTex = new THREE.CanvasTexture(bgCanvas);
-    bgTex.colorSpace = THREE.SRGBColorSpace;
-    scene.background = bgTex; // assigned once, mutated each frame
-
-    function paintFrame(dataUrl) {
-      const img = new Image();
-      img.onload = () => { bgCtx.drawImage(img, 0, 0, 1280, 720); bgTex.needsUpdate = true; };
-      img.src = dataUrl;
-    }
-
     // Lighting (just enough to see the robots beautifully)
     scene.add(new THREE.AmbientLight(0xffffff, 0.8));
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
@@ -230,10 +214,18 @@
           } catch { }
         }
         else if (env.type === 'updateCameraFeed' && new URLSearchParams(location.search).get('cam') === 'creative') {
-            try { paintFrame(JSON.parse(env.payload)); } catch { }
+            try { 
+                const img = new Image();
+                img.onload = () => { scene.background = new THREE.Texture(img); scene.background.colorSpace = THREE.SRGBColorSpace; scene.background.needsUpdate = true; };
+                img.src = JSON.parse(env.payload);
+            } catch { }
         }
         else if (env.type === 'updateCameraFeed2' && new URLSearchParams(location.search).get('cam') === 'intel') {
-            try { paintFrame(JSON.parse(env.payload)); } catch { }
+            try { 
+                const img = new Image();
+                img.onload = () => { scene.background = new THREE.Texture(img); scene.background.colorSpace = THREE.SRGBColorSpace; scene.background.needsUpdate = true; };
+                img.src = JSON.parse(env.payload);
+            } catch { }
         }
       };
       
