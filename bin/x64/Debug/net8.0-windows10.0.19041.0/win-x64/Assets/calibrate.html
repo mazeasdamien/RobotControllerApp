@@ -184,7 +184,7 @@
     const tableGeo = new THREE.BoxGeometry(0.8, 0.8, 0.05);
     const tableMat = new THREE.MeshStandardMaterial({ color: 0xcdba96, roughness: 0.9 });
     const tableMesh = new THREE.Mesh(tableGeo, tableMat);
-    tableMesh.position.set(0, 0.3025, -0.025); // ArUco sits directly bordering the bottom edge of the table mesh
+    tableMesh.position.set(0, -0.3025, -0.025); // Push table physically "up" to invert the 180deg axis
     scene.add(tableMesh);
 
     // Load actual robot models (ned.glb)
@@ -195,20 +195,20 @@
       // Convert standard GLTF Y-up to our Z-up scene
       model.rotation.x = Math.PI / 2;
 
-      // Robot 1 (Top Right of desk, physically furthest from operator)
+      // Robot 1 (Right physically, X = Positive)
       const r1 = new THREE.Group();
       const m1 = model.clone();
       r1.add(m1);
-      r1.position.set(0.29, 0.53, 0); // Exactly 4cm inside padding, 5cm top padding
-      r1.rotation.z = -Math.PI / 2; // Facing Left across the workspace
+      r1.position.set(0.29, -0.53, 0); // Flipped to bottom side
+      r1.rotation.z = -Math.PI / 2; // Facing Left (Inwards to center)
       scene.add(r1);
 
-      // Robot 2 (Bottom Right of desk, physically nearest to operator)
+      // Robot 2 (Left physically, X = Negative)
       const r2 = new THREE.Group();
       const m2 = model.clone();
       r2.add(m2);
-      r2.position.set(-0.29, 0.53, 0); // Exactly 4cm inside padding, 5cm top padding
-      r2.rotation.z = -Math.PI / 2; // Facing Left across the workspace
+      r2.position.set(-0.29, -0.53, 0); // Flipped to bottom side
+      r2.rotation.z = Math.PI / 2; // Facing Right (Inwards to center)
       scene.add(r2);
       
       // Map all 6 joint objects from both clones (Standard URDF node designations)

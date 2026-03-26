@@ -75,6 +75,16 @@
 
 <body>
 
+  <img id="video-bg" style="position: absolute; left: 50%; top: 50%; width: 100%; height: 100%; object-fit: contain; transform: translate(-50%, -50%); z-index: -1;" />
+  <div id="ar-controls" style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 6px; z-index: 999; border: 1px solid rgba(0, 229, 255, 0.2);">
+    <label style="display: block; font-size: 11px; margin-bottom: 6px; color: #00e5ff; font-weight: bold;">AR OPACITY
+      <input type="range" id="arOpacity" min="0" max="1" step="0.05" value="0.10" style="vertical-align: middle; margin-left: 10px;" />
+    </label>
+    <label style="display: block; font-size: 11px; color: #00e5ff; font-weight: bold;">AR GLOW
+      <input type="range" id="arGlow" min="0" max="1" step="0.05" value="0.25" style="vertical-align: middle; margin-left: 23px;" />
+    </label>
+  </div>
+  
   <canvas id="threejs-canvas"></canvas>
   <script type="importmap">
 {
@@ -203,6 +213,26 @@
             }
           } catch { }
         }
+        else if (env.type === 'updateCameraFeed' && new URLSearchParams(location.search).get('cam') === 'creative') {
+            try { document.getElementById('video-bg').src = JSON.parse(env.payload); } catch { }
+        }
+        else if (env.type === 'updateCameraFeed2' && new URLSearchParams(location.search).get('cam') === 'intel') {
+            try { document.getElementById('video-bg').src = JSON.parse(env.payload); } catch { }
+        }
+      };
+      
+      // Bind AR dynamic controls
+      document.getElementById('arOpacity').oninput = (e) => {
+         const v = parseFloat(e.target.value);
+         window.robotJointRefs.forEach(rob => rob.forEach(j => {
+             j.traverse(c => { if(c.isMesh && c.material.type !== 'LineBasicMaterial') c.material.opacity = v; });
+         }));
+      };
+      document.getElementById('arGlow').oninput = (e) => {
+         const v = parseFloat(e.target.value);
+         window.robotJointRefs.forEach(rob => rob.forEach(j => {
+             j.traverse(c => { if(c.isLineSegments) c.material.opacity = v; });
+         }));
       };
       ws.onclose = () => setTimeout(connect, 2000);
     }
