@@ -533,6 +533,11 @@
                             </Grid.ColumnDefinitions>
 
                             <!-- Start/Stop -->
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
+                                <TextBlock Text="Flip Target 180°" FontSize="11" Foreground="#888" VerticalAlignment="Center"/>
+                                <ToggleSwitch x:Name="ArUcoFlippedToggle" Toggled="ArUcoFlippedToggle_Toggled" OnContent="" OffContent="" MinWidth="0" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            
                             <Button Grid.Column="1" x:Name="StartCalibDetectionBtn"
                                     Content="▶  Start Dual Detection"
                                     Click="StartCalibDetectionBtn_Click"

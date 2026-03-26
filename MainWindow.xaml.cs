@@ -2742,7 +2742,11 @@ namespace RobotControllerApp
             });
         }
 
-        private void CalibCopyBtn_Click(object sender, RoutedEventArgs e) { }
+        private void ArUcoFlippedToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (_creativeService != null) _creativeService.FlipArUco180 = ArUcoFlippedToggle.IsOn;
+            if (_intelService != null) _intelService.FlipArUco180 = ArUcoFlippedToggle.IsOn;
+        }
 
         private void FreezeCalibToggle_Toggled(object sender, RoutedEventArgs e)
         {

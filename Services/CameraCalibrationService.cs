@@ -84,6 +84,7 @@ namespace RobotControllerApp.Services
         public static event Action<string>? OnLog;
 
         public bool IsRunning => _isRunning;
+        public bool FlipArUco180 { get; set; } = false;
 
         // ════════════════════════════════════════════════════════════════════════
         // PUBLIC API
@@ -233,10 +234,21 @@ namespace RobotControllerApp.Services
                                     float cy = v * SquareLength;
                                     float half = MarkerLength / 2.0f;
 
-                                    objPtsList.Add(new Point3f(cx - half, cy + half, 0f));
-                                    objPtsList.Add(new Point3f(cx + half, cy + half, 0f));
-                                    objPtsList.Add(new Point3f(cx + half, cy - half, 0f));
-                                    objPtsList.Add(new Point3f(cx - half, cy - half, 0f));
+                                    if (FlipArUco180) 
+                                    {
+                                        cx = -cx; cy = -cy;
+                                        objPtsList.Add(new Point3f(cx + half, cy - half, 0f));
+                                        objPtsList.Add(new Point3f(cx - half, cy - half, 0f));
+                                        objPtsList.Add(new Point3f(cx - half, cy + half, 0f));
+                                        objPtsList.Add(new Point3f(cx + half, cy + half, 0f));
+                                    }
+                                    else 
+                                    {
+                                        objPtsList.Add(new Point3f(cx - half, cy + half, 0f));
+                                        objPtsList.Add(new Point3f(cx + half, cy + half, 0f));
+                                        objPtsList.Add(new Point3f(cx + half, cy - half, 0f));
+                                        objPtsList.Add(new Point3f(cx - half, cy - half, 0f));
+                                    }
 
                                     imgPtsList.Add(corners[i][0]);
                                     imgPtsList.Add(corners[i][1]);
