@@ -76,17 +76,14 @@
 <body>
 
   <div style="position: relative; width: 100vw; height: 100vh; overflow: hidden;">
-    <img id="video-bg" style="position: absolute; left: 50%; top: 50%; width: 100%; height: 100%; object-fit: contain; transform: translate(-50%, -50%); z-index: 1;" />
-    
     <div id="ar-controls" style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 6px; z-index: 3; border: 1px solid rgba(0, 229, 255, 0.2);">
       <label style="display: block; font-size: 11px; margin-bottom: 6px; color: #00e5ff; font-weight: bold;">AR OPACITY
-        <input type="range" id="arOpacity" min="0" max="1" step="0.05" value="0.10" style="vertical-align: middle; margin-left: 10px;" />
+        <input type="range" id="arOpacity" min="0" max="0.1" step="0.01" value="0.02" style="vertical-align: middle; margin-left: 10px;" />
       </label>
       <label style="display: block; font-size: 11px; color: #00e5ff; font-weight: bold;">AR GLOW
-        <input type="range" id="arGlow" min="0" max="1" step="0.05" value="0.25" style="vertical-align: middle; margin-left: 23px;" />
+        <input type="range" id="arGlow" min="0" max="0.1" step="0.01" value="0.05" style="vertical-align: middle; margin-left: 23px;" />
       </label>
     </div>
-    
     <canvas id="threejs-canvas" style="position: absolute; left: 50%; top: 50%; width: 100%; height: 100%; transform: translate(-50%, -50%); z-index: 2;"></canvas>
   </div>
   <script type="importmap">
@@ -140,7 +137,7 @@
           child.material = new THREE.MeshBasicMaterial({
             color: 0x0088cc,
             transparent: true,
-            opacity: 0.10,
+            opacity: 0.02,
             wireframe: false,
             blending: THREE.AdditiveBlending,
             side: THREE.DoubleSide,
@@ -152,7 +149,7 @@
           const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
             color: 0x00ffff,
             transparent: true,
-            opacity: 0.25,
+            opacity: 0.05,
             blending: THREE.AdditiveBlending
           }));
           child.add(line);
@@ -172,7 +169,7 @@
       const m2 = model.clone();
       r2.add(m2);
       r2.position.set(-0.29, -0.53, 0); // Flipped to bottom side
-      r2.rotation.z = Math.PI / 2; // Facing Right (Inwards to center)
+      r2.rotation.z = -Math.PI / 2; // Facing Left (parallel to r1)
       scene.add(r2);
       
       for(let i=1; i<=6; i++) {
@@ -217,10 +214,18 @@
           } catch { }
         }
         else if (env.type === 'updateCameraFeed' && new URLSearchParams(location.search).get('cam') === 'creative') {
-            try { document.getElementById('video-bg').src = JSON.parse(env.payload); } catch { }
+            try { 
+                const img = new Image();
+                img.onload = () => { scene.background = new THREE.Texture(img); scene.background.colorSpace = THREE.SRGBColorSpace; scene.background.needsUpdate = true; };
+                img.src = JSON.parse(env.payload);
+            } catch { }
         }
         else if (env.type === 'updateCameraFeed2' && new URLSearchParams(location.search).get('cam') === 'intel') {
-            try { document.getElementById('video-bg').src = JSON.parse(env.payload); } catch { }
+            try { 
+                const img = new Image();
+                img.onload = () => { scene.background = new THREE.Texture(img); scene.background.colorSpace = THREE.SRGBColorSpace; scene.background.needsUpdate = true; };
+                img.src = JSON.parse(env.payload);
+            } catch { }
         }
       };
       
