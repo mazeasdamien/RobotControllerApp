@@ -107,24 +107,43 @@ namespace RobotControllerApp.Services
         /// <summary>Returns the string identifier of the first valid robot connection dict key.</summary>
         public string? GetFirstConnectedRobotId() => _robotClients.Keys.FirstOrDefault();
 
-        /// <summary>
-        /// Broadcasts a message to ALL currently connected Unity/Quest clients simultaneously.
-        /// Used for control-plane notifications like camera_robot_changed.
-        /// </summary>
+        private readonly System.Threading.SemaphoreSlim _broadcastLock = new System.Threading.SemaphoreSlim(1, 1);
+
         public async Task BroadcastToAllUnityClients(string message)
         {
-            var bytes = Encoding.UTF8.GetBytes(message);
-            var tasks = _unityClients.Values
-                .Where(ws => ws.State == WebSocketState.Open)
-                .Select(async ws =>
-                {
-                    try
+            // Zero-latency backpressure: If the socket is busy uploading a previous frame to the tunnel,
+            // drop this frame immediately instead of queueing it and causing infinite latency.
+            // ONLY drop video frames; critical telemetry (joints/settings) MUST queue up securely.
+            bool isVideoFrame = message.Contains("\"updateArFeed\"") || message.Contains("\"updateCameraFeed\"");
+
+            if (isVideoFrame)
+            {
+                if (!await _broadcastLock.WaitAsync(0)) return;
+            }
+            else
+            {
+                await _broadcastLock.WaitAsync();
+            }
+
+            try
+            {
+                var bytes = Encoding.UTF8.GetBytes(message);
+                var tasks = _unityClients.Values
+                    .Where(ws => ws.State == WebSocketState.Open)
+                    .Select(async ws =>
                     {
-                        await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
-                    }
-                    catch { }
-                });
-            await Task.WhenAll(tasks);
+                        try
+                        {
+                            await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
+                        }
+                        catch { }
+                    });
+                await Task.WhenAll(tasks);
+            }
+            finally
+            {
+                _broadcastLock.Release();
+            }
         }
     }
 }

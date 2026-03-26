@@ -1,6 +1,7 @@
 <ResourceDictionary
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:ui="using:Windows.UI">
 
     <!-- BRUSH TOKENS (colors inlined — avoids WMC designer warnings for <Color> elements) -->
     <SolidColorBrush x:Key="Brush.Primary"              Color="#FFFF7900" />  <!-- Standard Orange Brand -->
@@ -17,12 +18,12 @@
     <SolidColorBrush x:Key="Brush.Status.Error"         Color="#FFCC3300" />
 
     <!-- NAVIGATION VIEW OVERRIDES (Fix Blue Highlight) -->
-    <!-- SystemAccentColor overrides kept as Color resources — WMC warnings are designer-only, no build impact -->
-    <Color x:Key="SystemAccentColor">#FFFF7900</Color>
-    <Color x:Key="SystemAccentColorLight1">#FFE66000</Color>
-    <Color x:Key="SystemAccentColorLight2">#FFE66000</Color>
-    <Color x:Key="SystemAccentColorDark1">#FFE66000</Color>
-    <Color x:Key="SystemAccentColorDark2">#FFE66000</Color>
+    <!-- SystemAccentColor overrides kept as ui:Color resources -->
+    <ui:Color x:Key="SystemAccentColor">#FFFF7900</ui:Color>
+    <ui:Color x:Key="SystemAccentColorLight1">#FFE66000</ui:Color>
+    <ui:Color x:Key="SystemAccentColorLight2">#FFE66000</ui:Color>
+    <ui:Color x:Key="SystemAccentColorDark1">#FFE66000</ui:Color>
+    <ui:Color x:Key="SystemAccentColorDark2">#FFE66000</ui:Color>
 
     <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForeground"               Color="#FFFF7900" />
     <SolidColorBrush x:Key="NavigationViewSelectionIndicatorForegroundPointerOver"    Color="#FFE66000" />

@@ -55,12 +55,12 @@ namespace RobotControllerApp.Services
         public const int MarkerCount = GridCols * GridRows;
 
         // ── Camera intrinsics (approximate) ─────────────────────────────────────
-        public const double Fx = 800.0;
-        public const double Fy = 800.0;
-        public const double Cx = 640.0;
-        public const double Cy = 360.0;
-        public const int FrameW = 1280;
-        public const int FrameH = 720;
+        public double Fx { get; set; } = 800.0;
+        public double Fy { get; set; } = 800.0;
+        public double Cx { get; set; } = 640.0;
+        public double Cy { get; set; } = 360.0;
+        public int FrameW { get; set; } = 1280;
+        public int FrameH { get; set; } = 720;
 
         // ── Saved calibration file path ─────────────────────────────────────────
         public static string SavedPosePath { get; }
@@ -306,9 +306,9 @@ namespace RobotControllerApp.Services
                                         IsValid = true
                                     });
 
-                                    // Dessin du feedback visuel
-                                    CvAruco.DrawDetectedMarkers(frame, corners, ids, new Scalar(0, 255, 0));
-                                    Cv2.DrawFrameAxes(frame, cameraMatrix, distCoeffs, avgRvec, tvec, 0.1f, 3);
+                                    // Dessin du feedback visuel (Désactivé pour ne pas polluer le flux vidéo de l'opérateur)
+                                    // CvAruco.DrawDetectedMarkers(frame, corners, ids, new Scalar(0, 255, 0));
+                                    // Cv2.DrawFrameAxes(frame, cameraMatrix, distCoeffs, avgRvec, tvec, 0.1f, 3);
                                 }
                             }
                         }

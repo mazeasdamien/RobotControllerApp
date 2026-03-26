@@ -213,6 +213,15 @@ namespace RobotControllerApp
             RelayActiveText.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Status.Warning"];
             RelayIcon.Foreground = (SolidColorBrush)Application.Current.Resources["Brush.Text.Muted"];
 
+            _creativeService.FlipArUco180 = true;
+            _intelService.FlipArUco180 = true;
+
+            // D435 Intrinsics at 1280x720 (Approximate default)
+            _intelService.Fx = 912.0; 
+            _intelService.Fy = 912.0;
+            _intelService.Cx = 640.0;
+            _intelService.Cy = 360.0;
+
             WireUpEvents();
 
             this.AppWindow.Closing += AppWindow_Closing;
@@ -254,14 +263,20 @@ namespace RobotControllerApp
             {
                 var degAngles = joints.Select(r => (double)(r * 180.0 / Math.PI)).ToArray();
                 DispatcherQueue.TryEnqueue(() => TelemJoints.Text = "[" + string.Join(", ", joints.Select(j => j.ToString("0.00"))) + "]");
+                string jointJson = JsonSerializer.Serialize(new { op = "setRobotJoints", angles = degAngles, robotIdx = 0 });
                 _ = _broadcastServer.BroadcastAsync("setRobotJoints", JsonSerializer.Serialize(new { angles = degAngles, robotIdx = 0 }));
+                if (RelayServerHost.UnityClientConnected && RelayServerHost.CurrentManager != null)
+                    _ = RelayServerHost.CurrentManager.BroadcastToAllUnityClients(jointJson);
             };
 
             RelayServerHost.OnRobot2JointsReceived += (joints) =>
             {
                 var degAngles = joints.Select(r => (double)(r * 180.0 / Math.PI)).ToArray();
                 DispatcherQueue.TryEnqueue(() => TelemJoints2.Text = "[" + string.Join(", ", joints.Select(j => j.ToString("0.00"))) + "]");
+                string jointJson2 = JsonSerializer.Serialize(new { op = "setRobotJoints", angles = degAngles, robotIdx = 1 });
                 _ = _broadcastServer.BroadcastAsync("setRobotJoints", JsonSerializer.Serialize(new { angles = degAngles, robotIdx = 1 }));
+                if (RelayServerHost.UnityClientConnected && RelayServerHost.CurrentManager != null)
+                    _ = RelayServerHost.CurrentManager.BroadcastToAllUnityClients(jointJson2);
             };
 
             RelayServerHost.OnImageStatsUpdated += (fps, total) => DispatcherQueue.TryEnqueue(() =>
@@ -443,7 +458,63 @@ namespace RobotControllerApp
             UpdateRobot2Status(false);
 
             StartRelayStatusPoll();
+
+            // Initialize Calibration WebViews
+            try
+            {
+                await CalibARViewCreative.EnsureCoreWebView2Async();
+                CalibARViewCreative.DefaultBackgroundColor = Microsoft.UI.Colors.Transparent;
+                string arUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/ar.html?cam=creative&t={Environment.TickCount}";
+                CalibARViewCreative.WebMessageReceived += HandleArWebMessage;
+                CalibARViewCreative.Source = new Uri(arUrl);
+
+                await CalibARViewIntel.EnsureCoreWebView2Async();
+                CalibARViewIntel.DefaultBackgroundColor = Microsoft.UI.Colors.Transparent;
+                string arUrl2 = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/ar.html?cam=intel&t={Environment.TickCount}";
+                CalibARViewIntel.WebMessageReceived += HandleArWebMessage;
+                CalibARViewIntel.Source = new Uri(arUrl2);
+
+                await CalibWebView.EnsureCoreWebView2Async();
+                CalibWebView.DefaultBackgroundColor = Microsoft.UI.Colors.Transparent;
+                string calibUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/calibrate.html?t={Environment.TickCount}";
+                CalibWebView.Source = new Uri(calibUrl);
+            }
+            catch { }
+
             Log("System Ready. Waiting for connections...");
+        }
+
+        private void HandleArWebMessage(Microsoft.UI.Xaml.Controls.WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs args)
+        {
+            if (_isClosing || _broadcastServer == null) return;
+            if (_broadcastServer.ConnectedClients == 0 && !RelayServerHost.UnityClientConnected) return;
+
+            try
+            {
+                string msg = args.TryGetWebMessageAsString();
+                if (string.IsNullOrEmpty(msg) || !msg.StartsWith("ar_frame|")) return;
+
+                // High-performance string splitting avoids JSON allocation locks on UI thread
+                string[] parts = msg.Split('|', 3);
+                if (parts.Length != 3) return;
+
+                string cam = parts[1];
+                string dataRaw = parts[2];
+
+                if (string.IsNullOrEmpty(dataRaw) || dataRaw.Length < 10) return;
+
+                string feedName = cam == "intel" ? "updateArFeed2" : "updateArFeed";
+
+                _ = _broadcastServer.BroadcastAsync(feedName, $"\"{dataRaw}\"");
+                if (RelayServerHost.UnityClientConnected)
+                {
+                    // Manually build JSON to skip heavy serialization allocations
+                    _ = RelayServerHost.CurrentManager?.BroadcastToAllUnityClients(
+                        $"{{\"op\":\"{feedName}\",\"payload\":\"{dataRaw}\"}}"
+                    );
+                }
+            }
+            catch { /* Ignore */ }
         }
 
         private async void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
@@ -2088,6 +2159,7 @@ namespace RobotControllerApp
                     "gemini-3-pro-image-preview" => 2,
                     _ => 0
                 };
+                if (ArOpacitySlider != null) ArOpacitySlider.Value = _settings.ArOpacity;
             }
             catch { }
         }
@@ -2233,6 +2305,8 @@ namespace RobotControllerApp
                         if (_lastValidPoseCreative != null) await PushCameraPoseAsync(_lastValidPoseCreative, "creative");
                         if (_lastValidPoseIntel != null) await PushCameraPoseAsync(_lastValidPoseIntel, "intel");
                         
+                        await _broadcastServer.BroadcastAsync("setArOpacity", _settings.ArOpacity.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+
                         await PushObjectsToSceneAsync();
                     };
 
@@ -2299,10 +2373,10 @@ namespace RobotControllerApp
                 });
                 await tcs.Task;
 
-                double fx = CameraCalibrationService.Fx == 0 ? 1000 : CameraCalibrationService.Fx;
-                double fy = CameraCalibrationService.Fy == 0 ? 1000 : CameraCalibrationService.Fy;
-                double cx = CameraCalibrationService.Cx, cy = CameraCalibrationService.Cy;
-                int frameW = CameraCalibrationService.FrameW, frameH = CameraCalibrationService.FrameH;
+                double fx = _intelService.Fx == 0 ? 1000 : _intelService.Fx;
+                double fy = _intelService.Fy == 0 ? 1000 : _intelService.Fy;
+                double cx = _intelService.Cx, cy = _intelService.Cy;
+                int frameW = _intelService.FrameW, frameH = _intelService.FrameH;
 
                 var pose = _lastValidPoseIntel;
                 double camX = pose?.X ?? 0, camY = pose?.Y ?? 0, camZ = pose?.Z ?? 1.0;
@@ -2404,11 +2478,18 @@ namespace RobotControllerApp
 
         private async Task PushCameraPoseAsync(CameraPose pose, string camType = "unknown")
         {
-            if (!_broadcastServer.IsRunning) return;
             try
             {
-                var poseObj = new { camType, pose.X, pose.Y, pose.Z, pose.Rx, pose.Ry, pose.Rz, pose.R11, pose.R12, pose.R13, pose.R21, pose.R22, pose.R23, pose.R31, pose.R32, pose.R33 };
-                _ = _broadcastServer.BroadcastAsync("setCameraPose", JsonSerializer.Serialize(poseObj));
+                var poseObj = new { op = "camera_pose", camType, pose.X, pose.Y, pose.Z, pose.Rx, pose.Ry, pose.Rz, pose.R11, pose.R12, pose.R13, pose.R21, pose.R22, pose.R23, pose.R31, pose.R32, pose.R33 };
+                string json = JsonSerializer.Serialize(poseObj);
+
+                if (_broadcastServer.IsRunning) {
+                    _ = _broadcastServer.BroadcastAsync("setCameraPose", json);
+                }
+
+                if (RelayServerHost.UnityClientConnected && RelayServerHost.CurrentManager != null) {
+                    _ = RelayServerHost.CurrentManager.BroadcastToAllUnityClients(json);
+                }
             }
             catch { }
         }
@@ -2618,35 +2699,8 @@ namespace RobotControllerApp
 
 
         // ── Calibration overlay open / close ────────────────────────────────
-        private void OpenCalibrateBtn_Click(object sender, RoutedEventArgs e)
-        {
-            CalibOverlay.Visibility = Visibility.Visible;
-            CalibDetectionBanner.Visibility = Visibility.Collapsed;
-            CalibOfflineState.Visibility = Visibility.Visible;
-            
-            // Navigate WebView2 to the Three.js calibration page served by the Kestrel server
-            string calibUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/calibrate.html?t={Environment.TickCount}";
-            string arUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/ar.html?cam=creative&t={Environment.TickCount}";
-            try { 
-                CalibWebView.Source = new Uri(calibUrl); 
-                CalibARViewCreative.Source = new Uri(arUrl);
-            }
-            catch { /* server might not be running yet; will retry on first connect */ }
-        }
 
-        private void CloseCalibOverlay_Click(object sender, RoutedEventArgs e) => CloseCalibOverlay();
-        private void CalibOverlayBackdrop_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e) => CloseCalibOverlay();
-
-        private void CloseCalibOverlay()
-        {
-            // Stop detection if still running
-            if (_creativeService?.IsRunning == true) _creativeService.Stop();
-            if (_intelService?.IsRunning == true) _intelService.Stop();
-            SetCalibStopped();
-            CalibOverlay.Visibility = Visibility.Collapsed;
-        }
-
-        private void StartCalibDetectionBtn_Click(object sender, RoutedEventArgs e)
+        private async void StartCalibDetectionBtn_Click(object sender, RoutedEventArgs e)
         {
             if (_creativeService == null || _intelService == null) return;
             if (StartCalibDetectionBtn.Content?.ToString()?.StartsWith('\u25a0') == true) 
@@ -2655,6 +2709,14 @@ namespace RobotControllerApp
             }
             else
             {
+                // Stop normal camera loops to free up devices
+                _cvCaptureCts?.Cancel();
+                _cvCaptureCts2?.Cancel();
+                if (_cameraTask != null) try { await _cameraTask; } catch { }
+                if (_cameraTask2 != null) try { await _cameraTask2; } catch { }
+                if (_cvCapture != null) { _cvCapture.Release(); _cvCapture.Dispose(); _cvCapture = null; }
+                if (_cvCapture2 != null) { _cvCapture2.Release(); _cvCapture2.Dispose(); _cvCapture2 = null; }
+
                 int creativeIdx = -1, intelIdx = -1;
                 for (int i = 0; i < _videoDevices?.Count; i++) {
                     string n = _videoDevices[i].Name;
@@ -2676,9 +2738,8 @@ namespace RobotControllerApp
                 }
 
                 _isCalibFrozen = false; FreezeCalibToggle.IsOn = false; FreezeCalibToggle.IsEnabled = false;
-                CalibOfflineState.Visibility = Visibility.Collapsed; CalibDetectionBanner.Visibility = Visibility.Visible;
-                StartCalibDetectionBtn.Content = "\u25a0  Stop Dual Detection";
-                Log($"[Calib] Dual detection started");
+                StartCalibDetectionBtn.Content = "\u25a0  Stop Detection";
+                Log($"[Calib] Detection started");
             }
         }
 
@@ -2691,7 +2752,7 @@ namespace RobotControllerApp
                         string b64 = Convert.ToBase64String(jpeg);
                         _ = _broadcastServer.BroadcastAsync("updateCameraFeed", $"\"data:image/jpeg;base64,{b64}\"");
                     }
-                    if (CalibOverlay.Visibility == Visibility.Visible) CalibCameraPreviewCreative.Source = await LoadImageFromBytesAsync(jpeg);
+                    ContextWebcamPreview.Source = await LoadImageFromBytesAsync(jpeg);
                 } catch { }
             });
         }
@@ -2705,7 +2766,7 @@ namespace RobotControllerApp
                         string b64 = Convert.ToBase64String(jpeg);
                         _ = _broadcastServer.BroadcastAsync("updateCameraFeed2", $"\"data:image/jpeg;base64,{b64}\"");
                     }
-                    if (CalibOverlay.Visibility == Visibility.Visible) CalibCameraPreviewIntel.Source = await LoadImageFromBytesAsync(jpeg);
+                    IntelCamPreview.Source = await LoadImageFromBytesAsync(jpeg);
                 } catch { }
             });
         }
@@ -2742,11 +2803,6 @@ namespace RobotControllerApp
             });
         }
 
-        private void ArUcoFlippedToggle_Toggled(object sender, RoutedEventArgs e)
-        {
-            if (_creativeService != null) _creativeService.FlipArUco180 = ArUcoFlippedToggle.IsOn;
-            if (_intelService != null) _intelService.FlipArUco180 = ArUcoFlippedToggle.IsOn;
-        }
 
         private void FreezeCalibToggle_Toggled(object sender, RoutedEventArgs e)
         {
@@ -2779,11 +2835,48 @@ namespace RobotControllerApp
             } catch (Exception ex) { FreezeCalibToggle.IsOn = false; Log($"[Calib] Save failed: {ex.Message}"); }
         }
 
-        private void SetCalibStopped()
+        private async void SaveCalibBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_lastValidPoseCreative == null && _lastValidPoseIntel == null) { Log("[Calib] No valid pose to save."); return; }
+            try {
+                string dir = Path.GetDirectoryName(CameraCalibrationService.SavedPosePath)!;
+                if (_lastValidPoseCreative != null) {
+                    string cp = Path.Combine(dir, "robot_camera_pose_creative.json");
+                    await File.WriteAllTextAsync(cp, JsonSerializer.Serialize(_lastValidPoseCreative));
+                }
+                if (_lastValidPoseIntel != null) {
+                    string ip = Path.Combine(dir, "robot_camera_pose_intel.json");
+                    await File.WriteAllTextAsync(ip, JsonSerializer.Serialize(_lastValidPoseIntel));
+                }
+                Log($"[Calib] Calibration saved successfully.");
+            } catch (Exception ex) { Log($"[Calib] Save failed: {ex.Message}"); }
+        }
+
+        private void ArOpacitySlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            if (_settings != null)
+            {
+                _settings.ArOpacity = e.NewValue;
+                _settings.Save();
+            }
+
+            if (_broadcastServer != null && _broadcastServer.IsRunning)
+            {
+                _ = _broadcastServer.BroadcastAsync("setArOpacity", e.NewValue.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+            }
+        }
+
+        private async void SetCalibStopped()
         {
             if (!_isCalibFrozen) { FreezeCalibToggle.IsOn = false; FreezeCalibToggle.IsEnabled = false; }
-            StartCalibDetectionBtn.Content = "▶  Start Dual Detection"; CalibDetectionBanner.Visibility = Visibility.Collapsed;
-            Log("[Calib] Dual detection stopped.");
+            StartCalibDetectionBtn.Content = "▶ Start Detection"; 
+            Log("[Calib] Detection stopped.");
+
+            // RELIABILITY FIX: Give hardware a moment to release before restarting normal loops
+            await Task.Delay(500);
+
+            // Restart normal camera feeds
+            await LoadCameraList();
         }
 
         private void HandleClientBrowserMessage(string jsonStr)
@@ -3208,34 +3301,80 @@ namespace RobotControllerApp
             catch { }
         }
 
+        private static int _arRobotIdx = 0; // toggled per robot call to track which robot sent last
         private void HandleUnityIKTelemetry(string raw)
         {
             try
             {
                 using var doc = JsonDocument.Parse(raw);
                 var root = doc.RootElement;
+
+                // ── ROS JointTrajectory from Unity (main teleoperation path) ────────
+                // Unity sends: {"op":"publish","topic":"/niryo_robot_follow_joint_trajectory_controller/command",...}
+                if (root.TryGetProperty("op", out var opProp) && opProp.GetString() == "publish"
+                    && root.TryGetProperty("topic", out var topicProp)
+                    && (topicProp.GetString() ?? "").Contains("joint_trajectory"))
+                {
+                    try
+                    {
+                        // Determine robot index from the robotId that sent the message
+                        // We use a simple alternating approach since both robots publish to same topic name
+                        // The robotId context is not accessible here, so we infer from recent joint data
+                        if (root.TryGetProperty("msg", out var msg)
+                            && msg.TryGetProperty("points", out var points)
+                            && points.GetArrayLength() > 0)
+                        {
+                            var firstPoint = points[0];
+                            if (firstPoint.TryGetProperty("positions", out var positions))
+                            {
+                                // Convert radians → degrees for AR display
+                                var anglesDeg = positions.EnumerateArray()
+                                    .Select(e => e.GetDouble() * 180.0 / Math.PI)
+                                    .ToArray();
+
+                                if (anglesDeg.Length == 6 && _broadcastServer.IsRunning)
+                                {
+                                    // Robot 0 and Robot 1 both send on same topic.
+                                    // We broadcast for BOTH robots so both AR views update.
+                                    _ = _broadcastServer.BroadcastAsync("setRobotJoints",
+                                        JsonSerializer.Serialize(new { angles = anglesDeg, robotIdx = 0 }));
+                                    _ = _broadcastServer.BroadcastAsync("setRobotJoints",
+                                        JsonSerializer.Serialize(new { angles = anglesDeg, robotIdx = 1 }));
+                                }
+                            }
+                        }
+                    }
+                    catch { /* non-critical */ }
+                    return;
+                }
+
                 if (!root.TryGetProperty("type", out var typeProp)) return;
                 string type = typeProp.GetString() ?? "";
 
-                // ── IK joint teleoperation ───────────────────────────────────────
+                // ── IK joint teleoperation (custom message type) ─────────────────
                 if (type == "ik_joints" && root.TryGetProperty("payload", out var payload))
                 {
                     if (!payload.TryGetProperty("angles", out var anglesProp)) return;
                     int robotIdx = payload.TryGetProperty("robotIdx", out var ri) ? ri.GetInt32() : 0;
 
-                    // JS sends degrees — convert to radians for ROS
                     var anglesRad = anglesProp.EnumerateArray()
                         .Select(e => e.GetDouble() * Math.PI / 180.0)
+                        .ToArray();
+
+                    var anglesDeg = anglesProp.EnumerateArray()
+                        .Select(e => e.GetDouble())
                         .ToArray();
 
                     if (anglesRad.Length != 6) return;
 
                     var bridge = robotIdx == 0 ? _robotBridge : _robotBridge2;
                     if (bridge.IsConnected)
-                    {
-                        // Fire-and-forget: don't await to avoid blocking the recv loop
                         _ = bridge.SendDirectToRobotAsync(BuildIkJointCommand(anglesRad));
-                    }
+
+                    if (_broadcastServer.IsRunning)
+                        _ = _broadcastServer.BroadcastAsync("setRobotJoints",
+                            JsonSerializer.Serialize(new { angles = anglesDeg, robotIdx }));
+
                     return;
                 }
 
@@ -3297,6 +3436,481 @@ namespace RobotControllerApp
                     }
                 }
             });
+
+
+        // ════════════════════════════════════════════════════════════════════════
+        // PANEL 1 — TELEOPERATION
+        // ════════════════════════════════════════════════════════════════════════
+
+        private bool _teleopEnabled = false;
+        private double _teleopSpeedPct = 30.0;
+
+        private void TeleopToggle_Toggled(object sender, RoutedEventArgs e)
+        {
+            if (TeleopEnableToggle == null) return;
+            _teleopEnabled = TeleopEnableToggle.IsOn;
+
+            if (TeleopStatusText != null)
+                TeleopStatusText.Text = _teleopEnabled
+                    ? $"Active — {_teleopSpeedPct:0}% speed — Robot {(TeleopR2Radio?.IsChecked == true ? "2" : "1")}"
+                    : "Disabled — learning mode active";
+
+            // Broadcast enable/disable to the 3D viewer so the IK gizmo knows
+            if (_broadcastServer != null)
+            {
+                _ = _broadcastServer.BroadcastAsync("teleopState",
+                    JsonSerializer.Serialize(new { enabled = _teleopEnabled, speed = _teleopSpeedPct }));
+            }
+
+            Log($"[Teleop] {(_teleopEnabled ? "Enabled" : "Disabled")} at speed {_teleopSpeedPct:0}%");
+        }
+
+        private void TeleopSpeedSlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+        {
+            _teleopSpeedPct = e.NewValue;
+            if (TeleopSpeedLabel != null)
+                TeleopSpeedLabel.Text = $"{_teleopSpeedPct:0}%";
+
+            if (_teleopEnabled && _broadcastServer != null)
+            {
+                _ = _broadcastServer.BroadcastAsync("teleopState",
+                    JsonSerializer.Serialize(new { enabled = true, speed = _teleopSpeedPct }));
+            }
+        }
+
+        // ════════════════════════════════════════════════════════════════════════
+        // PANEL 2 — VOICE / WHISPER
+        // ════════════════════════════════════════════════════════════════════════
+
+        private bool _isRecording = false;
+        private Windows.Media.Capture.MediaCapture? _mediaCapture;
+        private Windows.Media.MediaProperties.MediaEncodingProfile? _audioProfile;
+        private Windows.Storage.StorageFile? _tempAudioFile;
+        private Windows.Media.Capture.LowLagMediaRecording? _lowLagRecording;
+        
+
+        private async void WhisperRecordBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (_isRecording)
+                await StopRecordingAsync();
+            else
+                await StartRecordingAsync();
+        }
+
+        private async Task StartRecordingAsync()
+        {
+            try
+            {
+                if (WhisperStatusLabel != null) WhisperStatusLabel.Text = "Initialising mic…";
+                if (WhisperRecordDot != null) WhisperRecordDot.Fill = new SolidColorBrush(Microsoft.UI.Colors.OrangeRed);
+
+                _mediaCapture = new Windows.Media.Capture.MediaCapture();
+                var settings = new Windows.Media.Capture.MediaCaptureInitializationSettings
+                {
+                    StreamingCaptureMode = Windows.Media.Capture.StreamingCaptureMode.Audio
+                };
+                await _mediaCapture.InitializeAsync(settings);
+
+                _tempAudioFile = await Windows.Storage.ApplicationData.Current.TemporaryFolder
+                    .CreateFileAsync("whisper_rec.wav",
+                        Windows.Storage.CreationCollisionOption.ReplaceExisting);
+
+                _audioProfile = Windows.Media.MediaProperties.MediaEncodingProfile.CreateWav(
+                    Windows.Media.MediaProperties.AudioEncodingQuality.Auto);
+
+                _lowLagRecording = await _mediaCapture.PrepareLowLagRecordToStorageFileAsync(
+                    _audioProfile, _tempAudioFile);
+                await _lowLagRecording.StartAsync();
+
+                _isRecording = true;
+                if (WhisperStatusLabel!=null) WhisperStatusLabel.Text = "Recording…";
+                if (WhisperRecordDot!=null) WhisperRecordDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 60, 60));
+                if (WhisperRecordLabel!=null) WhisperRecordLabel.Text = "Stop";
+                if (WhisperRecordIcon!=null) WhisperRecordIcon.Glyph = "\uE71A"; // Stop icon
+                Log("[Voice] Recording started");
+            }
+            catch (Exception ex)
+            {
+                if (WhisperStatusLabel!=null) WhisperStatusLabel.Text = $"Mic error: {ex.Message}";
+                if (WhisperRecordDot!=null) WhisperRecordDot.Fill = new SolidColorBrush(Microsoft.UI.Colors.Gray);
+                Log($"[Voice] Mic init failed: {ex.Message}");
+            }
+        }
+
+        private async Task StopRecordingAsync()
+        {
+            try
+            {
+                if (WhisperStatusLabel!=null) WhisperStatusLabel.Text = "Stopping…";
+                if (_lowLagRecording != null)
+                {
+                    await _lowLagRecording.StopAsync();
+                    await _lowLagRecording.FinishAsync();
+                    _lowLagRecording = null;
+                }
+                _mediaCapture?.Dispose();
+                _mediaCapture = null;
+                _isRecording = false;
+
+                if (WhisperRecordDot!=null) WhisperRecordDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 80, 200, 80));
+                if (WhisperRecordLabel!=null) WhisperRecordLabel.Text = "Record";
+                if (WhisperRecordIcon!=null) WhisperRecordIcon.Glyph = "\uE720"; // Mic icon
+
+                if (WhisperStatusLabel!=null) WhisperStatusLabel.Text = "Transcribing…";
+                Log("[Voice] Recording stopped — sending to Whisper");
+
+                await TranscribeAudioAsync();
+            }
+            catch (Exception ex)
+            {
+                if (WhisperStatusLabel!=null) WhisperStatusLabel.Text = $"Stop error: {ex.Message}";
+                Log($"[Voice] Stop recording error: {ex.Message}");
+            }
+        }
+
+        private async Task TranscribeAudioAsync()
+        {
+            if (_tempAudioFile == null) return;
+
+            try
+            {
+                string hubBase = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}";
+                string transcribeUrl = $"{hubBase}/transcribe";
+
+                using var form = new MultipartFormDataContent();
+                var fileBytes = await File.ReadAllBytesAsync(_tempAudioFile.Path);
+                var fileContent = new ByteArrayContent(fileBytes);
+                fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("audio/wav");
+                form.Add(fileContent, "file", "audio.wav");
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+                using var response = await SharedHttpClient.PostAsync(transcribeUrl, form, cts.Token);
+                string json = await response.Content.ReadAsStringAsync(cts.Token);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    using var doc = JsonDocument.Parse(json);
+                    string text = doc.RootElement.TryGetProperty("text", out var t) ? t.GetString() ?? "" : json;
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (WhisperTranscriptText!=null) WhisperTranscriptText.Text = text.Trim();
+                        if (WhisperStatusLabel!=null) WhisperStatusLabel.Text = $"Done ({text.Trim().Length} chars)";
+                        if (WhisperRecordDot!=null) WhisperRecordDot.Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 200, 100));
+                    });
+                    Log($"[Voice] Transcription: {text.Trim()}");
+                }
+                else
+                {
+                    DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (WhisperStatusLabel!=null) WhisperStatusLabel.Text = $"API error {(int)response.StatusCode}";
+                        if (WhisperRecordDot!=null) WhisperRecordDot.Fill = new SolidColorBrush(Microsoft.UI.Colors.OrangeRed);
+                    });
+                    Log($"[Voice] Transcription failed: {json}");
+                }
+            }
+            catch (Exception ex)
+            {
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    if (WhisperStatusLabel!=null) WhisperStatusLabel.Text = $"Error: {ex.Message}";
+                    if (WhisperRecordDot!=null) WhisperRecordDot.Fill = new SolidColorBrush(Microsoft.UI.Colors.OrangeRed);
+                });
+                Log($"[Voice] TranscribeAudio error: {ex.Message}");
+            }
+        }
+
+        private void WhisperSendTranscript_Click(object sender, RoutedEventArgs e)
+        {
+            string text = WhisperTranscriptText?.Text?.Trim() ?? "";
+            if (string.IsNullOrEmpty(text)) return;
+
+            // Broadcast the voice transcription to the 3D viewer / Unity client
+            if (_broadcastServer != null)
+                _ = _broadcastServer.BroadcastAsync("voiceTranscription", JsonSerializer.Serialize(text));
+            
+            Log($"[Voice] Sent transcript: {text}");
+            if (WhisperStatusLabel!=null) WhisperStatusLabel.Text = "Sent ✓";
+        }
+
+        // ════════════════════════════════════════════════════════════════════════
+        // PANEL 3 — CONTEXT SCAN (Intel Camera + Gemini)
+        // ════════════════════════════════════════════════════════════════════════
+
+        private readonly ObservableCollection<string> _scanDetectedLabels = [];
+        private byte[]? _latestIntelFrameBytes;
+
+        private async void ContextScanBtn_Click(object sender, RoutedEventArgs e)
+        {
+            // Mirror latest Intel frame into the scan preview panel
+            byte[]? frame = _latestIntelFrameBytes ?? _latestWebcamFrameBytes;
+            if (frame != null)
+                await UpdateScanPreviewAsync(frame);
+
+            // Reuse the existing AnalyzeSceneAsync pipeline (Orange proxy → Gemini)
+            if (string.IsNullOrWhiteSpace(_settings.OrangeApiKey))
+            {
+                if (IntelScanStatusText!=null) IntelScanStatusText.Text = "No Orange API key — see Settings";
+                return;
+            }
+            if (frame == null)
+            {
+                if (IntelScanStatusText!=null) IntelScanStatusText.Text = "No camera frame available";
+                return;
+            }
+
+            if (IntelScanStatusText!=null) IntelScanStatusText.Text = "Scanning…";
+            if (ScanBtnIcon!=null) ScanBtnIcon.Glyph = "\uE768"; // Spinning-ish
+            if (ScanPanelBtn!=null) ScanPanelBtn.IsEnabled = false;
+            _scanDetectedLabels.Clear();
+            if (DetectedObjectsList!=null) DetectedObjectsList.ItemsSource = _scanDetectedLabels;
+
+            try
+            {
+                // Call the shared Orange/Gemini bounding-box analysis pipeline
+                await AnalyzeSceneWithCallbackAsync(frame,
+                    onLabel: (label) => DispatcherQueue.TryEnqueue(() => _scanDetectedLabels.Add(label)),
+                    onDone: (count) => DispatcherQueue.TryEnqueue(() =>
+                    {
+                        if (IntelScanStatusText!=null) IntelScanStatusText.Text = $"{count} object{(count == 1 ? "" : "s")} detected";
+                        if (ScanBtnIcon!=null) ScanBtnIcon.Glyph = "\uE773";
+                        if (ScanPanelBtn!=null) ScanPanelBtn.IsEnabled = true;
+                    }));
+            }
+            catch (Exception ex)
+            {
+                if (IntelScanStatusText!=null) IntelScanStatusText.Text = $"Error: {ex.Message}";
+                if (ScanBtnIcon!=null) ScanBtnIcon.Glyph = "\uE773";
+                if (ScanPanelBtn!=null) ScanPanelBtn.IsEnabled = true;
+            }
+        }
+
+        private async Task UpdateScanPreviewAsync(byte[] frameBytes)
+        {
+            try
+            {
+                var bmp = await LoadImageFromBytesAsync(frameBytes);
+                if (ScanCameraPreview != null)
+                {
+                    ScanCameraPreview.Source = bmp;
+                    if (ScanNoFrameState != null) ScanNoFrameState.Visibility = Visibility.Collapsed;
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Calls the Orange/Gemini object detection pipeline and fires callbacks per detected label.
+        /// Reuses the same API path as AnalyzeSceneAsync but strips the UI drawing capabilities.
+        /// </summary>
+        private async Task AnalyzeSceneWithCallbackAsync(byte[] frameBytes, Action<string>? onLabel, Action<int>? onDone)
+        {
+            if (Interlocked.CompareExchange(ref _analyzeInProgressFlag, 1, 0) == 1)
+            {
+                if (IntelScanStatusText!=null) IntelScanStatusText.Text = "Scan already in progress";
+                return;
+            }
+            try
+            {
+                string orangeApiKey = _settings.OrangeApiKey;
+                string orangeBaseUrl = (string.IsNullOrWhiteSpace(_settings.OrangeApiUrl)
+                    ? "https://llmproxy.ai.orange"
+                    : _settings.OrangeApiUrl.TrimEnd('/'));
+                string url = $"{orangeBaseUrl}/v1/chat/completions";
+
+                string base64Image = Convert.ToBase64String(frameBytes);
+                string prompt = string.IsNullOrWhiteSpace(_settings.BananaPromptTemplate)
+                    ? DefaultBananaPrompt : _settings.BananaPromptTemplate;
+
+                var requestBody = new
+                {
+                    model = "vertex_ai/gemini-2.5-flash-lite",
+                    temperature = 0.3,
+                    messages = new object[]
+                    {
+                        new {
+                            role = "user",
+                            content = new object[]
+                            {
+                                new { type = "image_url", image_url = new { url = $"data:image/jpeg;base64,{base64Image}" } },
+                                new { type = "text", text = prompt }
+                            }
+                        }
+                    }
+                };
+
+                using var request = new HttpRequestMessage(HttpMethod.Post, url)
+                {
+                    Content = new StringContent(JsonSerializer.Serialize(requestBody), System.Text.Encoding.UTF8, "application/json")
+                };
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", orangeApiKey);
+
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                using var response = await SharedHttpClient.SendAsync(request, cts.Token);
+                string responseString = await response.Content.ReadAsStringAsync(cts.Token);
+
+                if (!response.IsSuccessStatusCode) { onDone?.Invoke(0); return; }
+
+                using var doc = JsonDocument.Parse(responseString);
+                string? messageContent = null;
+                if (doc.RootElement.TryGetProperty("choices", out var choices) && choices.GetArrayLength() > 0)
+                    messageContent = choices[0].GetProperty("message").GetProperty("content").GetString();
+
+                int count = 0;
+                if (!string.IsNullOrEmpty(messageContent))
+                {
+                    int s = messageContent.IndexOf('[');
+                    int eIdx = messageContent.LastIndexOf(']');
+                    if (s >= 0 && eIdx > s)
+                    {
+                        string jsonStr = messageContent.Substring(s, eIdx - s + 1);
+                        using var itemsDoc = JsonDocument.Parse(jsonStr);
+                        if (itemsDoc.RootElement.ValueKind == JsonValueKind.Array)
+                        {
+                            foreach (var item in itemsDoc.RootElement.EnumerateArray())
+                            {
+                                string label = item.TryGetProperty("label", out var lp) ? lp.GetString() ?? "?" : "?";
+                                onLabel?.Invoke(label);
+                                count++;
+                            }
+                        }
+                    }
+                }
+                onDone?.Invoke(count);
+                Log($"[Context] Scan detected {count} objects");
+            }
+            catch (Exception ex) { Log($"[Context] Scan error: {ex.Message}"); onDone?.Invoke(0); }
+            finally { Interlocked.Exchange(ref _analyzeInProgressFlag, 0); }
+        }
+
+        // Hook into the Intel camera stream to cache the latest frame for the scan panel
+        private async Task UpdateIntelScanFeedAsync(byte[] frameBytes)
+        {
+            _latestIntelFrameBytes = frameBytes;
+            // The side panel has been removed, so we no longer update its live preview here.
+        }
+
+        // ════════════════════════════════════════════════════════════════════════
+        // PANEL 4 — SIS / SAEH TAXONOMY
+        // ════════════════════════════════════════════════════════════════════════
+
+        private string _saehSelected = "";
+
+        private void SaehQuadrant_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Button btn) return;
+            string tag = btn.Tag?.ToString() ?? "";
+            _saehSelected = tag;
+
+            if (SisSelectedLabel != null)
+            {
+                string desc = tag switch
+                {
+                    "S" => "S — Safe",
+                    "A" => "A — Abnormal",
+                    "E" => "E — Emergency",
+                    "H" => "H — Hazard",
+                    _ => "None"
+                };
+                SisSelectedLabel.Text = desc;
+            }
+
+            HighlightSaehBtn(SaehSBtn, tag == "S", "#FFD700");
+            HighlightSaehBtn(SaehABtn, tag == "A", "#FF9800");
+            HighlightSaehBtn(SaehEBtn, tag == "E", "#FF4444");
+            HighlightSaehBtn(SaehHBtn, tag == "H", "#AA44FF");
+
+            Log($"[SIS] SAEH category selected: {tag}");
+            if (_broadcastServer != null) _ = _broadcastServer.BroadcastAsync("sisSaeh", JsonSerializer.Serialize(new { category = tag }));
+        }
+
+        private static void HighlightSaehBtn(Button? btn, bool active, string hexColor)
+        {
+            if (btn == null) return;
+            byte r = Convert.ToByte(hexColor.Substring(1, 2), 16);
+            byte g = Convert.ToByte(hexColor.Substring(3, 2), 16);
+            byte b = Convert.ToByte(hexColor.Substring(5, 2), 16);
+            btn.Background = active
+                ? new SolidColorBrush(Windows.UI.Color.FromArgb(60, r, g, b))
+                : new SolidColorBrush(Windows.UI.Color.FromArgb(21, r, g, b));
+            btn.BorderBrush = active
+                ? new SolidColorBrush(Windows.UI.Color.FromArgb(180, r, g, b))
+                : new SolidColorBrush(Windows.UI.Color.FromArgb(37, r, g, b));
+        }
+
+        private void SimulateIKBtn_Click(object sender, RoutedEventArgs e)
+        {
+            int robotIdx = TeleopR2Radio?.IsChecked == true ? 1 : 0;
+            if (_broadcastServer != null) _ = _broadcastServer.BroadcastAsync("simulateIK",
+                JsonSerializer.Serialize(new
+                {
+                    robotIdx,
+                    saeh = _saehSelected,
+                    speedPct = _teleopSpeedPct
+                }));
+
+            Log($"[SIS] Simulate IK broadcast for robot {robotIdx + 1}, SAEH={_saehSelected}");
+        }
+
+        // ════════════════════════════════════════════════════════════════════════
+        // PANEL 5 — EXECUTE TRAJECTORY
+        // ════════════════════════════════════════════════════════════════════════
+
+
+        private async void ExecuteTrajectoryBtn_Click(object sender, RoutedEventArgs e)
+        {
+            int robotIdx = TeleopR2Radio?.IsChecked == true ? 1 : 0;
+            var bridge = robotIdx == 0 ? _robotBridge : _robotBridge2;
+
+            if (bridge == null || !bridge.IsConnected)
+            {
+                if (ExecuteStatusLabel != null) ExecuteStatusLabel.Text = $"Robot {robotIdx + 1} not connected";
+                return;
+            }
+
+            var dialog = new ContentDialog
+            {
+                Title = "Execute Trajectory",
+                Content = $"This will physically move Robot {robotIdx + 1} to the current IK target position.\n\nEnsure the workspace is clear before proceeding.",
+                PrimaryButtonText = "Execute",
+                CloseButtonText = "Cancel",
+                XamlRoot = this.Content.XamlRoot
+            };
+
+            ContentDialogResult result;
+            try { result = await dialog.ShowAsync(); } catch { result = ContentDialogResult.None; }
+
+            if (result != ContentDialogResult.Primary) return;
+
+            if (ExecuteStatusLabel != null) ExecuteStatusLabel.Text = "Executing…";
+            if (ExecutePanelBtn != null) ExecutePanelBtn.IsEnabled = false;
+
+            try
+            {
+                if (_broadcastServer != null)
+                {
+                    await _broadcastServer.BroadcastAsync("executeTrajectory", JsonSerializer.Serialize(new
+                    {
+                        robotIdx,
+                        saeh = _saehSelected,
+                        speedPct = _teleopSpeedPct
+                    }));
+                }
+
+                Log($"[Execute] Trajectory execution requested for robot {robotIdx + 1}");
+                if (ExecuteStatusLabel != null) ExecuteStatusLabel.Text = $"Trajectory sent to Robot {robotIdx + 1} ✓";
+            }
+            catch (Exception ex)
+            {
+                Log($"[Execute] Error: {ex.Message}");
+                if (ExecuteStatusLabel != null) ExecuteStatusLabel.Text = $"Error: {ex.Message}";
+            }
+            finally
+            {
+                await Task.Delay(2000);
+                if (ExecutePanelBtn != null) ExecutePanelBtn.IsEnabled = true;
+            }
+        }
 
     }
 }

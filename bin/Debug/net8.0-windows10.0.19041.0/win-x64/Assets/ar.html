@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Calibration 3D View</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: transparent;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #threejs-canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* Overlay legend */
+    #legend {
+      position: absolute;
+      top: 12px;
+      right: 14px;
+      background: rgba(10, 10, 13, .8);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 6px;
+      padding: 8px 12px;
+      font-size: 10px;
+      line-height: 1.8;
+      pointer-events: none;
+    }
+
+    .leg {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .leg-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 2px;
+      flex-shrink: 0;
+    }
+
+    /* Camera label tag */
+    #cam-tag {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      background: rgba(0, 229, 255, .1);
+      border: 1px solid rgba(0, 229, 255, .25);
+      border-radius: 5px;
+      padding: 4px 10px;
+      font-size: 10px;
+      color: #00e5ff;
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div style="position: relative; width: 100vw; height: 100vh; overflow: hidden;">
+    <div id="ar-controls" style="position: absolute; top: 10px; left: 10px; background: rgba(0,0,0,0.6); padding: 10px; border-radius: 6px; z-index: 3; border: 1px solid rgba(0, 229, 255, 0.2);">
+      <label style="display: block; font-size: 11px; margin-bottom: 6px; color: #00e5ff; font-weight: bold;">AR OPACITY
+        <input type="range" id="arOpacity" min="0" max="0.1" step="0.01" value="0.02" style="vertical-align: middle; margin-left: 10px;" />
+      </label>
+      <label style="display: block; font-size: 11px; color: #00e5ff; font-weight: bold;">AR GLOW
+        <input type="range" id="arGlow" min="0" max="0.1" step="0.01" value="0.05" style="vertical-align: middle; margin-left: 23px;" />
+      </label>
+    </div>
+    <canvas id="threejs-canvas" style="position: absolute; left: 50%; top: 50%; width: 100%; height: 100%; transform: translate(-50%, -50%); z-index: 2;"></canvas>
+  </div>
+  <script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+  }
+}
+</script>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    // ── URL params ──────────────────────────────────────────────────────────────
+    const params = new URLSearchParams(location.search);
+    const camName = params.get('cam') || 'Camera';
+    const isIntel = camName.toLowerCase().includes('intel');
+    const camColor = isIntel ? 0x5599ff : 0x00e5ff;
+
+
+
+    // ── Three.js AR Mode scene ───────────────────────────────────────────────────
+    const canvas = document.getElementById('threejs-canvas');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+    renderer.setPixelRatio(devicePixelRatio);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.setClearColor(0x000000, 0); // Transparent background for AR overlay!
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.01, 20);
+
+    // Lighting (just enough to see the robots beautifully)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    dirLight.position.set(0, 5, 2);
+    scene.add(dirLight);
+
+    // Load actual robot models (ned.glb)
+    const gltfLoader = new GLTFLoader();
+    window.robotJointRefs = [[], []]; // Global cache for IK runtime streaming
+    gltfLoader.load('./ned.glb', (gltf) => {
+      const model = gltf.scene;
+      model.rotation.x = Math.PI / 2;
+
+      // Apply gorgeous transparent holographic styling
+      model.traverse((child) => {
+        if (child.isMesh) {
+          child.material = new THREE.MeshBasicMaterial({
+            color: 0x0088cc,
+            transparent: true,
+            opacity: 0.02,
+            wireframe: false,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide,
+            depthWrite: false
+          });
+          
+          // Add glowing outline wireframe for structure
+          const edges = new THREE.EdgesGeometry(child.geometry);
+          const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.05,
+            blending: THREE.AdditiveBlending
+          }));
+          child.add(line);
+        }
+      });
+
+      // Robot 1 (Right physically, X = Positive)
+      const r1 = new THREE.Group();
+      const m1 = model.clone();
+      r1.add(m1);
+      r1.position.set(0.29, -0.53, 0); // Flipped to bottom side
+      r1.rotation.z = -Math.PI / 2; // Facing Left (Inwards to center)
+      scene.add(r1);
+
+      // Robot 2 (Left physically, X = Negative)
+      const r2 = new THREE.Group();
+      const m2 = model.clone();
+      r2.add(m2);
+      r2.position.set(-0.29, -0.53, 0); // Flipped to bottom side
+      r2.rotation.z = Math.PI / 2; // Facing Right (opposite to r1)
+      scene.add(r2);
+      
+      for(let i=1; i<=6; i++) {
+          window.robotJointRefs[0].push(m1.getObjectByName('joint_' + i));
+          window.robotJointRefs[1].push(m2.getObjectByName('joint_' + i));
+      }
+    });
+
+    const WS_URL = `ws://${location.hostname}:8181/scene3d-ws`;
+    let ws;
+    function connect() {
+      ws = new WebSocket(WS_URL);
+      ws.onmessage = (ev) => {
+        let env;
+        try { env = JSON.parse(ev.data); } catch { return; }
+        
+        // Slave the Main camera to the Creative camera pose!
+        if (env.type === 'setCameraPose') {
+          try {
+            const p = typeof env.payload === 'string' ? JSON.parse(env.payload) : env.payload;
+            if (p.camType === 'creative') {
+                camera.position.set(p.X, p.Y, p.Z);
+                const R = new THREE.Matrix4().set(
+                    p.R11, p.R12, p.R13, 0,
+                    p.R21, p.R22, p.R23, 0,
+                    p.R31, p.R32, p.R33, 0,
+                    0, 0, 0, 1
+                );
+                camera.setRotationFromMatrix(R);
+                // Three.js frustum local forward is -Z. OpenCV is +Z. Reverse Pitch around X.
+                camera.rotateX(Math.PI);
+            }
+          } catch { }
+        }
+        else if (env.type === 'setRobotJoints') {
+          try {
+            const p = typeof env.payload === 'string' ? JSON.parse(env.payload) : env.payload;
+            if (window.robotJointRefs && window.robotJointRefs[p.robotIdx]) {
+                const j = window.robotJointRefs[p.robotIdx];
+                for(let i=0; i<6; i++) if (j[i]) j[i].rotation.z = p.angles[i] * Math.PI / 180.0;
+            }
+          } catch { }
+        }
+        else if (env.type === 'updateCameraFeed' && new URLSearchParams(location.search).get('cam') === 'creative') {
+            try { 
+                const img = new Image();
+                img.onload = () => { scene.background = new THREE.Texture(img); scene.background.colorSpace = THREE.SRGBColorSpace; scene.background.needsUpdate = true; };
+                img.src = JSON.parse(env.payload);
+            } catch { }
+        }
+        else if (env.type === 'updateCameraFeed2' && new URLSearchParams(location.search).get('cam') === 'intel') {
+            try { 
+                const img = new Image();
+                img.onload = () => { scene.background = new THREE.Texture(img); scene.background.colorSpace = THREE.SRGBColorSpace; scene.background.needsUpdate = true; };
+                img.src = JSON.parse(env.payload);
+            } catch { }
+        }
+      };
+      
+      // Bind AR dynamic controls
+      document.getElementById('arOpacity').oninput = (e) => {
+         const v = parseFloat(e.target.value);
+         scene.traverse(c => { 
+             if(c.isMesh && c.material.type !== 'LineBasicMaterial') c.material.opacity = v; 
+         });
+      };
+      document.getElementById('arGlow').oninput = (e) => {
+         const v = parseFloat(e.target.value);
+         scene.traverse(c => { 
+             if(c.isLineSegments) c.material.opacity = v; 
+         });
+      };
+      ws.onclose = () => setTimeout(connect, 2000);
+    }
+    connect();
+
+    // ── Resize ───────────────────────────────────────────────────────────────────
+    function resize() {
+      const w = canvas.parentElement.clientWidth;
+      const h = canvas.parentElement.clientHeight;
+      const aspect = 16 / 9; // Physical camera feed is 16:9 (1280x720 / 1920x1080)
+      let rw = w, rh = h;
+      if (w / h > aspect) rw = h * aspect; // Letterbox left/right
+      else rh = w / aspect; // Letterbox top/bottom
+      
+      renderer.setSize(rw, rh);
+      camera.aspect = aspect;
+      camera.updateProjectionMatrix();
+      
+      // Center the canvas inside the transparent WebView to overlap exactly the 16:9 Video
+      canvas.style.position = 'absolute';
+      canvas.style.left = '50%';
+      canvas.style.top = '50%';
+      canvas.style.transform = 'translate(-50%, -50%)';
+    }
+    new ResizeObserver(resize).observe(canvas.parentElement);
+    resize();
+
+    // ── Render loop ──────────────────────────────────────────────────────────────
+    (function loop() {
+      requestAnimationFrame(loop);
+      renderer.render(scene, camera);
+    })();
+  </script>
+</body>
+</html>

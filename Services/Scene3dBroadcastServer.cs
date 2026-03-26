@@ -79,7 +79,7 @@ namespace RobotControllerApp.Services
             // "pong" is droppable: a stale pong from the previous ping cycle must not
             // arrive after the client has already sent a newer ping.
             private static readonly HashSet<string> _droppableTypes =
-                new() { "updateCameraFeed", "updateCameraFeed2", "setCameraPose", "setRobotJoints", "setCameraRobot", "pong" };
+                new() { "updateCameraFeed", "updateCameraFeed2", "updateArFeed", "updateArFeed2", "setCameraPose", "setRobotJoints", "setCameraRobot", "pong" };
 
             private readonly CancellationTokenSource _cts = new();
             private readonly SemaphoreSlim _socketLock = new(1, 1);

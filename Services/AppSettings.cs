@@ -56,6 +56,11 @@ namespace RobotControllerApp.Services
         public double CameraFovScale { get; set; } = 0.40;
 
         /// <summary>
+        /// The opacity applied to the glowing AR Holograms in the telepresence Hub view.
+        /// </summary>
+        public double ArOpacity { get; set; } = 0.15;
+
+        /// <summary>
         /// Which physical robot carries the camera (1 = Robot 1, 2 = Robot 2).
         /// The hub subscribes to the camera topic only on this robot's bridge.
         /// </summary>
