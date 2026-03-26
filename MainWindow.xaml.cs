@@ -2625,8 +2625,8 @@ namespace RobotControllerApp
             CalibOfflineState.Visibility = Visibility.Visible;
             
             // Navigate WebView2 to the Three.js calibration page served by the Kestrel server
-            string calibUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/calibrate.html";
-            string arUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/ar.html?cam=creative";
+            string calibUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/calibrate.html?t={Environment.TickCount}";
+            string arUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/ar.html?cam=creative&t={Environment.TickCount}";
             try { 
                 CalibWebView.Source = new Uri(calibUrl); 
                 CalibARViewCreative.Source = new Uri(arUrl);
