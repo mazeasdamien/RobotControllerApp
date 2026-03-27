@@ -190,11 +190,7 @@ namespace RobotControllerApp
             DetectedObjectsList.ItemsSource = _detectedObjects;
             SelectedObjectsList.ItemsSource = _selectedForBanana;
             BananaImagesList.ItemsSource = _bananaImages;
-            LibraryList.ItemsSource = _libraryItems;
-            _libraryItems.CollectionChanged += (_, _) =>
-                LibraryCountBadge.Text = $"{_libraryItems.Count} asset{(_libraryItems.Count == 1 ? "" : "s")}";
 
-            _ = LoadLibraryAsync();
 
             _settings = AppSettings.Load();
             _relayServer = new RelayServerHost();
@@ -459,62 +455,9 @@ namespace RobotControllerApp
 
             StartRelayStatusPoll();
 
-            // Initialize Calibration WebViews
-            try
-            {
-                await CalibARViewCreative.EnsureCoreWebView2Async();
-                CalibARViewCreative.DefaultBackgroundColor = Microsoft.UI.Colors.Transparent;
-                string arUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/ar.html?cam=creative&t={Environment.TickCount}";
-                CalibARViewCreative.WebMessageReceived += HandleArWebMessage;
-                CalibARViewCreative.Source = new Uri(arUrl);
 
-                await CalibARViewIntel.EnsureCoreWebView2Async();
-                CalibARViewIntel.DefaultBackgroundColor = Microsoft.UI.Colors.Transparent;
-                string arUrl2 = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/ar.html?cam=intel&t={Environment.TickCount}";
-                CalibARViewIntel.WebMessageReceived += HandleArWebMessage;
-                CalibARViewIntel.Source = new Uri(arUrl2);
-
-                await CalibWebView.EnsureCoreWebView2Async();
-                CalibWebView.DefaultBackgroundColor = Microsoft.UI.Colors.Transparent;
-                string calibUrl = $"http://localhost:{Scene3dBroadcastServer.DefaultPort}/calibrate.html?t={Environment.TickCount}";
-                CalibWebView.Source = new Uri(calibUrl);
-            }
-            catch { }
 
             Log("System Ready. Waiting for connections...");
-        }
-
-        private void HandleArWebMessage(Microsoft.UI.Xaml.Controls.WebView2 sender, Microsoft.Web.WebView2.Core.CoreWebView2WebMessageReceivedEventArgs args)
-        {
-            if (_isClosing || _broadcastServer == null) return;
-            if (_broadcastServer.ConnectedClients == 0 && !RelayServerHost.UnityClientConnected) return;
-
-            try
-            {
-                string msg = args.TryGetWebMessageAsString();
-                if (string.IsNullOrEmpty(msg) || !msg.StartsWith("ar_frame|")) return;
-
-                // High-performance string splitting avoids JSON allocation locks on UI thread
-                string[] parts = msg.Split('|', 3);
-                if (parts.Length != 3) return;
-
-                string cam = parts[1];
-                string dataRaw = parts[2];
-
-                if (string.IsNullOrEmpty(dataRaw) || dataRaw.Length < 10) return;
-
-                string feedName = cam == "intel" ? "updateArFeed2" : "updateArFeed";
-
-                _ = _broadcastServer.BroadcastAsync(feedName, $"\"{dataRaw}\"");
-                if (RelayServerHost.UnityClientConnected)
-                {
-                    // Manually build JSON to skip heavy serialization allocations
-                    _ = RelayServerHost.CurrentManager?.BroadcastToAllUnityClients(
-                        $"{{\"op\":\"{feedName}\",\"payload\":\"{dataRaw}\"}}"
-                    );
-                }
-            }
-            catch { /* Ignore */ }
         }
 
         private async void AppWindow_Closing(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
@@ -714,12 +657,7 @@ namespace RobotControllerApp
 
                 DispatcherQueue.TryEnqueue(() =>
                 {
-                    DashboardCameraCombo.Items.Clear();
-                    foreach (var dev in _videoDevices)
-                    {
-                        DashboardCameraCombo.Items.Add(dev.Name);
-                    }
-                    if (creativeIdx >= 0) DashboardCameraCombo.SelectedIndex = creativeIdx;
+
 
                     // Update header labels with detected names
                     if (CreativeCamLabel != null && creativeIdx >= 0)
@@ -736,17 +674,7 @@ namespace RobotControllerApp
             catch (Exception ex) { Log($"[Webcam] Enumeration failed: {ex.Message}"); }
         }
 
-        private async void DashboardCameraCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            int idx = DashboardCameraCombo.SelectedIndex;
-            if (idx >= 0) await StartCameraByIndex(idx);
-        }
 
-        private async void RefreshCamerasButton_Click(object sender, RoutedEventArgs e)
-        {
-            Log("[Webcam] Refreshing camera list...");
-            await LoadCameraList();
-        }
 
         private void HandleCameraFrame(string robotId, byte[] imageBytes)
         {
@@ -2159,7 +2087,6 @@ namespace RobotControllerApp
                     "gemini-3-pro-image-preview" => 2,
                     _ => 0
                 };
-                if (ArOpacitySlider != null) ArOpacitySlider.Value = _settings.ArOpacity;
             }
             catch { }
         }
@@ -2299,14 +2226,17 @@ namespace RobotControllerApp
 
                     _broadcastServer.OnClientConnected += async () =>
                     {
-                        // Flip the hub "REMOTE EXPERT" card to ACTIVE immediately on connect.
                         DispatcherQueue.TryEnqueue(() => UpdateExpertStatus(true));
 
-                        if (_lastValidPoseCreative != null) await PushCameraPoseAsync(_lastValidPoseCreative, "creative");
-                        if (_lastValidPoseIntel != null) await PushCameraPoseAsync(_lastValidPoseIntel, "intel");
+                        // Read pure hardware factory intrinsics off the RealSense via P/Invoke
+                        var intr = RobotControllerApp.Services.RealSenseIntrinsics.GetColorIntrinsics();
+                        if (intr.HasValue) 
+                        {
+                            string intrJson = System.Text.Json.JsonSerializer.Serialize(intr.Value);
+                            _ = _broadcastServer.BroadcastAsync("setRealSenseIntrinsics", intrJson);
+                            Log($"[RealSense] Hardware intrinsics acquired! (Fx: {intr.Value.fx:F1}, Fy: {intr.Value.fy:F1})");
+                        }
                         
-                        await _broadcastServer.BroadcastAsync("setArOpacity", _settings.ArOpacity.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
-
                         await PushObjectsToSceneAsync();
                     };
 
@@ -2351,8 +2281,6 @@ namespace RobotControllerApp
                 }
 
                 for (int i = 0; i < 10 && !_broadcastServer.IsRunning; i++) await Task.Delay(50);
-                if (_lastValidPoseCreative != null) await PushCameraPoseAsync(_lastValidPoseCreative, "creative");
-                if (_lastValidPoseIntel != null) await PushCameraPoseAsync(_lastValidPoseIntel, "intel");
                 await PushObjectsToSceneAsync();
             }
             catch (Exception ex) { Log($"[3D Preview] Server init failed: {ex.Message}"); }
@@ -2470,29 +2398,10 @@ namespace RobotControllerApp
                 var costs = new { scanEur = 0.0, bananaEur = Math.Round(_totalBananaCost, 4), totalEur = Math.Round(_totalBananaCost, 4) };
                 _ = _broadcastServer.BroadcastAsync("setScanCosts", JsonSerializer.Serialize(costs));
 
-                if (_lastValidPoseCreative != null) await PushCameraPoseAsync(_lastValidPoseCreative, "creative");
-                if (_lastValidPoseIntel != null) await PushCameraPoseAsync(_lastValidPoseIntel, "intel");
             }
             catch (Exception ex) { Log($"[3D Preview] Push failed: {ex.Message}"); }
         }
 
-        private async Task PushCameraPoseAsync(CameraPose pose, string camType = "unknown")
-        {
-            try
-            {
-                var poseObj = new { op = "camera_pose", camType, pose.X, pose.Y, pose.Z, pose.Rx, pose.Ry, pose.Rz, pose.R11, pose.R12, pose.R13, pose.R21, pose.R22, pose.R23, pose.R31, pose.R32, pose.R33 };
-                string json = JsonSerializer.Serialize(poseObj);
-
-                if (_broadcastServer.IsRunning) {
-                    _ = _broadcastServer.BroadcastAsync("setCameraPose", json);
-                }
-
-                if (RelayServerHost.UnityClientConnected && RelayServerHost.CurrentManager != null) {
-                    _ = RelayServerHost.CurrentManager.BroadcastToAllUnityClients(json);
-                }
-            }
-            catch { }
-        }
 
         private static string BuildLearningModeCommand(bool activate) => JsonSerializer.Serialize(new
         { op = "call_service", service = "/niryo_robot/learning_mode/activate", type = "niryo_robot_msgs/SetBool", args = new { value = activate } });
@@ -2782,7 +2691,6 @@ namespace RobotControllerApp
                     CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     FreezeCalibToggle.IsEnabled = true;
-                    _ = PushCameraPoseAsync(pose, "creative");
                 }
             });
         }
@@ -2798,7 +2706,6 @@ namespace RobotControllerApp
                     CalibDetectionStatus.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     CalibDetectionIcon.Foreground = new SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 204, 106));
                     FreezeCalibToggle.IsEnabled = true;
-                    _ = PushCameraPoseAsync(pose, "intel");
                 }
             });
         }
@@ -2850,20 +2757,6 @@ namespace RobotControllerApp
                 }
                 Log($"[Calib] Calibration saved successfully.");
             } catch (Exception ex) { Log($"[Calib] Save failed: {ex.Message}"); }
-        }
-
-        private void ArOpacitySlider_ValueChanged(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
-        {
-            if (_settings != null)
-            {
-                _settings.ArOpacity = e.NewValue;
-                _settings.Save();
-            }
-
-            if (_broadcastServer != null && _broadcastServer.IsRunning)
-            {
-                _ = _broadcastServer.BroadcastAsync("setArOpacity", e.NewValue.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
-            }
         }
 
         private async void SetCalibStopped()

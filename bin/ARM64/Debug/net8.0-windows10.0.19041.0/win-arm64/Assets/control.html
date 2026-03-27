@@ -3,508 +3,141 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Robot Control Panel</title>
-    <!-- Google Fonts for clean typography -->
+    <title>Robot Control Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
         :root {
-            /* Clean Light Theme Palette */
             --bg-page: #f8f9fa;
             --bg-card: #ffffff;
             --border-light: #e2e8f0;
             --text-main: #1e293b;
             --text-muted: #64748b;
             --accent-primary: #2563eb;
-            --accent-primary-hover: #1d4ed8;
-            
-            /* Professional SAEH Accents */
             --saeh-show: #10b981;
             --saeh-alert: #f59e0b;
             --saeh-hesitate: #ef4444;
             --saeh-encourage: #8b5cf6;
-            
-            /* UI States */
-            --bg-hover: #f1f5f9;
         }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-family: 'Inter', sans-serif;
             background-color: var(--bg-page);
             color: var(--text-main);
-            min-height: 100vh;
-            width: 100%; 
-            display: flex;
-            flex-direction: column;
-            overflow-x: hidden;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        /* Container Layout */
-        .dashboard {
-            width: 100%;
-            max-width: 1280px;
-            margin: 0 auto;
-            padding: 32px 40px;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
-        }
-
-        /* Header */
-        .header {
-            grid-column: 1 / -1;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--border-light);
-            margin-bottom: 8px;
-        }
-
-        .header h1 {
-            font-size: 24px;
-            font-weight: 600;
-            color: #0f172a;
-            letter-spacing: -0.02em;
-        }
-
-        .status-pill {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            background: #dcfce7;
-            color: #166534;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 13px;
-            font-weight: 500;
-            border: 1px solid #bbf7d0;
-            transition: all 0.3s ease;
-        }
-        .status-pill.disconnected {
-            background: #ffe4e6;
-            color: #be123c;
-            border-color: #fecdd3;
-        }
-        .status-indicator {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background: currentColor;
-        }
-
-        /* Clean Cards */
-        .card {
-            background: var(--bg-card);
-            border: 1px solid var(--border-light);
-            border-radius: 12px;
-            padding: 24px;
+            padding: 20px;
             display: flex;
             flex-direction: column;
             gap: 20px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
-        }
-        .card.span-full {
-            grid-column: 1 / -1;
+            -webkit-font-smoothing: antialiased;
         }
 
-        .card-header {
+        .header {
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            gap: 12px;
-            font-size: 16px;
-            font-weight: 600;
-            color: #0f172a;
-        }
-        
-        .svg-icon {
-            width: 20px;
-            height: 20px;
-            fill: var(--text-muted);
-            display: inline-block;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 12px;
         }
 
-        /* Controls */
-        label {
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-main);
-            margin-bottom: 6px;
-            display: block;
-        }
+        .header h1 { font-size: 18px; font-weight: 600; }
 
-        .input-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        /* Toggle Switch */
-        .toggle-switch {
-            position: relative;
-            width: 44px;
-            height: 24px;
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-            background: #e2e8f0;
-            border-radius: 12px;
-            outline: none;
-            cursor: pointer;
-            transition: background 0.2s ease;
-        }
-        .toggle-switch::after {
-            content: '';
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            width: 20px;
-            height: 20px;
-            background: #fff;
-            border-radius: 50%;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-            transition: transform 0.2s cubic-bezier(0.4, 0.0, 0.2, 1);
-        }
-        .toggle-switch:checked {
-            background: var(--accent-primary);
-        }
-        .toggle-switch:checked::after {
-            transform: translateX(20px);
-        }
-
-        /* Styled Range Sliders */
-        input[type=range] {
-            -webkit-appearance: none;
-            -moz-appearance: none;
-            appearance: none;
-            width: 100%;
-            height: 4px;
-            background: #e2e8f0;
-            border-radius: 2px;
-            outline: none;
-        }
-        input[type=range]::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            appearance: none;
-            width: 16px;
-            height: 16px;
-            border-radius: 50%;
-            background: var(--accent-primary);
-            cursor: pointer;
-            border: 2px solid #fff;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.3);
-            transition: transform 0.1s;
-        }
-        input[type=range]::-webkit-slider-thumb:hover {
-            transform: scale(1.15);
-        }
-        
-        .slider-row {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-        .slider-val {
-            font-family: 'Roboto Mono', monospace;
-            font-size: 13px;
-            color: var(--text-main);
-            width: 36px;
-            text-align: right;
-        }
-
-        /* Clean Buttons */
-        button {
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            font-weight: 500;
-            padding: 10px 18px;
-            border-radius: 6px;
-            border: 1px solid transparent;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-        
-        .btn-primary {
-            background-color: var(--accent-primary);
-            color: #fff;
-        }
-        .btn-primary:hover {
-            background-color: var(--accent-primary-hover);
-        }
-        
-        .btn-danger {
-            background-color: #ef4444;
-            color: #fff;
-            font-weight: 600;
-            padding: 14px 24px;
-        }
-        .btn-danger:hover {
-            background-color: #dc2626;
-        }
-
-        .btn-outline {
-            background-color: #fff;
-            border-color: #cbd5e1;
-            color: #334155;
-        }
-        .btn-outline:hover {
-            background-color: #f8fafc;
-            border-color: #94a3b8;
-        }
-
-        /* Text Input Area */
-        textarea {
-            width: 100%;
-            background: #f8fafc;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            padding: 12px;
-            color: var(--text-main);
-            font-family: 'Inter', sans-serif;
-            font-size: 14px;
-            line-height: 1.5;
-            resize: vertical;
-            min-height: 80px;
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        textarea:focus {
-            border-color: var(--accent-primary);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-            background: #fff;
-        }
-
-        /* Lists and Results Area */
-        .scan-results {
-            margin-top: 8px;
-            background: #f8fafc;
+        .card {
+            background: var(--bg-card);
             border: 1px solid var(--border-light);
-            border-radius: 6px;
-            padding: 12px;
-            min-height: 60px;
-        }
-        .scan-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 4px;
-            border-bottom: 1px solid #e2e8f0;
-            font-size: 13px;
-        }
-        .scan-item:last-child { border-bottom: none; }
-        .color-dot {
-            width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
-        }
-
-        /* SAEH Strict Taxonomy Grid */
-        .saeh-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
-        .saeh-btn {
-            background: #fff;
-            border: 1px solid #cbd5e1;
             border-radius: 8px;
-            padding: 16px 12px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
-            align-items: flex-start;
-            gap: 4px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-        }
-        .saeh-btn:hover {
-            background: var(--bg-hover);
-        }
-        .saeh-btn h3 {
-            font-size: 15px;
-            font-weight: 600;
-        }
-        .saeh-btn p {
-            font-size: 12px;
-            color: var(--text-muted);
-        }
-
-        /* SAEH Selection States */
-        .saeh-show.active { border-color: var(--saeh-show); background: #ecfdf5; box-shadow: 0 0 0 1px var(--saeh-show); }
-        .saeh-show h3 { color: var(--saeh-show); }
-        
-        .saeh-alert.active { border-color: var(--saeh-alert); background: #fffbeb; box-shadow: 0 0 0 1px var(--saeh-alert); }
-        .saeh-alert h3 { color: var(--saeh-alert); }
-        
-        .saeh-hesitate.active { border-color: var(--saeh-hesitate); background: #fef2f2; box-shadow: 0 0 0 1px var(--saeh-hesitate); }
-        .saeh-hesitate h3 { color: var(--saeh-hesitate); }
-        
-        .saeh-encourage.active { border-color: var(--saeh-encourage); background: #faf5ff; box-shadow: 0 0 0 1px var(--saeh-encourage); }
-        .saeh-encourage h3 { color: var(--saeh-encourage); }
-
-        .warning-banner {
-            background: #fffbeb;
-            border-left: 4px solid var(--saeh-alert);
-            border-radius: 4px;
-            padding: 16px;
-            font-size: 13px;
-            line-height: 1.5;
-            color: #92400e;
-            display: flex;
-            align-items: flex-start;
             gap: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
-        .warning-banner svg {
-            fill: #d97706;
-            margin-top: 2px;
-            flex-shrink: 0;
+
+        .card-header { font-size: 14px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+
+        /* Sliders */
+        input[type=range] { width: 100%; height: 4px; background: #e2e8f0; border-radius: 2px; }
+        .slider-row { display: flex; align-items: center; justify-content: space-between; font-size: 12px; }
+
+        /* Buttons */
+        button {
+            font-size: 13px; font-weight: 500; padding: 8px 12px; border-radius: 4px; border: 1px solid transparent; cursor: pointer; transition: all 0.15s ease;
+            display: inline-flex; align-items: center; justify-content: center; gap: 6px;
         }
+        .btn-primary { background-color: var(--accent-primary); color: #fff; }
+        .btn-outline { background-color: #fff; border-color: #cbd5e1; color: #334155; }
+        .btn-danger { background-color: #ef4444; color: #fff; font-weight: 600; }
+
+        /* SAEH Grid */
+        .saeh-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .saeh-btn {
+            background: #fff; border: 1px solid #cbd5e1; border-radius: 6px; padding: 12px 8px;
+            display: flex; flex-direction: column; align-items: center; cursor: pointer; transition: all 0.1s;
+        }
+        .saeh-btn h3 { font-size: 13px; }
+        .saeh-btn p { font-size: 10px; color: var(--text-muted); }
+        .saeh-btn.active { border-width: 2px; }
+        .saeh-show.active { border-color: var(--saeh-show); background: #ecfdf5; }
+        .saeh-alert.active { border-color: var(--saeh-alert); background: #fffbeb; }
+        .saeh-hesitate.active { border-color: var(--saeh-hesitate); background: #fef2f2; }
+        .saeh-encourage.active { border-color: var(--saeh-encourage); background: #faf5ff; }
+
+        .scan-results { background: #f8fafc; border: 1px solid var(--border-light); border-radius: 4px; padding: 8px; min-height: 40px; font-size: 12px; }
+        textarea { width: 100%; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px; font-size: 13px; min-height: 60px; outline: none; }
+        .status-pill { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #ffe4e6; color: #be123c; }
+        .status-pill.online { background: #dcfce7; color: #166534; }
 
     </style>
 </head>
 <body>
 
-    <div class="dashboard">
-        <!-- Header -->
-        <header class="header">
-            <h1>Hardware Control Dashboard</h1>
-            <div class="status-pill disconnected" id="ws-status">
-                <div class="status-indicator"></div>
-                <span>Offline</span>
-            </div>
-        </header>
+    <header class="header">
+        <h1>Control Panel</h1>
+        <div class="status-pill" id="ws-status">Offline</div>
+    </header>
 
-        <!-- PANEL 1: Teleoperation -->
-        <div class="card">
-            <div class="card-header">
-                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M21 6H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-10 7H8v3H6v-3H3v-2h3V8h2v3h3v2zm4.5 2c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm3-3c-.83 0-1.5-.67-1.5-1.5S17.67 9 18.5 9s1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>
-                Inverse Kinematics Teleoperation
-            </div>
-            
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 4px;">
-                <label style="margin:0;">IK Solving (Dual Target)</label>
-                <input type="checkbox" class="toggle-switch" id="ik-toggle">
-            </div>
-
-            <div class="input-group" style="margin-top: 12px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom:8px;">
-                    <label>Learning Rate / Follow Speed</label>
-                    <label id="speed-val" style="font-family: 'Roboto Mono', monospace;">1.00</label>
-                </div>
-                <input type="range" class="slider-speed" id="speed-slider" min="0.01" max="5.0" step="0.01" value="1.0">
-            </div>
+    <div class="card">
+        <div class="card-header">Teleoperation</div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <label style="font-size: 13px;">IK Solving</label>
+            <input type="checkbox" id="ik-toggle" style="width: 20px; height: 20px;">
         </div>
-
-        <!-- PANEL 2: Context Scan -->
-        <div class="card">
-            <div class="card-header">
-                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                Semantic Context Scan
-            </div>
-            <p style="font-size:13px; color:var(--text-muted); margin-top:-8px;">Execute a visual grounding pass using the main camera feed.</p>
-            
-            <button class="btn-outline" id="scan-btn" style="align-self: flex-start;">
-                Analyze Workspace
-            </button>
-            
-            <div class="scan-results" id="scan-results">
-                <div style="color:var(--text-muted); font-size:13px; text-align:center; padding:10px;">
-                    Awaiting scan command...
-                </div>
-            </div>
+        <div class="slider-row">
+            <label>Follow Speed</label>
+            <span id="speed-val" style="font-family: monospace;">1.00</span>
         </div>
-
-        <!-- PANEL 3: Voice / Whisper -->
-        <div class="card span-full">
-            <div class="card-header">
-                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/></svg>
-                Voice Command System
-            </div>
-            <div style="display:flex; gap:16px;">
-                <div style="flex:1;">
-                    <textarea id="voice-input" placeholder="Enter transcript payload or use microphone..."></textarea>
-                </div>
-                <div style="display:flex; flex-direction:column; gap:12px; width:160px;">
-                    <button class="btn-outline" id="mic-btn">
-                        Record Audio
-                    </button>
-                    <button class="btn-primary" id="submit-llm-btn">
-                        Dispatch Command
-                    </button>
-                </div>
-            </div>
-        </div>
-
-        <!-- PANEL 4: SIS / SAEH Taxonomy -->
-        <div class="card">
-            <div class="card-header">
-                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                SIS • SAEH Taxonomy
-            </div>
-            
-            <div class="saeh-grid">
-                <div class="saeh-btn saeh-show" data-saeh="S">
-                    <h3>SHOW (S)</h3>
-                    <p>Deictic / Inform / Pointing</p>
-                </div>
-                <div class="saeh-btn saeh-alert" data-saeh="A">
-                    <h3>ALERT (A)</h3>
-                    <p>Cautionary / Warning</p>
-                </div>
-                <div class="saeh-btn saeh-hesitate" data-saeh="H">
-                    <h3>HESITATE (H)</h3>
-                    <p>Uncertain / Oscillation</p>
-                </div>
-                <div class="saeh-btn saeh-encourage" data-saeh="E">
-                    <h3>ENCOURAGE (E)</h3>
-                    <p>Affirmative / Nodding</p>
-                </div>
-            </div>
-
-            <div class="input-group" style="margin-top: 4px;">
-                <div class="slider-row">
-                    <label style="width:70px; margin:0;">Urgency</label>
-                    <input type="range" id="urgency-slider" min="0" max="1" step="0.05" value="0.5">
-                    <div class="slider-val" id="urgency-val">0.50</div>
-                </div>
-            </div>
-            
-            <button class="btn-outline" id="simulate-btn" style="margin-top:12px;">
-                Simulate Trajectory Target
-            </button>
-        </div>
-
-        <!-- PANEL 5: Execution -->
-        <div class="card">
-            <div class="card-header">
-                <svg class="svg-icon" viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-                Physical Actuation
-            </div>
-            
-            <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
-                <div class="warning-banner">
-                    <svg width="24" height="24" viewBox="0 0 24 24"><path d="M12 2L1 21h22M12 6l7.53 13H4.47M11 10v4h2v-4m-2 6v2h2v-2"/></svg>
-                    <div>
-                        <strong>Hardware Dispatch Warning</strong><br>
-                        This commits the active trajectory command directly to the real robot. Ensure the physical workspace is unobstructed before proceeding.
-                    </div>
-                </div>
-            </div>
-
-            <button class="btn-danger" id="execute-btn">
-                Execute Trajectory
-            </button>
-        </div>
-
+        <input type="range" id="speed-slider" min="0.01" max="5.0" step="0.01" value="1.0">
     </div>
 
-    <!-- Communication Logic -->
+    <div class="card">
+        <div class="card-header">Voice Command</div>
+        <textarea id="voice-input" placeholder="Transcript..."></textarea>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <button class="btn-outline" id="mic-btn">Record</button>
+            <button class="btn-primary" id="submit-llm-btn">Dispatch</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">Context Scan</div>
+        <button class="btn-outline" id="scan-btn">Analyze Workspace</button>
+        <div class="scan-results" id="scan-results">Awaiting scan...</div>
+    </div>
+
+    <div class="card" style="gap: 8px;">
+        <div class="card-header">SIS • SAEH</div>
+        <div class="saeh-grid">
+            <div class="saeh-btn saeh-show" data-saeh="S"><h3>SHOW</h3><p>Pointing</p></div>
+            <div class="saeh-btn saeh-alert" data-saeh="A"><h3>ALERT</h3><p>Caution</p></div>
+            <div class="saeh-btn saeh-hesitate" data-saeh="H"><h3>HESITATE</h3><p>Uncertain</p></div>
+            <div class="saeh-btn saeh-encourage" data-saeh="E"><h3>ENCOURAGE</h3><p>Affirmative</p></div>
+        </div>
+        <button class="btn-outline" id="simulate-btn">Simulate Trajectory</button>
+    </div>
+
+    <div class="card">
+        <button class="btn-danger" id="execute-btn" style="padding: 12px;">EXECUTE ON ROBOTS</button>
+    </div>
+
     <script>
         const wsStatus = document.getElementById('ws-status');
         const speedSlider = document.getElementById('speed-slider');
@@ -516,97 +149,52 @@
         const saehBtns = document.querySelectorAll('.saeh-btn');
         
         let selectedSaeh = null;
-
         let ws;
-        function connectWebSocket() {
+
+        function connect() {
             ws = new WebSocket('ws://localhost:9095/');
-            
-            ws.onopen = () => {
-                wsStatus.className = 'status-pill';
-                wsStatus.querySelector('span').innerText = 'Online';
-            };
-            
-            ws.onclose = () => {
-                wsStatus.className = 'status-pill disconnected';
-                wsStatus.querySelector('span').innerText = 'Reconnecting...';
-                setTimeout(connectWebSocket, 3000);
-            };
-            
-            ws.onerror = (e) => console.error("WebSocket error", e);
+            ws.onopen = () => { wsStatus.innerText = 'Online'; wsStatus.className = 'status-pill online'; };
+            ws.onclose = () => { wsStatus.innerText = 'Offline'; wsStatus.className = 'status-pill'; setTimeout(connect, 2000); };
         }
+        connect();
 
-        connectWebSocket();
-
-        function sendEvent(type, payload) {
+        function send(type, payload) {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ type, ...payload }));
+                ws.send(JSON.stringify({ type, ...payload, robotIdx: 0 }));
+                ws.send(JSON.stringify({ type, ...payload, robotIdx: 1 }));
             }
         }
 
-        // Send to BOTH robots sequentially
-        function sendEventToBoth(type, payload) {
-            sendEvent(type, { ...payload, robotIdx: 0 });
-            sendEvent(type, { ...payload, robotIdx: 1 });
-        }
-
-        // Event Listeners
-        speedSlider.addEventListener('input', (e) => {
+        speedSlider.oninput = (e) => {
             speedVal.innerText = parseFloat(e.target.value).toFixed(2);
-            sendEventToBoth('teleopState', { enabled: ikToggle.checked, speed: parseFloat(e.target.value) });
-        });
-
-        ikToggle.addEventListener('change', (e) => {
-            sendEventToBoth('teleopState', { enabled: e.target.checked, speed: parseFloat(speedSlider.value) });
-        });
+            send('teleopState', { enabled: ikToggle.checked, speed: parseFloat(e.target.value) });
+        };
+        ikToggle.onchange = (e) => send('teleopState', { enabled: e.target.checked, speed: parseFloat(speedSlider.value) });
 
         saehBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
+            btn.onclick = () => {
                 saehBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 selectedSaeh = btn.getAttribute('data-saeh');
-                sendEventToBoth('sisSaeh', { category: selectedSaeh });
-            });
+                send('sisSaeh', { category: selectedSaeh });
+            };
         });
 
-        const urgencySlider = document.getElementById('urgency-slider');
-        const urgencyVal = document.getElementById('urgency-val');
-        urgencySlider.addEventListener('input', (e) => {
-            urgencyVal.innerText = parseFloat(e.target.value).toFixed(2);
-        });
-
-        document.getElementById('submit-llm-btn').addEventListener('click', () => {
+        document.getElementById('submit-llm-btn').onclick = () => {
             const text = document.getElementById('voice-input').value;
-            if (text) sendEventToBoth('voiceTranscription', { text });
-        });
+            if (text) send('voiceTranscription', { text });
+        };
 
-        scanBtn.addEventListener('click', () => {
-            const res = document.getElementById('scan-results');
-            res.innerHTML = '<div style="color:var(--text-muted); font-size:13px; text-align:center; padding:10px;">Scanning Workspace...</div>';
-            
+        scanBtn.onclick = () => {
+            document.getElementById('scan-results').innerText = 'Scanning...';
             setTimeout(() => {
-                res.innerHTML = `
-                    <div class="scan-item"><div class="color-dot" style="background:#2563eb;"></div>Object 1 Recognized</div>
-                    <div class="scan-item"><div class="color-dot" style="background:#ef4444;"></div>Object 2 Recognized</div>
-                `;
-                sendEventToBoth('contextScan', { command: 'scan' });
+                document.getElementById('scan-results').innerText = 'Objects found (2)';
+                send('contextScan', { command: 'scan' });
             }, 1000);
-        });
+        };
 
-        simulateBtn.addEventListener('click', () => {
-            if (!selectedSaeh) { alert('Select a SAEH classification first.'); return; }
-            sendEventToBoth('simulateIK', { 
-                saeh: selectedSaeh, 
-                speedPct: parseFloat(speedSlider.value)
-            });
-        });
-
-        executeBtn.addEventListener('click', () => {
-            sendEventToBoth('executeTrajectory', { 
-                saeh: selectedSaeh, 
-                speedPct: parseFloat(speedSlider.value)
-            });
-        });
-
+        simulateBtn.onclick = () => { if(selectedSaeh) send('simulateIK', { saeh: selectedSaeh, speedPct: parseFloat(speedSlider.value) }); };
+        executeBtn.onclick = () => { if(selectedSaeh) send('executeTrajectory', { saeh: selectedSaeh, speedPct: parseFloat(speedSlider.value) }); };
     </script>
 </body>
 </html>
