@@ -252,27 +252,68 @@ namespace RobotControllerApp
             _robotBridge.OnHardwareStatusUpdated += (hw) => DispatcherQueue.TryEnqueue(() => UpdateHardwareInfoBox(hw, R1RpiTemp, R1CalibStatus, R1MotorTemp, R1HwErrors));
             _robotBridge2.OnHardwareStatusUpdated += (hw) => DispatcherQueue.TryEnqueue(() => UpdateHardwareInfoBox(hw, R2RpiTemp, R2CalibStatus, R2MotorTemp, R2HwErrors));
 
-            RelayServerHost.OnUnityConnectionChanged += (c) => DispatcherQueue.TryEnqueue(() => UpdateExpertStatus(c));
+            RelayServerHost.OnUnityConnectionChanged += (c) => DispatcherQueue.TryEnqueue(() =>
+            {
+                UpdateExpertStatus(c);
+                if (c && RelayServerHost.CurrentManager != null)
+                {
+                    try
+                    {
+                        var intr = RobotControllerApp.Services.RealSenseIntrinsics.GetColorIntrinsics();
+                        if (intr.HasValue)
+                        {
+                            var envelope = new { type = "setRealSenseIntrinsics", op = "setRealSenseIntrinsics", payload = intr.Value, intrinsics = intr.Value };
+                            string envJson = JsonSerializer.Serialize(envelope);
+                            _ = RelayServerHost.CurrentManager.BroadcastToAllUnityClients(envJson);
+                            Log($"[RealSense] Hardware intrinsics sent to Unity! (Fx: {intr.Value.fx:F1}, Fy: {intr.Value.fy:F1})");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log($"[RealSense] Failed to read intrinsics for Unity: {ex.Message}");
+                    }
+                }
+            });
             RelayServerHost.OnUnityTelemetryReceived += (loc, rx, tx, pubIp) => DispatcherQueue.TryEnqueue(() => { _questLocation = loc; _questRxKbps = rx; _questTxKbps = tx; if (!string.IsNullOrEmpty(pubIp)) _questPublicIp = pubIp; });
 
+            float[] _lastSentJoints1 = new float[6];
             RelayServerHost.OnJointsReceived += (joints) =>
             {
-                var degAngles = joints.Select(r => (double)(r * 180.0 / Math.PI)).ToArray();
-                DispatcherQueue.TryEnqueue(() => TelemJoints.Text = "[" + string.Join(", ", joints.Select(j => j.ToString("0.00"))) + "]");
-                string jointJson = JsonSerializer.Serialize(new { op = "setRobotJoints", angles = degAngles, robotIdx = 0 });
-                _ = _broadcastServer.BroadcastAsync("setRobotJoints", JsonSerializer.Serialize(new { angles = degAngles, robotIdx = 0 }));
-                if (RelayServerHost.UnityClientConnected && RelayServerHost.CurrentManager != null)
-                    _ = RelayServerHost.CurrentManager.BroadcastToAllUnityClients(jointJson);
+                bool changed = false;
+                for (int i = 0; i < joints.Length && i < 6; i++)
+                {
+                    if (Math.Abs(joints[i] - _lastSentJoints1[i]) > 0.005f) { changed = true; _lastSentJoints1[i] = joints[i]; }
+                }
+
+                if (changed)
+                {
+                    var degAngles = joints.Select(r => (double)(r * 180.0f / Math.PI)).ToArray();
+                    DispatcherQueue.TryEnqueue(() => TelemJoints.Text = "[" + string.Join(", ", joints.Select(j => j.ToString("0.00"))) + "]");
+                    string jointJson = JsonSerializer.Serialize(new { op = "setRobotJoints", angles = degAngles, robotIdx = 0 });
+                    _ = _broadcastServer.BroadcastAsync("setRobotJoints", JsonSerializer.Serialize(new { angles = degAngles, robotIdx = 0 }));
+                    if (RelayServerHost.UnityClientConnected && RelayServerHost.CurrentManager != null)
+                        _ = RelayServerHost.CurrentManager.BroadcastToAllUnityClients(jointJson);
+                }
             };
 
+            float[] _lastSentJoints2 = new float[6];
             RelayServerHost.OnRobot2JointsReceived += (joints) =>
             {
-                var degAngles = joints.Select(r => (double)(r * 180.0 / Math.PI)).ToArray();
-                DispatcherQueue.TryEnqueue(() => TelemJoints2.Text = "[" + string.Join(", ", joints.Select(j => j.ToString("0.00"))) + "]");
-                string jointJson2 = JsonSerializer.Serialize(new { op = "setRobotJoints", angles = degAngles, robotIdx = 1 });
-                _ = _broadcastServer.BroadcastAsync("setRobotJoints", JsonSerializer.Serialize(new { angles = degAngles, robotIdx = 1 }));
-                if (RelayServerHost.UnityClientConnected && RelayServerHost.CurrentManager != null)
-                    _ = RelayServerHost.CurrentManager.BroadcastToAllUnityClients(jointJson2);
+                bool changed = false;
+                for (int i = 0; i < joints.Length && i < 6; i++)
+                {
+                    if (Math.Abs(joints[i] - _lastSentJoints2[i]) > 0.005f) { changed = true; _lastSentJoints2[i] = joints[i]; }
+                }
+
+                if (changed)
+                {
+                    var degAngles = joints.Select(r => (double)(r * 180.0f / Math.PI)).ToArray();
+                    DispatcherQueue.TryEnqueue(() => TelemJoints2.Text = "[" + string.Join(", ", joints.Select(j => j.ToString("0.00"))) + "]");
+                    string jointJson2 = JsonSerializer.Serialize(new { op = "setRobotJoints", angles = degAngles, robotIdx = 1 });
+                    _ = _broadcastServer.BroadcastAsync("setRobotJoints", JsonSerializer.Serialize(new { angles = degAngles, robotIdx = 1 }));
+                    if (RelayServerHost.UnityClientConnected && RelayServerHost.CurrentManager != null)
+                        _ = RelayServerHost.CurrentManager.BroadcastToAllUnityClients(jointJson2);
+                }
             };
 
             RelayServerHost.OnImageStatsUpdated += (fps, total) => DispatcherQueue.TryEnqueue(() =>
@@ -685,6 +726,12 @@ namespace RobotControllerApp
         // AI GENERATION (GEMINI / TRIPO 3D)
         // ════════════════════════════════════════════════════════════════════════
 
+        private void OpenDebugWindowBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var debugWindow = new UnityDebugWindow();
+            debugWindow.Activate();
+        }
+
         private async void GenerateObjectImagesBtn_Click(object sender, RoutedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(_settings.GeminiApiKey))
@@ -888,7 +935,6 @@ namespace RobotControllerApp
                 else
                 {
                     Log($"[Scene3D] Orange proxy error: {responseString[..Math.Min(200, responseString.Length)]}");
-                    _ = _broadcastServer.BroadcastAsync("setDetectedObjects", "[]");
                     if (AutoScanToggle?.IsChecked != true)
                     {
                         DispatcherQueue.TryEnqueue(async () =>
@@ -901,7 +947,6 @@ namespace RobotControllerApp
             catch (Exception ex)
             {
                 Log($"[Scene3D] AnalyzeSceneAsync exception: {ex.Message}");
-                _ = _broadcastServer.BroadcastAsync("setDetectedObjects", "[]");
                 if (AutoScanToggle?.IsChecked != true)
                 {
                     DispatcherQueue.TryEnqueue(async () =>
@@ -1938,117 +1983,7 @@ namespace RobotControllerApp
         }
 
         // Populates the 3D scene with every GLB in the library at random table
-        // positions, so you can test the scene without a camera or robots.
-        private bool _debugModeActive = false;
-        private static readonly Random _debugRng = new();
 
-        private void DebugModeToggle_Click(object sender, RoutedEventArgs e)
-        {
-            _debugModeActive = !_debugModeActive;
-            if (DebugModeLabel != null)
-                DebugModeLabel.Text = _debugModeActive ? "Debug ON" : "Debug";
-
-            if (!_debugModeActive)
-            {
-                // Clear the scene
-                _ = _broadcastServer.BroadcastAsync("setDetectedObjects", "[]");
-                Log("[Debug] Scene cleared.");
-                return;
-            }
-
-            _ = Task.Run(async () =>
-            {
-                try
-                {
-                    if (!Directory.Exists(LibraryPath)) { Log("[Debug] Library folder not found."); return; }
-
-                    // Find all GLB files and pair with their PNG crop
-                    var glbFiles = Directory.GetFiles(LibraryPath, "*.glb");
-                    if (glbFiles.Length == 0) { Log("[Debug] No GLB files in library — generate some 3D models first."); return; }
-
-                    // Table extent: x âˆˆ [-0.25, 0.25] m, y âˆˆ [-0.20, 0.20] m (world units)
-                    const double tableHalfW = 0.25, tableHalfD = 0.20;
-
-                    var items = glbFiles.Select(glbPath =>
-                    {
-                        string fileName = Path.GetFileNameWithoutExtension(glbPath); // e.g. "GREEN_MUG_3DModel"
-                        // Derive label: strip "_3DModel" suffix, replace _ with space
-                        string label = fileName.Replace("_3DModel", "").Replace("_", " ").Trim();
-                        if (string.IsNullOrEmpty(label)) label = fileName;
-
-                        // Random position on table
-                        double wx = (_debugRng.NextDouble() * 2 - 1) * tableHalfW;
-                        double wy = (_debugRng.NextDouble() * 2 - 1) * tableHalfD;
-                        double angleRad = _debugRng.NextDouble() * Math.PI * 2;
-
-                        // Build the URLs the browser will use
-                        string glbFile = Path.GetFileName(glbPath);
-                        string modelUrl = $"http://localhost:{_settings.RelayPort}/library/{Uri.EscapeDataString(glbFile)}";
-                        string modelUrlRemote = $"/library/{Uri.EscapeDataString(glbFile)}";
-
-                        // Try to find crop and orient images — search by explicit suffix
-                        string safeLabelBase = label.Replace(" ", "_");
-                        string cropBase64 = "";
-                        string orientBase64 = "";
-
-                        var allPngs = Directory.GetFiles(LibraryPath, $"{safeLabelBase}*.png");
-                        foreach (var png in allPngs)
-                        {
-                            string pngName = Path.GetFileNameWithoutExtension(png);
-                            try
-                            {
-                                if (pngName.EndsWith("_banana", StringComparison.OrdinalIgnoreCase))
-                                    cropBase64 = $"data:image/png;base64,{Convert.ToBase64String(File.ReadAllBytes(png))}";
-                                else if (pngName.EndsWith("_Orient", StringComparison.OrdinalIgnoreCase))
-                                    orientBase64 = $"data:image/png;base64,{Convert.ToBase64String(File.ReadAllBytes(png))}";
-                            }
-                            catch { }
-                        }
-
-                        // Also check library.json config for orient image (covers non-standard filenames)
-                        if (string.IsNullOrEmpty(orientBase64))
-                        {
-                            var cfg = _libraryConfig.FirstOrDefault(c => c.Name.Equals(label, StringComparison.OrdinalIgnoreCase));
-                            if (cfg != null && !string.IsNullOrEmpty(cfg.OrientImageUrl))
-                            {
-                                try
-                                {
-                                    var orientPath = Path.Combine(LibraryPath, cfg.OrientImageUrl);
-                                    if (File.Exists(orientPath))
-                                        orientBase64 = $"data:image/png;base64,{Convert.ToBase64String(File.ReadAllBytes(orientPath))}";
-                                }
-                                catch { }
-                            }
-                        }
-
-                        return new
-                        {
-                            label,
-                            worldX = wx,
-                            worldY = wy,
-                            sizeW = 0.08,
-                            sizeH = 0.08,
-                            angleRad,
-                            modelUrl,
-                            modelUrlRemote,
-                            cropBase64,
-                            hasModel = true,
-                            isInLibrary = true,
-                            offsetRx = 0.0,
-                            offsetRy = 0.0,
-                            offsetRz = 0.0,
-                            offsetScale = 1.0,
-                            orientImageUrl = string.IsNullOrEmpty(orientBase64) ? (string?)null : orientBase64
-
-                        };
-                    }).ToList();
-
-                    await _broadcastServer.BroadcastAsync("setDetectedObjects", JsonSerializer.Serialize(items));
-                    Log($"[Debug] Placed {items.Count} library object(s) randomly on the table.");
-                }
-                catch (Exception ex) { Log($"[Debug] Error: {ex.Message}"); }
-            });
-        }
 
         private void SettingsToggleBtn_Click(object sender, RoutedEventArgs e)
 
@@ -2391,12 +2326,6 @@ namespace RobotControllerApp
                         orientImageUrl = orientBase64
                     };
                 }).ToList();
-
-                _ = _broadcastServer.BroadcastAsync("setDetectedObjects", JsonSerializer.Serialize(items));
-
-                // Scan (Orange proxy) is free. TRELLIS 3D is free. Only Banana costs tracked.
-                var costs = new { scanEur = 0.0, bananaEur = Math.Round(_totalBananaCost, 4), totalEur = Math.Round(_totalBananaCost, 4) };
-                _ = _broadcastServer.BroadcastAsync("setScanCosts", JsonSerializer.Serialize(costs));
 
             }
             catch (Exception ex) { Log($"[3D Preview] Push failed: {ex.Message}"); }
@@ -2870,11 +2799,11 @@ namespace RobotControllerApp
                     {
                         try
                         {
-                            if (_latestWebcamFrameBytes == null || _latestWebcamFrameBytes.Length == 0) { Log("[Scene3D] Scan ignored — no camera frame."); _ = _broadcastServer.BroadcastAsync("setDetectedObjects", "[]"); return; }
+                            if (_latestWebcamFrameBytes == null || _latestWebcamFrameBytes.Length == 0) { Log("[Scene3D] Scan ignored — no camera frame."); return; }
                             if (_analyzeInProgressFlag == 1) { Log("[Scene3D] Scan ignored — already in progress."); return; }
                             await AnalyzeSceneAsync();
                         }
-                        catch (Exception ex) { Log($"[Scene3D] Remote scan error: {ex.Message}"); _ = _broadcastServer.BroadcastAsync("setDetectedObjects", "[]"); }
+                        catch (Exception ex) { Log($"[Scene3D] Remote scan error: {ex.Message}"); }
                     });
                     return;
                 }

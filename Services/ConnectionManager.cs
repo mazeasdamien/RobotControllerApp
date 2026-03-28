@@ -82,6 +82,32 @@ namespace RobotControllerApp.Services
             {
                 if (ws.State == WebSocketState.Open)
                 {
+                    if (lockKey.StartsWith("unity_") || lockKey.StartsWith("robot_"))
+                    {
+                        bool isToUnity = lockKey.StartsWith("unity_");
+                        string direction = isToUnity ? "ToUnity" : "FromUnity";
+                        
+                        // Try to extract type for debugging
+                        string debugType = isToUnity ? "Relay->Unity" : "Unity->Relay";
+                        try
+                        {
+                            if (message.Contains("\"op\"") || message.Contains("\"type\""))
+                            {
+                                using var doc = System.Text.Json.JsonDocument.Parse(message);
+                                if (doc.RootElement.TryGetProperty("op", out var opProp))
+                                {
+                                    debugType = opProp.GetString() ?? debugType;
+                                }
+                                else if (doc.RootElement.TryGetProperty("type", out var typeProp))
+                                {
+                                    debugType = typeProp.GetString() ?? debugType;
+                                }
+                            }
+                        }
+                        catch { }
+                        Scene3dBroadcastServer.TriggerMessageBroadcast(debugType, message, direction);
+                    }
+
                     var bytes = Encoding.UTF8.GetBytes(message);
                     await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
                 }
@@ -127,6 +153,22 @@ namespace RobotControllerApp.Services
 
             try
             {
+                // Try to extract type for debugging
+                string debugType = "Broadcast->Unity";
+                try
+                {
+                    if (message.Contains("\"op\"") || message.Contains("\"type\""))
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(message);
+                        if (doc.RootElement.TryGetProperty("op", out var prop) || doc.RootElement.TryGetProperty("type", out prop))
+                        {
+                            debugType = prop.GetString() ?? debugType;
+                        }
+                    }
+                }
+                catch { }
+                Scene3dBroadcastServer.TriggerMessageBroadcast(debugType, message);
+
                 var bytes = Encoding.UTF8.GetBytes(message);
                 var tasks = _unityClients.Values
                     .Where(ws => ws.State == WebSocketState.Open)

@@ -54,6 +54,12 @@ namespace RobotControllerApp.Services
         public event Action<string>? OnBrowserMessage;
         public event Func<Task>? OnClientConnected;
         public event Action? OnClientDisconnected;
+        public static event Action<string, string, string>? OnMessageBroadcast;
+
+        public static void TriggerMessageBroadcast(string type, string payload, string direction = "ToUnity")
+        {
+            OnMessageBroadcast?.Invoke(type, payload, direction);
+        }
 
         // ── Thread-Safe WebSocket Wrapper ─────────────────────────────────────────
         // Uses a "latest-wins" slot per message type for high-frequency streams
@@ -404,6 +410,18 @@ namespace RobotControllerApp.Services
                                     }
 
                                     OnBrowserMessage?.Invoke(msg);
+
+                                    try
+                                    {
+                                        using var doc = JsonDocument.Parse(msg);
+                                        string debugType = "Browser->Server";
+                                        if (doc.RootElement.TryGetProperty("type", out var typeProp) || doc.RootElement.TryGetProperty("op", out typeProp))
+                                        {
+                                            debugType = typeProp.GetString() ?? debugType;
+                                        }
+                                        TriggerMessageBroadcast(debugType, msg, "FromUnity");
+                                    }
+                                    catch { }
                                 }
                             }
                         }
@@ -593,6 +611,8 @@ namespace RobotControllerApp.Services
         /// </summary>
         public Task BroadcastAsync(string type, string payloadJson)
         {
+            OnMessageBroadcast?.Invoke(type, payloadJson, "ToUnity");
+
             if (_clients.IsEmpty) return Task.CompletedTask;
             string envelope = $"{{\"type\":\"{type}\",\"payload\":{payloadJson}}}";
             byte[] bytes = Encoding.UTF8.GetBytes(envelope);

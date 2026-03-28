@@ -51,15 +51,16 @@
                                   Visibility="Collapsed"
                                   ToolTipService.ToolTip="Toggle continuous scene analysis"/>
 
-                    <!-- Debug Mode -->
-                    <ToggleButton x:Name="DebugModeToggle" Click="DebugModeToggle_Click"
-                                  CornerRadius="6" Padding="10,5" VerticalAlignment="Center"
-                                  ToolTipService.ToolTip="Debug Mode: randomly place all library objects on the table (no camera needed)">
+                    <Button x:Name="OpenDebugWindowBtn" Click="OpenDebugWindowBtn_Click"
+                            CornerRadius="6" Padding="10,5" VerticalAlignment="Center" Margin="0,0,8,0"
+                            ToolTipService.ToolTip="Open Unity Messages Debug Window">
                         <StackPanel Orientation="Horizontal" Spacing="6">
-                            <FontIcon Glyph="&#xE756;" FontSize="13"/>
-                            <TextBlock x:Name="DebugModeLabel" Text="Debug" FontSize="12" VerticalAlignment="Center"/>
+                            <FontIcon Glyph="&#xE8B2;" FontSize="13" Foreground="{StaticResource Brush.Primary}"/>
+                            <TextBlock Text="Unity Output" FontSize="12" VerticalAlignment="Center"/>
                         </StackPanel>
-                    </ToggleButton>
+                    </Button>
+
+
 
 
 
