@@ -56,8 +56,18 @@ namespace RobotControllerApp.Services
         [DllImport("realsense2.dll", CallingConvention = CallingConvention.Cdecl)]
         private static extern int rs2_get_api_version(out IntPtr error);
 
+        private static Rs2Intrinsics? _cachedIntrinsics = null;
+        private static bool _hasAttemptedFetch = false;
+        private static readonly object _lock = new object();
+
         public static Rs2Intrinsics? GetColorIntrinsics()
         {
+            lock (_lock)
+            {
+                if (_hasAttemptedFetch) return _cachedIntrinsics;
+                _hasAttemptedFetch = true;
+            }
+
             IntPtr ctx = IntPtr.Zero;
             IntPtr pipe = IntPtr.Zero;
             IntPtr prof = IntPtr.Zero;
@@ -85,6 +95,7 @@ namespace RobotControllerApp.Services
                 // Safely stop before returning
                 rs2_pipeline_stop(pipe, out err);
 
+                _cachedIntrinsics = intr;
                 return intr;
             }
             catch

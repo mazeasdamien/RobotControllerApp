@@ -707,6 +707,13 @@ namespace RobotControllerApp
                         IntelCamLabel.Text = intelIdx >= 0 ? _videoDevices[intelIdx].Name : "Intel RGB";
                 });
 
+                // Fetch intrinsics NOW before OpenCV locks the camera device
+                if (intelIdx >= 0)
+                {
+                    Log("[RealSense] Pre-fetching factory hardware calibration...");
+                    await Task.Run(() => RobotControllerApp.Services.RealSenseIntrinsics.GetColorIntrinsics());
+                }
+
                 // Start both camera streams in parallel
                 var t1 = creativeIdx >= 0 ? StartCameraByIndex(creativeIdx) : Task.CompletedTask;
                 var t2 = intelIdx >= 0 ? StartCamera2ByIndex(intelIdx) : Task.CompletedTask;
