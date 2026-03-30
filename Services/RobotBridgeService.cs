@@ -44,7 +44,9 @@ namespace RobotControllerApp.Services
         public string RosIp { get; set; } = "169.254.200.200";
         public int RosPort { get; set; } = 9090;
         public string RelayServerUrl { get; set; } = "ws://localhost:5000/robot";
-        public int TelemetryIntervalMs { get; set; } = 100;
+        // Set to 0: deliver every joint_states message at the robot's native publish rate.
+        // A non-zero value throttles rosbridge and directly causes perceived joint state lag.
+        public int TelemetryIntervalMs { get; set; } = 0;
         /// <summary>Set to false for robots without a camera (skips camera topic subscription).</summary>
         public bool HasCamera { get; set; } = true;
 
@@ -113,9 +115,13 @@ namespace RobotControllerApp.Services
 
                     await SubscribeToJointStates();
 
+                    // Reuse a single MemoryStream for the lifetime of the connection
+                    // to avoid a heap allocation on every incoming message.
+                    using var ms = new MemoryStream(1024 * 512);
+
                     while (_robotWebSocket.State == WebSocketState.Open && !token.IsCancellationRequested)
                     {
-                        using var ms = new MemoryStream();
+                        ms.SetLength(0); // reset without reallocation
                         WebSocketReceiveResult result;
                         do
                         {
@@ -125,7 +131,12 @@ namespace RobotControllerApp.Services
 
                         if (result.MessageType == WebSocketMessageType.Close) break;
 
-                        var message = Encoding.UTF8.GetString(ms.ToArray());
+                        // Zero-copy decode: read directly from the MemoryStream internal buffer.
+                        string message;
+                        if (ms.TryGetBuffer(out ArraySegment<byte> seg))
+                            message = Encoding.UTF8.GetString(seg.Array!, seg.Offset, seg.Count);
+                        else
+                            message = Encoding.UTF8.GetString(ms.ToArray());
                         ParseLearningModeIfPresent(message);
                         ParseHardwareStatusIfPresent(message);
                         ParseRobotStatusIfPresent(message);
