@@ -19,7 +19,7 @@ namespace RobotControllerApp.Services
         private readonly ConcurrentDictionary<string, SemaphoreSlim> _sendLocks = new();
         private byte[]? _latestImage;
         private byte[]? _latestOperatorImage;
-        private float[] _currentJoints = new float[6];
+        private readonly ConcurrentDictionary<string, float[]> _robotJoints = new();
 
         private SemaphoreSlim SendLock(string key) =>
             _sendLocks.GetOrAdd(key, _ => new SemaphoreSlim(1, 1));
@@ -48,17 +48,24 @@ namespace RobotControllerApp.Services
         /// <summary>Retrieves the latest cached image frame from the expert's local webcam.</summary>
         public byte[]? GetLatestOperatorImage() => _latestOperatorImage;
 
-        /// <summary>Caches the latest joint configurations for internal nudge tracking.</summary>
-        public void UpdateJoints(float[] newJoints)
+        /// <summary>Caches the latest joint configurations for internal nudge tracking and HTTP polling.</summary>
+        public void UpdateJoints(string robotId, float[] newJoints)
         {
             if (newJoints != null && newJoints.Length >= 6)
             {
-                Array.Copy(newJoints, _currentJoints, 6);
+                var copy = new float[newJoints.Length];
+                Array.Copy(newJoints, copy, newJoints.Length);
+                _robotJoints[robotId] = copy;
             }
         }
 
-        /// <summary>Returns a clone of the most recently received joint state payload.</summary>
-        public float[] GetCurrentJoints() => (float[])_currentJoints.Clone();
+        /// <summary>Returns a clone of the most recently received joint state payload for a specific robot.</summary>
+        public float[]? GetCurrentJoints(string robotId)
+        {
+            if (_robotJoints.TryGetValue(robotId, out var joints))
+                return (float[])joints.Clone();
+            return null;
+        }
 
         /// <summary>Checks if a specific robot client maintains an open WebSocket state.</summary>
         public bool IsRobotConnected(string robotId) =>

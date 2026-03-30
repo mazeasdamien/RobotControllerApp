@@ -180,7 +180,21 @@ namespace RobotControllerApp.Services
                     return Results.NotFound("No image received yet");
                 });
 
+                // Joint States HTTP Endpoint (for zero-latency polling)
+                app.MapGet("/joints", (Microsoft.AspNetCore.Http.HttpContext context, ConnectionManager manager) =>
+                {
+                    var id = context.Request.Query["robotId"].ToString();
+                    if (string.IsNullOrEmpty(id)) return Results.BadRequest("robotId parameter required");
+                    
+                    var joints = manager.GetCurrentJoints(id);
+                    if (joints != null && joints.Length == 6)
+                        return Results.Ok(new { positions = joints });
+                        
+                    return Results.NotFound(new { positions = new float[6] });
+                });
+
                 app.MapGet("/image_operator", (ConnectionManager manager) =>
+
                 {
                     var img = manager.GetLatestOperatorImage();
                     if (img != null && img.Length > 0)
@@ -309,7 +323,7 @@ namespace RobotControllerApp.Services
                                 {
                                     if (count < 6) positions[count++] = (float)p.GetDouble();
                                 }
-                                manager.UpdateJoints(positions);
+                                manager.UpdateJoints(robotId, positions);
 
                                 // Route to the correct robot's event
                                 bool isRobot2 = robotId.EndsWith("02") || robotId.EndsWith("_2");
@@ -318,6 +332,10 @@ namespace RobotControllerApp.Services
                             }
                         }
                         catch { /* Parsing error safe ignore */ }
+                        
+                        // ─── IMPORTANT: Joint states are polled via HTTP, NOT forwarded via WebSocket. ───
+                        // This prevents TCP buffer replay lag and frees up WebRTC/WebSocket bandwidth.
+                        continue;
                     }
 
                     // 2. Camera Image
