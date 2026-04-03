@@ -147,4 +147,48 @@ app.MapGet("/status/sse", async (HttpContext ctx, CancellationToken ct) =>
     }
 });
 
+// POST /api/learning — Toggles the physical joints learning mode for all robots
+app.MapPost("/api/learning/{state}", async (bool state, ConnectionManager mgr) =>
+{
+    var cmd = JsonSerializer.Serialize(new 
+    { 
+        op = "call_service", 
+        service = "/niryo_robot/learning_mode/activate", 
+        type = "niryo_robot_msgs/SetBool", 
+        args = new { value = state } 
+    });
+
+    // Send to both robots
+    await mgr.SendToRobotClient("Robot_Niryo_01", cmd);
+    await mgr.SendToRobotClient("Robot_Niryo_02", cmd);
+
+    return Results.Ok(new { success = true, learning_mode = state });
+});
+
+// POST /api/calibrate/{robotId} — Triggers hardware auto-calibration sequence
+app.MapPost("/api/calibrate/{robotId}", async (string robotId, ConnectionManager mgr) =>
+{
+    var requestCalib = JsonSerializer.Serialize(new 
+    { 
+        op = "call_service", 
+        service = "/niryo_robot/joints_interface/request_new_calibration", 
+        type = "niryo_robot_msgs/SetInt", 
+        args = new { value = 1 } 
+    });
+
+    var startCalib = JsonSerializer.Serialize(new 
+    { 
+        op = "call_service", 
+        service = "/niryo_robot/joints_interface/calibrate_motors", 
+        type = "niryo_robot_msgs/SetInt", 
+        args = new { value = 1 } 
+    });
+
+    await mgr.SendToRobotClient(robotId, requestCalib);
+    await Task.Delay(1500); // Hardware requires wait window before starting
+    await mgr.SendToRobotClient(robotId, startCalib);
+
+    return Results.Ok(new { success = true });
+});
+
 app.Run();
