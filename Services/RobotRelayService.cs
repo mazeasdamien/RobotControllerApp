@@ -256,8 +256,9 @@ namespace RobotHub.Services
                                             // scene3d-ws WebSocket. Reuses the already-extracted b64
                                             // string to avoid re-encoding. The latest-wins slot in
                                             // UnityPushServer drops stale frames on slow connections.
+                                            bool isR2 = robotId.EndsWith("02") || robotId.EndsWith("_2");
                                             _ = UnityPushServer.Instance?.BroadcastAsync(
-                                                "updateCameraFeed",
+                                                isR2 ? "updateCameraFeed2" : "updateCameraFeed",
                                                 $"{{\"data\":\"{b64}\"}}");
 
                                             _imagesTotal++;
