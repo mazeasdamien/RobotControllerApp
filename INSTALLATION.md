@@ -14,7 +14,7 @@ cd RobotHub
 dotnet run
 ```
 
-Dashboard: `http://localhost:5001/ui`
+Dashboard: `http://localhost:5000/ui`
 
 ## Production (Windows Service)
 
@@ -41,11 +41,11 @@ sc.exe start RobotOrangeHub
 ### 4. Verify
 
 ```powershell
-curl http://localhost:5001/status
+curl http://localhost:5000/status
 # {"service":"RobotOrangeHub","ok":true,...}
 ```
 
-Open `http://localhost:5001/ui` in a browser for the live monitoring dashboard.
+Open `http://localhost:5000/ui` in a browser for the live monitoring dashboard.
 
 ## Updating an Existing Install
 
@@ -68,5 +68,5 @@ Open the same ports as before:
 ```powershell
 netsh advfirewall firewall add rule name="RobotHub-Relay" dir=in action=allow protocol=TCP localport=5000
 netsh advfirewall firewall add rule name="RobotHub-Scene3D" dir=in action=allow protocol=TCP localport=8181
-netsh advfirewall firewall add rule name="RobotHub-Dashboard" dir=in action=allow protocol=TCP localport=5001
+netsh advfirewall firewall add rule name="RobotHub-Dashboard" dir=in action=allow protocol=TCP localport=5000
 ```

@@ -7,125 +7,156 @@
   <title>Robot Orange Hub Monitor</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link
-    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap"
     rel="stylesheet" />
   <style>
     /* ── Design tokens ── */
     :root {
-      --bg: #0a0e1a;
-      --surface: rgba(255, 255, 255, 0.04);
-      --border: rgba(255, 255, 255, 0.08);
-      --accent: #f97316;
-      /* orange */
-      --accent2: #38bdf8;
-      /* sky blue */
-      --green: #22c55e;
+      --bg-dark: #07090f;
+      --surface-color: rgba(255, 255, 255, 0.025);
+      --surface-border: rgba(255, 255, 255, 0.07);
+      --surface-blur: blur(24px);
+      
+      --accent-1: #ff6b1a; /* Vibrant orange */
+      --accent-2: #ff2a5f; /* Hot pink/magenta blend */
+      --accent-gradient: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+      
+      --green-glow: rgba(16, 185, 129, 0.5);
+      --green: #10b981;
+      --red-glow: rgba(239, 68, 68, 0.5);
       --red: #ef4444;
-      --yellow: #facc15;
-      --text: #e2e8f0;
-      --muted: #64748b;
-      --radius: 14px;
+      --yellow: #eab308;
+      
+      --text-main: #f8fafc;
+      --text-muted: #8b9bb4;
+      --radius-lg: 24px;
+      --radius-md: 16px;
+      --radius-sm: 10px;
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Inter', sans-serif;
-      background: var(--bg);
-      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      background-color: var(--bg-dark);
+      background-image: 
+        radial-gradient(circle at 10% 40%, rgba(255, 107, 26, 0.08), transparent 40%),
+        radial-gradient(circle at 90% 60%, rgba(255, 42, 95, 0.08), transparent 40%);
+      background-attachment: fixed;
+      color: var(--text-main);
       min-height: 100vh;
-      padding: 24px;
-      background-image:
-        radial-gradient(ellipse 80% 40% at 50% 0%, rgba(249, 115, 22, 0.08) 0%, transparent 70%);
+      padding: 20px 30px;
+      overflow-x: hidden;
     }
 
-    /* ── Header ── */
     header {
       display: flex;
       align-items: center;
-      gap: 14px;
-      margin-bottom: 32px;
+      gap: 16px;
+      margin-bottom: 24px;
+      padding: 0 10px;
     }
 
     header .logo {
-      width: 42px;
-      height: 42px;
-      background: linear-gradient(135deg, var(--accent), #ea580c);
-      border-radius: 10px;
+      width: 44px;
+      height: 44px;
+      background: var(--accent-gradient);
+      border-radius: 12px;
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 20px;
       font-weight: 700;
       color: #fff;
+      box-shadow: 0 8px 32px rgba(255, 107, 26, 0.35);
+      position: relative;
+    }
+    
+    header .logo::after {
+      content: '';
+      position: absolute;
+      inset: -2px;
+      border-radius: 18px;
+      background: var(--accent-gradient);
+      z-index: -1;
+      filter: blur(8px);
+      opacity: 0.6;
     }
 
     header h1 {
-      font-size: 1.35rem;
-      font-weight: 600;
-      background: linear-gradient(90deg, #fff 60%, var(--accent));
+      font-size: 1.8rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      background: #fff;
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
     }
 
+    /* ── Pills and Toggles ── */
     .connection-pill {
       margin-left: auto;
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 6px 14px;
+      gap: 12px;
+      padding: 10px 24px;
       border-radius: 100px;
-      font-size: 0.78rem;
-      font-weight: 500;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      transition: all 0.3s ease;
+      font-size: 0.85rem;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      background: var(--surface-color);
+      border: 1px solid var(--surface-border);
+      backdrop-filter: var(--surface-blur);
+      box-shadow: 0 4px 20px rgba(0,0,0,0.2);
     }
 
     .connection-pill .dot {
-      width: 8px;
-      height: 8px;
+      width: 10px;
+      height: 10px;
       border-radius: 50%;
       background: var(--red);
-      transition: background 0.3s;
+      box-shadow: 0 0 14px var(--red-glow);
+      transition: all 0.5s ease;
     }
 
     .connection-pill.live .dot {
       background: var(--green);
+      box-shadow: 0 0 14px var(--green-glow);
     }
 
     /* ── Toggle Switch ── */
     .toggle-wrapper {
-      margin-left: 20px;
+      margin-left: 30px;
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 14px;
       margin-right: auto;
+      background: var(--surface-color);
+      padding: 10px 20px;
+      border-radius: 100px;
+      border: 1px solid var(--surface-border);
+      backdrop-filter: var(--surface-blur);
     }
 
     .toggle-label {
-      font-size: 0.8rem;
+      font-size: 0.85rem;
       font-weight: 500;
-      color: var(--muted);
+      color: var(--text-muted);
       transition: color 0.3s;
     }
 
     .toggle-switch {
       position: relative;
-      width: 44px;
-      height: 24px;
+      width: 52px;
+      height: 28px;
       appearance: none;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid var(--surface-border);
+      border-radius: 14px;
       outline: none;
       cursor: pointer;
-       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .toggle-switch::after {
@@ -133,248 +164,275 @@
       position: absolute;
       top: 2px;
       left: 2px;
-      width: 18px;
-      height: 18px;
-      background: var(--muted);
+      width: 22px;
+      height: 22px;
+      background: var(--text-muted);
       border-radius: 50%;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: 0 2px 5px rgba(0,0,0,0.3);
     }
 
     .toggle-switch:checked {
-      background: rgba(249, 115, 22, 0.2);
-      border-color: var(--accent);
+      background: rgba(255, 107, 26, 0.25);
+      border-color: var(--accent-1);
     }
 
     .toggle-switch:checked::after {
-      transform: translateX(20px);
-      background: var(--accent);
+      transform: translateX(24px);
+      background: var(--accent-1);
+      box-shadow: 0 0 10px rgba(255, 107, 26, 0.6);
     }
 
     .toggle-switch:checked ~ .toggle-label {
-      color: var(--accent);
-      text-shadow: 0 0 10px rgba(249, 115, 22, 0.4);
+      color: var(--accent-1);
+      text-shadow: 0 0 12px rgba(255, 107, 26, 0.3);
     }
 
     /* ── Grid ── */
     .grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 16px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    @media (max-width: 1200px) {
+      .grid { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    @media (max-width: 800px) {
+      .grid { grid-template-columns: 1fr; }
     }
 
     .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 20px 22px;
-      backdrop-filter: blur(12px);
-      transition: border-color 0.3s;
+      background: linear-gradient(145deg, rgba(255,255,255,0.035) 0%, rgba(255,255,255,0.01) 100%);
+      border: 1px solid var(--surface-border);
+      border-radius: var(--radius-lg);
+      padding: 20px 24px;
+      backdrop-filter: var(--surface-blur);
+      box-shadow: 0 12px 40px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.05);
+      transition: border-color 0.3s ease;
       position: relative;
       overflow: hidden;
     }
-
+    
     .card::before {
       content: '';
       position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.03), transparent);
-      pointer-events: none;
+      top: 0; left: 20%; right: 20%; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
     }
 
     .card:hover {
-      border-color: rgba(255, 255, 255, 0.14);
+      border-color: rgba(255,255,255,0.15);
     }
 
     .card-title {
-      font-size: 0.72rem;
-      font-weight: 600;
-      letter-spacing: 0.1em;
+      font-size: 0.85rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
       text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 14px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
     }
 
     /* ── Status row ── */
     .status-row {
       display: flex;
       align-items: center;
-      gap: 10px;
-      margin-bottom: 10px;
+      gap: 14px;
+      margin-bottom: 12px;
     }
 
     .status-row .indicator {
-      width: 10px;
-      height: 10px;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
       background: var(--red);
-      box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
-      transition: background 0.3s, box-shadow 0.3s;
+      box-shadow: 0 0 14px var(--red-glow);
+      transition: all 0.4s ease;
       flex-shrink: 0;
     }
 
     .status-row .indicator.on {
       background: var(--green);
-      box-shadow: 0 0 6px 2px rgba(34, 197, 94, 0.4);
+      box-shadow: 0 0 16px var(--green-glow);
     }
 
     .status-row .label {
-      font-size: 0.92rem;
-      font-weight: 500;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-main);
     }
 
     .status-row .badge {
       margin-left: auto;
-      font-size: 0.72rem;
-      font-weight: 600;
-      padding: 3px 9px;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.06);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 6px 12px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-main);
       font-family: 'JetBrains Mono', monospace;
+      letter-spacing: 0.05em;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.1);
     }
 
     /* ── Joint bars ── */
     .joint-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 8px;
+      gap: 16px;
     }
 
     .joint-item {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
     }
 
     .joint-label {
-      font-size: 0.68rem;
-      font-weight: 500;
-      color: var(--muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.08em;
     }
 
     .joint-bar-track {
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 4px;
-      height: 6px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 8px;
+      height: 8px;
       overflow: hidden;
+      box-shadow: inset 0 1px 3px rgba(0,0,0,0.3);
     }
 
     .joint-bar-fill {
       height: 100%;
-      border-radius: 4px;
-      background: linear-gradient(90deg, var(--accent2), var(--accent));
-      transition: width 0.2s ease;
+      border-radius: 8px;
+      background: var(--accent-gradient);
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
       width: 50%;
-      /* default centre */
+      box-shadow: 0 0 10px rgba(255, 107, 26, 0.6);
     }
 
     .joint-value {
-      font-size: 0.7rem;
+      font-size: 0.85rem;
       font-family: 'JetBrains Mono', monospace;
-      color: var(--text);
+      color: var(--text-main);
+      font-weight: 600;
     }
 
     /* ── Metrics ── */
     .metric-row {
       display: flex;
       align-items: baseline;
-      gap: 8px;
-      margin-bottom: 6px;
+      gap: 10px;
+      margin-bottom: 4px;
     }
 
     .metric-value {
-      font-size: 1.9rem;
+      font-size: 2.2rem;
       font-weight: 700;
       font-family: 'JetBrains Mono', monospace;
-      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      background: var(--accent-gradient);
       -webkit-background-clip: text;
       background-clip: text;
       -webkit-text-fill-color: transparent;
+      line-height: 1.1;
+      text-shadow: 0 4px 16px rgba(255, 107, 26, 0.15);
     }
 
     .metric-unit {
-      font-size: 0.8rem;
-      color: var(--muted);
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-muted);
     }
 
     /* ── Log ── */
+    .log-card {
+      grid-column: 1 / -1;
+      padding: 0;
+    }
+
     .log-box {
-      background: rgba(0, 0, 0, 0.25);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 12px;
-      height: 130px;
+      background: transparent;
+      border: none;
+      border-radius: var(--radius-lg);
+      padding: 16px 24px;
+      height: 220px;
       overflow-y: auto;
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.7rem;
-      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: var(--text-muted);
     }
 
-    .log-box .entry {
-      margin-bottom: 3px;
+    .log-box::-webkit-scrollbar { width: 8px; }
+    .log-box::-webkit-scrollbar-track { background: transparent; }
+    .log-box::-webkit-scrollbar-thumb {
+      background: rgba(255,255,255,0.15);
+      border-radius: 4px;
     }
+    .log-box::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 
-    .log-box .entry.info {
-      color: var(--accent2);
-    }
-
-    .log-box .entry.warn {
-      color: var(--yellow);
-    }
-
-    .log-box .entry.err {
-      color: var(--red);
-    }
-
-    .log-box .entry.ok {
-      color: var(--green);
-    }
+    .log-box .entry { margin-bottom: 6px; }
+    .log-box .entry.info { color: #38bdf8; }
+    .log-box .entry.warn { color: var(--yellow); }
+    .log-box .entry.err { color: var(--red); }
+    .log-box .entry.ok { color: var(--green); text-shadow: 0 0 8px rgba(16, 185, 129, 0.3); }
 
     /* ── Action Buttons ── */
     .btn {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: inherit;
-      font-size: 0.72rem;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--surface-border);
+      color: var(--text-main);
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.75rem;
       font-weight: 600;
-      padding: 6px 12px;
-      border-radius: 6px;
+      padding: 8px 18px;
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.3s;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      backdrop-filter: blur(4px);
     }
 
     .btn:hover:not(:disabled) {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(255, 255, 255, 0.12);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(0,0,0,0.2);
     }
     
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+    .btn:active:not(:disabled) { transform: translateY(1px); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
     .card-title-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-top: 4px;
-      margin-bottom: 14px;
+      margin-top: 12px;
+      margin-bottom: 16px;
     }
     
-    .card-title-row .card-title {
-      margin-bottom: 0;
-      margin-top: 0;
-    }
+    .card-title-row .card-title { margin: 0; }
 
     /* ── Footer ── */
     footer {
-      margin-top: 28px;
-      font-size: 0.72rem;
-      color: var(--muted);
+      margin-top: 30px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: var(--text-muted);
       text-align: center;
+      letter-spacing: 0.02em;
+    }
+    
+    /* Micro-animations */
+    @keyframes pulse-glow {
+      0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); }
+      70% { box-shadow: 0 0 0 12px rgba(16,185,129,0); }
+      100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
     }
   </style>
 </head>
@@ -386,8 +444,8 @@
     <h1>Robot Hub</h1>
     
     <div class="toggle-wrapper" title="Unlock physical motors for manual pose teaching">
-      <input type="checkbox" id="learning-toggle" class="toggle-switch">
-      <span class="toggle-label" id="learning-label">Motors Locked</span>
+      <input type="checkbox" id="learning-toggle" class="toggle-switch" checked>
+      <span class="toggle-label" id="learning-label">Motors Unlocked (Learning)</span>
     </div>
 
     <div class="connection-pill" id="pill">
@@ -406,8 +464,8 @@
         <span class="label">ROS Bridge</span>
         <span class="badge" id="r1-status">--</span>
       </div>
-      <div style="margin-top:4px; font-size:0.75rem; color:var(--muted); margin-bottom:14px;">
-        RPi temp: <span id="r1-temp" style="color:var(--text);">-- C</span>
+      <div style="margin-top:4px; font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
+        RPi temp: <span id="r1-temp" style="color:var(--text-main);">-- C</span>
       </div>
       <div class="card-title-row">
         <div class="card-title">Joint State (rad)</div>
@@ -426,8 +484,8 @@
         <span class="label">ROS Bridge</span>
         <span class="badge" id="r2-status">--</span>
       </div>
-      <div style="margin-top:4px; font-size:0.75rem; color:var(--muted); margin-bottom:14px;">
-        RPi temp: <span id="r2-temp" style="color:var(--text);">-- C</span>
+      <div style="margin-top:4px; font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">
+        RPi temp: <span id="r2-temp" style="color:var(--text-main);">-- C</span>
       </div>
       <div class="card-title-row">
         <div class="card-title">Joint State (rad)</div>
@@ -445,12 +503,12 @@
         <span class="label">Connection</span>
         <span class="badge" id="unity-status">OFFLINE</span>
       </div>
-      <div class="card-title" style="margin-top:18px;">Round-trip Latency</div>
+      <div class="card-title" style="margin-top:10px;">Round-trip Latency</div>
       <div class="metric-row">
         <span class="metric-value" id="latency-val">--</span>
         <span class="metric-unit">ms</span>
       </div>
-      <div class="card-title" style="margin-top:18px;">Relay FPS</div>
+      <div class="card-title" style="margin-top:10px;">Relay FPS</div>
       <div class="metric-row">
         <span class="metric-value" id="fps-val">--</span>
         <span class="metric-unit">Hz</span>
@@ -458,8 +516,7 @@
     </div>
 
     <!-- Event Log -->
-    <div class="card">
-      <div class="card-title">Live Event Log</div>
+    <div class="card log-card">
       <div class="log-box" id="log-box"></div>
     </div>
 
@@ -574,39 +631,52 @@
       es.onmessage = (e) => {
         const d = JSON.parse(e.data);
 
+        // Map PascalCase (C# default JSON) / camelCase
+        const r1Conn = d.R1Connected ?? d.r1Connected;
+        const r2Conn = d.R2Connected ?? d.r2Connected;
+        const unityConn = d.UnityConnected ?? d.unityConnected;
+        const r1Stat = d.R1Status ?? d.r1Status ?? '--';
+        const r2Stat = d.R2Status ?? d.r2Status ?? '--';
+        const r1T = d.R1RpiTemp ?? d.r1RpiTemp ?? '--';
+        const r2T = d.R2RpiTemp ?? d.r2RpiTemp ?? '--';
+        const r1J = d.R1Joints ?? d.r1Joints ?? [];
+        const r2J = d.R2Joints ?? d.r2Joints ?? [];
+        const lat = d.UnityLatencyMs ?? d.unityLatencyMs ?? '--';
+        const fps = d.CameraFps ?? d.cameraFps ?? '--';
+
         // Robots
         const r1Dot = document.getElementById('r1-dot');
         const r2Dot = document.getElementById('r2-dot');
-        r1Dot.classList.toggle('on', d.r1Connected);
-        r2Dot.classList.toggle('on', d.r2Connected);
-        document.getElementById('r1-status').textContent = d.r1Status ?? '--';
-        document.getElementById('r2-status').textContent = d.r2Status ?? '--';
-        document.getElementById('r1-temp').textContent = (d.r1RpiTemp ?? '--') + ' C';
-        document.getElementById('r2-temp').textContent = (d.r2RpiTemp ?? '--') + ' C';
+        r1Dot.classList.toggle('on', r1Conn);
+        r2Dot.classList.toggle('on', r2Conn);
+        document.getElementById('r1-status').textContent = r1Stat;
+        document.getElementById('r2-status').textContent = r2Stat;
+        document.getElementById('r1-temp').textContent = r1T + ' C';
+        document.getElementById('r2-temp').textContent = r2T + ' C';
 
-        updateJoints('r1-joints', d.r1Joints ?? []);
-        updateJoints('r2-joints', d.r2Joints ?? []);
+        updateJoints('r1-joints', r1J);
+        updateJoints('r2-joints', r2J);
 
         // Unity
         const unityDot = document.getElementById('unity-dot');
-        unityDot.classList.toggle('on', d.unityConnected);
-        document.getElementById('unity-status').textContent = d.unityConnected ? 'ONLINE' : 'OFFLINE';
-        document.getElementById('latency-val').textContent = d.unityLatencyMs ?? '--';
-        document.getElementById('fps-val').textContent = d.cameraFps ?? '--';
+        unityDot.classList.toggle('on', unityConn);
+        document.getElementById('unity-status').textContent = unityConn ? 'ONLINE' : 'OFFLINE';
+        document.getElementById('latency-val').textContent = lat;
+        document.getElementById('fps-val').textContent = fps;
 
         document.getElementById('ts').textContent = new Date().toLocaleTimeString();
 
         // Log connection changes
-        if (prevR1 !== null && d.r1Connected !== prevR1)
-          addLog(`R1 ROS bridge: ${d.r1Connected ? 'CONNECTED' : 'DISCONNECTED'}`, d.r1Connected ? 'ok' : 'err');
-        if (prevR2 !== null && d.r2Connected !== prevR2)
-          addLog(`R2 ROS bridge: ${d.r2Connected ? 'CONNECTED' : 'DISCONNECTED'}`, d.r2Connected ? 'ok' : 'err');
-        if (prevUnity !== null && d.unityConnected !== prevUnity)
-          addLog(`Unity expert: ${d.unityConnected ? 'CONNECTED' : 'DISCONNECTED'}`, d.unityConnected ? 'ok' : 'warn');
+        if (prevR1 !== null && r1Conn !== prevR1)
+          addLog(`R1 ROS bridge: ${r1Conn ? 'CONNECTED' : 'DISCONNECTED'}`, r1Conn ? 'ok' : 'err');
+        if (prevR2 !== null && r2Conn !== prevR2)
+          addLog(`R2 ROS bridge: ${r2Conn ? 'CONNECTED' : 'DISCONNECTED'}`, r2Conn ? 'ok' : 'err');
+        if (prevUnity !== null && unityConn !== prevUnity)
+          addLog(`Unity expert: ${unityConn ? 'CONNECTED' : 'DISCONNECTED'}`, unityConn ? 'ok' : 'warn');
 
-        prevR1 = d.r1Connected;
-        prevR2 = d.r2Connected;
-        prevUnity = d.unityConnected;
+        prevR1 = r1Conn;
+        prevR2 = r2Conn;
+        prevUnity = unityConn;
       };
 
       es.onerror = () => {

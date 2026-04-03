@@ -20,8 +20,8 @@ Headless **ASP.NET Core 8 Worker Service** replacement for the WinUI3 `RobotCont
 | 5000 | `/unity?robotId=X` | WebSocket | Expert Unity clients |
 | 5000 | `/image` | HTTP GET | Latest camera frame (JPEG) |
 | 5000 | `/status` | HTTP GET | JSON health check |
-| 5001 | `/status/sse` | Server-Sent Events | Live telemetry stream |
-| 5001 | `/ui` | HTTP GET | Browser monitoring dashboard |
+| 5000 | `/status/sse` | Server-Sent Events | Live telemetry stream |
+| 5000 | `/ui` | HTTP GET | Browser monitoring dashboard |
 | 8181 | `/scene3d-ws` | WebSocket | 3D scene broadcast (pose + joints) |
 | 8181 | `/library/{file}` | HTTP GET | GLB asset streaming |
 
@@ -36,7 +36,7 @@ cd RobotHub
 dotnet run
 ```
 
-Open the dashboard at `http://localhost:5001/ui`
+Open the dashboard at `http://localhost:5000/ui`
 
 ### Install as Windows Service
 
