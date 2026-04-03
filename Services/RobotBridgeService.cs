@@ -187,7 +187,7 @@ namespace RobotControllerApp.Services
                         OnRosConnectionChanged?.Invoke(false);
                         OnInstanceConnectionChanged?.Invoke(false);
                     }
-                    
+
                     // Forcefully drop Relay connection if physical connection drops
                     // This unblocks the pending ReceiveAsync on Relay and updates the Hub status 
                     try { _relayWebSocket?.Abort(); } catch { }
