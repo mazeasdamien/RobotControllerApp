@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace RobotControllerApp.Services
+namespace RobotHub.Services
 {
     /// <summary>
     /// Thread-safe active connection registry managing telemetry caching and concurrent WebSocket transmission paths.
@@ -30,7 +30,7 @@ namespace RobotControllerApp.Services
         /// <summary>Removes a disconnected hardware robot bridge.</summary>
         public void RemoveRobotClient(string robotId) => _robotClients.TryRemove(robotId, out _);
 
-        /// <summary>Registers an active remote expert (Quest) interface stream.</summary>
+        /// <summary>Registers an active remote expert (Unity client) interface stream.</summary>
         public void AddUnityClient(string robotId, WebSocket ws) => _unityClients[robotId] = ws;
 
         /// <summary>Removes a disconnected remote expert stream.</summary>
@@ -89,32 +89,6 @@ namespace RobotControllerApp.Services
             {
                 if (ws.State == WebSocketState.Open)
                 {
-                    if (lockKey.StartsWith("unity_") || lockKey.StartsWith("robot_"))
-                    {
-                        bool isToUnity = lockKey.StartsWith("unity_");
-                        string direction = isToUnity ? "ToUnity" : "FromUnity";
-                        
-                        // Try to extract type for debugging
-                        string debugType = isToUnity ? "Relay->Unity" : "Unity->Relay";
-                        try
-                        {
-                            if (message.Contains("\"op\"") || message.Contains("\"type\""))
-                            {
-                                using var doc = System.Text.Json.JsonDocument.Parse(message);
-                                if (doc.RootElement.TryGetProperty("op", out var opProp))
-                                {
-                                    debugType = opProp.GetString() ?? debugType;
-                                }
-                                else if (doc.RootElement.TryGetProperty("type", out var typeProp))
-                                {
-                                    debugType = typeProp.GetString() ?? debugType;
-                                }
-                            }
-                        }
-                        catch { }
-                        Scene3dBroadcastServer.TriggerMessageBroadcast(debugType, message, direction);
-                    }
-
                     var bytes = Encoding.UTF8.GetBytes(message);
                     await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
                 }
@@ -139,60 +113,5 @@ namespace RobotControllerApp.Services
 
         /// <summary>Returns the string identifier of the first valid robot connection dict key.</summary>
         public string? GetFirstConnectedRobotId() => _robotClients.Keys.FirstOrDefault();
-
-        private readonly System.Threading.SemaphoreSlim _broadcastLock = new System.Threading.SemaphoreSlim(1, 1);
-
-        public async Task BroadcastToAllUnityClients(string message)
-        {
-            // Zero-latency backpressure: If the socket is busy uploading a previous frame to the tunnel,
-            // drop this frame immediately instead of queueing it and causing infinite latency.
-            // ONLY drop video frames; critical telemetry (joints/settings) MUST queue up securely.
-            bool isVideoFrame = message.Contains("\"updateArFeed\"") || message.Contains("\"updateCameraFeed\"");
-
-            if (isVideoFrame)
-            {
-                if (!await _broadcastLock.WaitAsync(0)) return;
-            }
-            else
-            {
-                await _broadcastLock.WaitAsync();
-            }
-
-            try
-            {
-                // Try to extract type for debugging
-                string debugType = "Broadcast->Unity";
-                try
-                {
-                    if (message.Contains("\"op\"") || message.Contains("\"type\""))
-                    {
-                        using var doc = System.Text.Json.JsonDocument.Parse(message);
-                        if (doc.RootElement.TryGetProperty("op", out var prop) || doc.RootElement.TryGetProperty("type", out prop))
-                        {
-                            debugType = prop.GetString() ?? debugType;
-                        }
-                    }
-                }
-                catch { }
-                Scene3dBroadcastServer.TriggerMessageBroadcast(debugType, message);
-
-                var bytes = Encoding.UTF8.GetBytes(message);
-                var tasks = _unityClients.Values
-                    .Where(ws => ws.State == WebSocketState.Open)
-                    .Select(async ws =>
-                    {
-                        try
-                        {
-                            await ws.SendAsync(new ArraySegment<byte>(bytes), WebSocketMessageType.Text, true, CancellationToken.None);
-                        }
-                        catch { }
-                    });
-                await Task.WhenAll(tasks);
-            }
-            finally
-            {
-                _broadcastLock.Release();
-            }
-        }
     }
 }

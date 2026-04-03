@@ -6,7 +6,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace RobotControllerApp.Services
+namespace RobotHub.Services
 {
     /// <summary>
     /// Service bridging continuous WebSocket telemetry and commands between a remote ROS master
@@ -17,14 +17,8 @@ namespace RobotControllerApp.Services
         /// <summary>Global logging event stream.</summary>
         public static event Action<string>? OnLog;
 
-        /// <summary>Static global connection event stream. Deprecated in favor of instance-specific streams.</summary>
-        public static event Action<bool>? OnRosConnectionChanged;
-
         /// <summary>Instance-level stream emitting true when the physical robot WebSocket establishes connection.</summary>
         public event Action<bool>? OnInstanceConnectionChanged;
-
-        /// <summary>Fires whenever the robot reports a learning mode state change via /niryo_robot/robot_state.</summary>
-        public event Action<bool>? OnLearningModeChanged;
 
         /// <summary>Fires on each hardware_status update with key metrics.</summary>
         public event Action<HardwareInfo>? OnHardwareStatusUpdated;
@@ -49,9 +43,6 @@ namespace RobotControllerApp.Services
         public int TelemetryIntervalMs { get; set; } = 0;
         /// <summary>Set to false for robots without a camera (skips camera topic subscription).</summary>
         public bool HasCamera { get; set; } = true;
-
-        /// <summary>Fired when a compressed camera frame arrives on this bridge (robotId, imageBytes).</summary>
-        public event Action<string, byte[]>? OnCameraFrameReceived;
 
         // Whether the camera is currently subscribed
         private bool _cameraSubscribed = false;
@@ -110,7 +101,6 @@ namespace RobotControllerApp.Services
                     _robotWebSocket = new ClientWebSocket();
                     await _robotWebSocket.ConnectAsync(new Uri(rosUrl), token);
                     IsConnected = true;
-                    OnRosConnectionChanged?.Invoke(true);
                     OnInstanceConnectionChanged?.Invoke(true);
 
                     await SubscribeToJointStates();
@@ -141,31 +131,6 @@ namespace RobotControllerApp.Services
                         ParseHardwareStatusIfPresent(message);
                         ParseRobotStatusIfPresent(message);
 
-                        // Intercept & fire camera frame event
-                        if (HasCamera && message.Contains("compressed_video_stream", StringComparison.OrdinalIgnoreCase))
-                        {
-                            try
-                            {
-                                int dataPropIndex = message.IndexOf("\"data\"");
-                                if (dataPropIndex != -1)
-                                {
-                                    int colonIndex = message.IndexOf(':', dataPropIndex);
-                                    int startQuote = colonIndex != -1 ? message.IndexOf('"', colonIndex + 1) : -1;
-                                    if (startQuote != -1)
-                                    {
-                                        int start = startQuote + 1;
-                                        int end = message.IndexOf('"', start);
-                                        if (end != -1)
-                                        {
-                                            string b64 = message[start..end];
-                                            if (b64.Length > 100)
-                                                OnCameraFrameReceived?.Invoke(RobotId, Convert.FromBase64String(b64));
-                                        }
-                                    }
-                                }
-                            }
-                            catch { }
-                        }
 
                         await SendToRelay(message); // Forward to Relay
                     }
@@ -184,7 +149,6 @@ namespace RobotControllerApp.Services
                     if (IsConnected)
                     {
                         IsConnected = false;
-                        OnRosConnectionChanged?.Invoke(false);
                         OnInstanceConnectionChanged?.Invoke(false);
                     }
 
@@ -320,7 +284,6 @@ namespace RobotControllerApp.Services
                 if (_isLearningMode != isLearning)
                 {
                     _isLearningMode = isLearning;
-                    OnLearningModeChanged?.Invoke(isLearning);
                     // Refresh STATUS string whenever learning mode changes
                     OnRobotStatusUpdated?.Invoke(DeriveStatusString(false, false));
                 }

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Robot Orange Hub Monitor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Design tokens ── */
+    :root {
+      --bg: #0a0e1a;
+      --surface: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.08);
+      --accent: #f97316;       /* orange */
+      --accent2: #38bdf8;      /* sky blue */
+      --green: #22c55e;
+      --red: #ef4444;
+      --yellow: #facc15;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --radius: 14px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+      background-image:
+        radial-gradient(ellipse 80% 40% at 50% 0%, rgba(249,115,22,0.08) 0%, transparent 70%);
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 32px;
+    }
+
+    header .logo {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--accent), #ea580c);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 700; color: #fff;
+    }
+
+    header h1 {
+      font-size: 1.35rem; font-weight: 600;
+      background: linear-gradient(90deg, #fff 60%, var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .connection-pill {
+      margin-left: auto;
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 14px;
+      border-radius: 100px;
+      font-size: 0.78rem; font-weight: 500;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      transition: all 0.3s ease;
+    }
+
+    .connection-pill .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--red);
+      transition: background 0.3s;
+    }
+
+    .connection-pill.live .dot { background: var(--green); }
+
+    /* ── Grid ── */
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      backdrop-filter: blur(12px);
+      transition: border-color 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,0.03), transparent);
+      pointer-events: none;
+    }
+
+    .card:hover { border-color: rgba(255,255,255,0.14); }
+
+    .card-title {
+      font-size: 0.72rem; font-weight: 600; letter-spacing: 0.1em;
+      text-transform: uppercase; color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    /* ── Status row ── */
+    .status-row {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .status-row .indicator {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--red);
+      box-shadow: 0 0 0 0 rgba(239,68,68,0);
+      transition: background 0.3s, box-shadow 0.3s;
+      flex-shrink: 0;
+    }
+
+    .status-row .indicator.on {
+      background: var(--green);
+      box-shadow: 0 0 6px 2px rgba(34,197,94,0.4);
+    }
+
+    .status-row .label { font-size: 0.92rem; font-weight: 500; }
+    .status-row .badge {
+      margin-left: auto; font-size: 0.72rem; font-weight: 600;
+      padding: 3px 9px; border-radius: 6px;
+      background: rgba(255,255,255,0.06);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* ── Joint bars ── */
+    .joint-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .joint-item { display: flex; flex-direction: column; gap: 4px; }
+
+    .joint-label {
+      font-size: 0.68rem; font-weight: 500;
+      color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em;
+    }
+
+    .joint-bar-track {
+      background: rgba(255,255,255,0.05);
+      border-radius: 4px; height: 6px;
+      overflow: hidden;
+    }
+
+    .joint-bar-fill {
+      height: 100%; border-radius: 4px;
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      transition: width 0.2s ease;
+      width: 50%; /* default centre */
+    }
+
+    .joint-value {
+      font-size: 0.7rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text);
+    }
+
+    /* ── Metrics ── */
+    .metric-row {
+      display: flex; align-items: baseline; gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-size: 1.9rem; font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .metric-unit { font-size: 0.8rem; color: var(--muted); }
+
+    /* ── Log ── */
+    .log-box {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      height: 130px;
+      overflow-y: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .log-box .entry { margin-bottom: 3px; }
+    .log-box .entry.info { color: var(--accent2); }
+    .log-box .entry.warn { color: var(--yellow); }
+    .log-box .entry.err  { color: var(--red); }
+    .log-box .entry.ok   { color: var(--green); }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 28px;
+      font-size: 0.72rem; color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">R</div>
+  <h1>Robot Orange Hub Monitor</h1>
+  <div class="connection-pill" id="pill">
+    <div class="dot"></div>
+    <span id="pill-label">Connecting ...</span>
+  </div>
+</header>
+
+<div class="grid">
+
+  <!-- Robot R1 -->
+  <div class="card">
+    <div class="card-title">Robot R1</div>
+    <div class="status-row">
+      <div class="indicator" id="r1-dot"></div>
+      <span class="label">ROS Bridge</span>
+      <span class="badge" id="r1-status">--</span>
+    </div>
+    <div style="margin-top:4px; font-size:0.75rem; color:var(--muted); margin-bottom:14px;">
+      RPi temp: <span id="r1-temp" style="color:var(--text);">-- C</span>
+    </div>
+    <div class="card-title" style="margin-top:4px;">Joint State (rad)</div>
+    <div class="joint-grid" id="r1-joints">
+      <!-- generated by JS -->
+    </div>
+  </div>
+
+  <!-- Robot R2 -->
+  <div class="card">
+    <div class="card-title">Robot R2</div>
+    <div class="status-row">
+      <div class="indicator" id="r2-dot"></div>
+      <span class="label">ROS Bridge</span>
+      <span class="badge" id="r2-status">--</span>
+    </div>
+    <div style="margin-top:4px; font-size:0.75rem; color:var(--muted); margin-bottom:14px;">
+      RPi temp: <span id="r2-temp" style="color:var(--text);">-- C</span>
+    </div>
+    <div class="card-title" style="margin-top:4px;">Joint State (rad)</div>
+    <div class="joint-grid" id="r2-joints">
+    </div>
+  </div>
+
+  <!-- Unity Expert -->
+  <div class="card">
+    <div class="card-title">Expert Unity Client</div>
+    <div class="status-row">
+      <div class="indicator" id="unity-dot"></div>
+      <span class="label">Connection</span>
+      <span class="badge" id="unity-status">OFFLINE</span>
+    </div>
+    <div class="card-title" style="margin-top:18px;">Round-trip Latency</div>
+    <div class="metric-row">
+      <span class="metric-value" id="latency-val">--</span>
+      <span class="metric-unit">ms</span>
+    </div>
+  </div>
+
+  <!-- Event Log -->
+  <div class="card">
+    <div class="card-title">Live Event Log</div>
+    <div class="log-box" id="log-box"></div>
+  </div>
+
+</div>
+
+<footer>Robot Orange Hub &mdash; Worker Service edition &bull; <span id="ts">--</span></footer>
+
+<script>
+  // ── Joint grid initializer ──
+  function buildJointGrid(containerId) {
+    const el = document.getElementById(containerId);
+    for (let i = 0; i < 6; i++) {
+      el.innerHTML += `
+        <div class="joint-item">
+          <span class="joint-label">J${i + 1}</span>
+          <div class="joint-bar-track"><div class="joint-bar-fill" id="${containerId}-bar-${i}" style="width:50%"></div></div>
+          <span class="joint-value" id="${containerId}-val-${i}">0.00</span>
+        </div>`;
+    }
+  }
+
+  buildJointGrid('r1-joints');
+  buildJointGrid('r2-joints');
+
+  function updateJoints(prefix, joints) {
+    for (let i = 0; i < 6; i++) {
+      const v = joints[i] ?? 0;
+      const pct = ((v + Math.PI) / (2 * Math.PI)) * 100;
+      const bar = document.getElementById(`${prefix}-bar-${i}`);
+      const val = document.getElementById(`${prefix}-val-${i}`);
+      if (bar) bar.style.width = pct.toFixed(1) + '%';
+      if (val) val.textContent = v.toFixed(3);
+    }
+  }
+
+  // ── Log helper ──
+  const MAX_LOG = 60;
+  let logEntries = [];
+
+  function addLog(msg, cls = 'info') {
+    const ts = new Date().toLocaleTimeString();
+    logEntries.push({ ts, msg, cls });
+    if (logEntries.length > MAX_LOG) logEntries.shift();
+    const box = document.getElementById('log-box');
+    box.innerHTML = logEntries.map(e =>
+      `<div class="entry ${e.cls}">[${e.ts}] ${e.msg}</div>`).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  // ── SSE connection ──
+  const pill = document.getElementById('pill');
+  const pillLabel = document.getElementById('pill-label');
+  let prevR1 = null, prevR2 = null, prevUnity = null;
+
+  function connect() {
+    const es = new EventSource('/status/sse');
+
+    es.onopen = () => {
+      pill.classList.add('live');
+      pillLabel.textContent = 'Live';
+      addLog('SSE stream connected to hub.', 'ok');
+    };
+
+    es.onmessage = (e) => {
+      const d = JSON.parse(e.data);
+
+      // Robots
+      const r1Dot = document.getElementById('r1-dot');
+      const r2Dot = document.getElementById('r2-dot');
+      r1Dot.classList.toggle('on', d.r1Connected);
+      r2Dot.classList.toggle('on', d.r2Connected);
+      document.getElementById('r1-status').textContent = d.r1Status ?? '--';
+      document.getElementById('r2-status').textContent = d.r2Status ?? '--';
+      document.getElementById('r1-temp').textContent = (d.r1RpiTemp ?? '--') + ' C';
+      document.getElementById('r2-temp').textContent = (d.r2RpiTemp ?? '--') + ' C';
+
+      updateJoints('r1-joints', d.r1Joints ?? []);
+      updateJoints('r2-joints', d.r2Joints ?? []);
+
+      // Unity
+      const unityDot = document.getElementById('unity-dot');
+      unityDot.classList.toggle('on', d.unityConnected);
+      document.getElementById('unity-status').textContent = d.unityConnected ? 'ONLINE' : 'OFFLINE';
+      document.getElementById('latency-val').textContent = d.questLatencyMs ?? '--';
+
+      document.getElementById('ts').textContent = new Date().toLocaleTimeString();
+
+      // Log connection changes
+      if (prevR1 !== null && d.r1Connected !== prevR1)
+        addLog(`R1 ROS bridge: ${d.r1Connected ? 'CONNECTED' : 'DISCONNECTED'}`, d.r1Connected ? 'ok' : 'err');
+      if (prevR2 !== null && d.r2Connected !== prevR2)
+        addLog(`R2 ROS bridge: ${d.r2Connected ? 'CONNECTED' : 'DISCONNECTED'}`, d.r2Connected ? 'ok' : 'err');
+      if (prevUnity !== null && d.unityConnected !== prevUnity)
+        addLog(`Unity expert: ${d.unityConnected ? 'CONNECTED' : 'DISCONNECTED'}`, d.unityConnected ? 'ok' : 'warn');
+
+      prevR1 = d.r1Connected;
+      prevR2 = d.r2Connected;
+      prevUnity = d.unityConnected;
+    };
+
+    es.onerror = () => {
+      pill.classList.remove('live');
+      pillLabel.textContent = 'Reconnecting ...';
+      addLog('SSE connection lost. Retrying ...', 'err');
+      es.close();
+      setTimeout(connect, 3000);
+    };
+  }
+
+  connect();
+</script>
+</body>
+</html>
